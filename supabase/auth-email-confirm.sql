@@ -1,0 +1,14 @@
+-- Email confirmation fix — use token_hash links (works on any device, no PKCE cookie required)
+--
+-- 1. Supabase Dashboard → Authentication → URL Configuration:
+--    Site URL: https://spinoracasinos.com
+--    Redirect URLs (add all):
+--      https://spinoracasinos.com/auth/callback
+--      http://localhost:3000/auth/callback
+--
+-- 2. Authentication → Email Templates → Confirm signup:
+--    Paste body from supabase/email-templates/confirm-signup.html
+--    Link must use token_hash (NOT {{ .ConfirmationURL }} alone):
+--    {{ .SiteURL }}/auth/callback?token_hash={{ .TokenHash }}&type=signup&redirect=/dashboard
+--
+-- 3. Authentication → Providers → Email → Enable "Confirm email"

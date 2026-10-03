@@ -1,0 +1,77 @@
+import {
+  Activity,
+  BadgePercent,
+  Banknote,
+  Bot,
+  ChartColumn,
+  Contact2,
+  Crown,
+  FileText,
+  Gamepad2,
+  Gift,
+  History,
+  Inbox,
+  LayoutDashboard,
+  LifeBuoy,
+  Mail,
+  MapPin,
+  Megaphone,
+  MessageSquare,
+  ScrollText,
+  Send,
+  Settings,
+  ShieldAlert,
+  ShieldCheck,
+  Sparkles,
+  Star,
+  Swords,
+  Trophy,
+  UserPlus,
+  Users,
+  Wallet,
+  type LucideIcon,
+} from "lucide-react";
+
+const ADMIN_ICONS: Record<string, LucideIcon> = {
+  Activity,
+  LayoutDashboard,
+  ChartColumn,
+  Users,
+  Contact2,
+  ShieldCheck,
+  ShieldAlert,
+  UserPlus,
+  BadgePercent,
+  Gift,
+  Trophy,
+  Crown,
+  Swords,
+  FileText,
+  Gamepad2,
+  Megaphone,
+  LifeBuoy,
+  MessageSquare,
+  Mail,
+  MapPin,
+  ScrollText,
+  Send,
+  Settings,
+  Sparkles,
+  Inbox,
+  Bot,
+  Banknote,
+  Wallet,
+  History,
+  Star,
+};
+
+export function AdminIcon({
+  name,
+  className,
+}: {
+  name: string;
+  className?: string;
+}) {
+  const Icon = ADMIN_ICONS[name] ?? LayoutDashboard;
+  return <Icon className={className} aria-hidden />;
+}

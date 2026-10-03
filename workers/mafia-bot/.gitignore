@@ -1,0 +1,9 @@
+node_modules/
+.env
+debug/
+chrome-bot-profile/
+probe-*.png
+probe-*.html
+dlg-*.png
+after-editor.png
+*.log

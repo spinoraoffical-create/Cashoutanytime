@@ -1,0 +1,9 @@
+workers/
+.git/
+node_modules/
+*.traineddata
+supabase/.temp/
+scripts/
+.gemini/
+.cursor/
+terminals/

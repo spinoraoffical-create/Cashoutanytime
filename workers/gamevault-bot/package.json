@@ -1,0 +1,23 @@
+{
+  "name": "spinora-gamevault-bot",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "start": "tsx src/index.ts",
+    "run-once": "tsx src/index.ts --once",
+    "probe": "node scripts/probe-panel.mjs",
+    "test-captcha": "tsx scripts/test-captcha-login.mjs",
+    "codegen": "playwright codegen https://agent.gamevault999.com/login"
+  },
+  "dependencies": {
+    "@supabase/supabase-js": "^2.57.4",
+    "dotenv": "^16.4.7",
+    "playwright": "^1.51.0",
+    "tesseract.js": "^6.0.1"
+  },
+  "devDependencies": {
+    "@types/node": "^22",
+    "tsx": "^4.19.3",
+    "typescript": "^5.8.2"
+  }
+}

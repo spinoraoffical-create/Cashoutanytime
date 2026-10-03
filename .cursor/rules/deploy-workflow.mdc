@@ -1,0 +1,53 @@
+---
+description: Git push and Vercel production deploy workflow for Spinora
+alwaysApply: true
+---
+
+# Spinora deploy & push
+
+When the user asks to **deploy**, **push**, **deploy and push**, or similar:
+
+## GitHub (push)
+
+- **Primary remote:** `origin` → `https://github.com/shivoosingh/Spinora.git`
+- **Branch:** `main` (tracks `origin/main`)
+- **Secondary remote:** `vercel` → `https://github.com/shivoosingh/spinoras.git` (Vercel-linked repo; only push here if the user explicitly wants both remotes updated)
+- Git credentials are configured (Windows Credential Manager). `git push` works without `gh` CLI.
+- Follow the user's commit rules: only commit when they ask; never force-push to main.
+
+### Push-only flow
+
+```powershell
+git push origin main
+```
+
+## Vercel (deploy)
+
+- **Project:** `spinoras` (team `darks-projects-0d253498`)
+- **Production URL:** https://spinoracasinos.com
+- **CLI account:** logged in via `npx vercel` (user `dark99hacker-9257`)
+- **Local link:** `.vercel/project.json` (gitignored)
+
+### Deploy-only flow
+
+```powershell
+npm run deploy
+```
+
+Uses `vercel --prod --yes` for production. Preview: `npm run deploy:preview`.
+
+## Deploy and push (full release)
+
+When the user wants both:
+
+1. Ensure changes are committed (commit only if they asked).
+2. `git push origin main`
+3. `npm run deploy`
+
+If Vercel Git auto-deploy is enabled on the connected repo, step 3 may be redundant after push — prefer CLI deploy when the user says "deploy" explicitly.
+
+## Do not
+
+- Push secrets (`.env`, `.env.local`, credentials).
+- Force-push `main` unless explicitly requested.
+- Deploy without the user asking when they only said "push", and vice versa.
