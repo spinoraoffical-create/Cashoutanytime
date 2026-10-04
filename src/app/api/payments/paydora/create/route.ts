@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { createPaydoraDeposit } from "@/lib/payments/paydora";
 import { createClient } from "@/lib/supabase/server";
-import { rateLimit } from "@/lib/rate-limit";
+import { checkRateLimit, rateLimitUserMessage } from "@/lib/rate-limit";
 
 export async function POST(req: Request) {
   try {
@@ -14,9 +14,13 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: "Sign in to deposit." }, { status: 401 });
     }
 
-    const allowed = await rateLimit("paydoraCreate", user.id);
-    if (!allowed) {
-      return NextResponse.json({ error: "Too many deposit requests. Please wait." }, { status: 429 });
+    const limited = await checkRateLimit("paydoraCreate", user.id);
+    if (!limited.allowed) {
+      const unavailable = limited.reason === "unavailable";
+      return NextResponse.json(
+        { error: rateLimitUserMessage(limited) },
+        { status: unavailable ? 503 : 429 }
+      );
     }
 
     const body = await req.json();

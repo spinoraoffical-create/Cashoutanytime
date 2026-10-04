@@ -9,7 +9,7 @@ import {
   getWalletData,
 } from "@/lib/data/dashboard";
 
-export const metadata: Metadata = { title: "My Games | Spinora" };
+export const metadata: Metadata = { title: "My Games | Sweepstakes Hub" };
 
 export const dynamic = "force-dynamic";
 

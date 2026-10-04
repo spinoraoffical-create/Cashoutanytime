@@ -44,7 +44,7 @@ export async function generateMetadata({
   const state = await getGeoState(stateSlug);
   if (!state) return {};
 
-  const title = `Play Sweepstakes Games Online in ${state.name} | Spinora`;
+  const title = `Play Sweepstakes Games Online in ${state.name} | Sweepstakes Hub`;
   return {
     title,
     description: state.metaDescription,

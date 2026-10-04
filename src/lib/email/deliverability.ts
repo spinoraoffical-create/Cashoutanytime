@@ -31,7 +31,7 @@ const SETTINGS_URL = `${SITE_URL}/dashboard/settings`;
 export function promoEmailHeaders(): Record<string, string> {
   return {
     "List-Unsubscribe": `<${SETTINGS_URL}>, <mailto:${PROMO_REPLY_TO}?subject=unsubscribe>`,
-    "X-Entity-Ref-ID": "spinora-promo",
+    "X-Entity-Ref-ID": "sweepstakes-hub-promo",
   };
 }
 

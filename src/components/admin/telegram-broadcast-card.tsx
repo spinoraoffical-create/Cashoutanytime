@@ -316,7 +316,7 @@ export function TelegramBroadcastCard({
                 👑
               </div>
               <div>
-                <span className="text-xs font-bold block">Spinora Royale VIP Channel</span>
+                <span className="text-xs font-bold block">Sweepstakes Hub Channel</span>
                 <span className="text-[10px] text-sky-400 font-mono">Live preview</span>
               </div>
             </div>

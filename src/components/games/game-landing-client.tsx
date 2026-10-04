@@ -436,13 +436,13 @@ export function GameLandingClient({
               <li className="flex gap-3">
                 <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-orange-500/20 text-orange-400 text-xs font-bold">3</span>
                 <span>
-                  Download the app, sign in with your credentials, then use <strong className="text-white">Load</strong> to move Spinora wallet credits into {game.name}.
+                  Download the app, sign in with your credentials, then use <strong className="text-white">Load</strong> to move Sweepstakes Hub wallet credits into {game.name}.
                 </span>
               </li>
               <li className="flex gap-3">
                 <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-orange-500/20 text-orange-400 text-xs font-bold">4</span>
                 <span>
-                  Need more Spinora balance? Use the <strong className="text-white">Deposit</strong> section below for PayPal, Chime, Cash App, Bitcoin, or Venmo.
+                  Need more Sweepstakes Hub balance? Use the <strong className="text-white">Deposit</strong> section below for PayPal, Chime, Cash App, Bitcoin, or Venmo.
                 </span>
               </li>
             </ol>

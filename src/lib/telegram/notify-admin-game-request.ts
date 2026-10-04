@@ -45,7 +45,7 @@ export async function notifyAdminOfGameRequest(input: {
     lines.push(`<b>Notes:</b> ${escapeTelegramHtml(clipped)}`);
   }
 
-  lines.push("", `<a href="${requestsUrl}">Open requests in Spinora</a>`);
+  lines.push("", `<a href="${requestsUrl}">Open requests in Sweepstakes Hub</a>`);
 
   const result = await sendTelegramMessage(lines.join("\n"));
   if (!result.ok && process.env.NODE_ENV === "development") {

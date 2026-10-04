@@ -18,7 +18,7 @@ import {
   profileInitials,
   profileIsBanned,
   profileNum,
-  type SpinoraProfileRow,
+  type ProfileRow,
 } from "@/lib/admin/spinora-profile";
 import { requirePermission, can } from "@/lib/data/admin";
 import type { VipTierKey } from "@/lib/database.types";
@@ -69,7 +69,7 @@ export default async function AdminUserDetailPage({
     .maybeSingle();
 
   if (!profile) notFound();
-  const p = profile as SpinoraProfileRow;
+  const p = profile as ProfileRow;
 
   const { data: authUser } = await db.auth.admin.getUserById(id);
   const email = authUser?.user?.email ?? p.email ?? null;

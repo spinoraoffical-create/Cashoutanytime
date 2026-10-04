@@ -28,12 +28,12 @@ export const NEWSLETTER_PRESETS: NewsletterPreset[] = [
     vibe: "jackpot",
     values: {
       template_id: "welcome-50",
-      subject: "JACKPOT: 50% bonus on your first deposit at Spinora",
+      subject: "JACKPOT: 50% bonus on your first deposit at Sweepstakes Hub",
       eyebrow: "New player exclusive",
       heading: "Double your first deposit — 50% extra credits",
       subhead: "All 12 games. Zero codes. Instant wallet credit.",
       message:
-        "Your welcome bonus is locked and loaded. New Spinora players get <strong>50% extra</strong> on their first deposit — Fire Kirin, Juwa, Game Vault and the full lineup included.<br><br>Fund once, load any game, and you're in the action within minutes.",
+        "Your welcome bonus is locked and loaded. New Sweepstakes Hub players get <strong>50% extra</strong> on their first deposit — Fire Kirin, Juwa, Game Vault and the full lineup included.<br><br>Fund once, load any game, and you're in the action within minutes.",
       cta_label: "Claim 50% bonus",
       cta_href: DEPOSIT,
       stat1_value: "50%",
@@ -79,7 +79,7 @@ export const NEWSLETTER_PRESETS: NewsletterPreset[] = [
       heading: "Happy hour is ON — grab +20% extra",
       subhead: "Every deposit boosted for the next few hours only.",
       message:
-        "Clock's ticking. For a short window, <strong>every Spinora deposit</strong> gets an extra 20% on top of your normal bonus.<br><br>Fire Kirin, Juwa, Orion Stars — load credits now and ride the happy hour wave.",
+        "Clock's ticking. For a short window, <strong>every Sweepstakes Hub deposit</strong> gets an extra 20% on top of your normal bonus.<br><br>Fire Kirin, Juwa, Orion Stars — load credits now and ride the happy hour wave.",
       cta_label: "Grab +20% now",
       cta_href: DEPOSIT,
       stat1_value: "+20%",
@@ -171,7 +171,7 @@ export const NEWSLETTER_PRESETS: NewsletterPreset[] = [
       heading: "Juwa is dominating the floor",
       subhead: "Chain combos. Boss battles. Non-stop action.",
       message:
-        "Juwa is the hottest game on Spinora right now. One-click account setup, instant wallet load, and you're in the middle of the action.<br><br>Your reload bonus applies on every deposit — stack credits and go.",
+        "Juwa is the hottest game on Sweepstakes Hub right now. One-click account setup, instant wallet load, and you're in the middle of the action.<br><br>Your reload bonus applies on every deposit — stack credits and go.",
       cta_label: "Play Juwa now",
       cta_href: GAMES,
       stat1_value: "#1",
@@ -236,7 +236,7 @@ export const NEWSLETTER_PRESETS: NewsletterPreset[] = [
     values: {
       template_id: "custom",
       subject: "",
-      eyebrow: "Spinora exclusive",
+      eyebrow: "Sweepstakes Hub exclusive",
       heading: "",
       subhead: "",
       message: "",

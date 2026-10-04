@@ -17,7 +17,7 @@ export function formatReviewDisplayName(review: ReviewWithAuthor): string {
     return local.charAt(0).toUpperCase() + local.slice(1);
   }
 
-  return "Spinora Player";
+  return "Sweepstakes Hub Player";
 }
 
 export function formatReviewVipTier(review: ReviewWithAuthor): string {

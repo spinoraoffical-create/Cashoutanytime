@@ -61,7 +61,7 @@ export function WelcomePromoModal() {
         </h2>
 
         <p className="text-xs text-muted-foreground mt-2 leading-relaxed">
-          Sign up today on Spinora Royale VIP to unlock your 100% deposit match + daily Wheel of Fortune free spin rewards!
+          Sign up today on Sweepstakes Hub to unlock your 100% deposit match + daily Wheel of Fortune free spin rewards!
         </p>
 
         {/* Promo Code Highlight */}

@@ -14,8 +14,8 @@ export function formatBlogTelegramMessage(
   post: GeneratedBlogPost,
   options?: TelegramBroadcastOptions
 ): string {
-  const header = options?.header || "🔥 <b>SPINORA AI GAMING UPDATE</b> 🔥";
-  const footer = options?.footer || "👉 Join Spinora & Claim Exclusive Bonus Credits! 🚀";
+  const header = options?.header || "🔥 <b>SWEEPSTAKES HUB UPDATE</b> 🔥";
+  const footer = options?.footer || "👉 Join Sweepstakes Hub & Claim Exclusive Bonus Credits! 🚀";
 
   const postLink = `${SITE_URL}/blog/${post.slug}`;
 
@@ -39,7 +39,7 @@ ${postLink}
 
 ${footer}
 
-${keywordsTag} #Spinora #Gaming #OnlineCasino
+${keywordsTag} #SweepstakesHub #Gaming #OnlineCasino
 `.trim();
 }
 
@@ -73,7 +73,7 @@ export async function broadcastPromoToTelegram(
 
 
   const text = `
-🎉 <b>SPECIAL SPINORA PROMOTION</b> 🎉
+🎉 <b>SPECIAL SWEEPSTAKES HUB PROMOTION</b> 🎉
 
 <b>${escapeTelegramHtml(title)}</b>
 
@@ -82,7 +82,7 @@ ${escapeTelegramHtml(description)}
 🎁 <b>Claim Your Bonus Here:</b>
 ${link}
 
-#SpinoraPromos #CasinoBonus #FreeCredits
+#SweepstakesHub #CasinoBonus #FreeCredits
 `.trim();
 
   return await sendTelegramMessage(text, { channel: "promo" });

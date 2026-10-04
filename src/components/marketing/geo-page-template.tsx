@@ -25,12 +25,12 @@ function GeoFaqs({
   const location = cityName ? `${cityName}, ${stateAbbr}` : stateName;
   const faqs = [
     {
-      q: `Is Spinora available in ${location}?`,
-      a: `Yes — Spinora serves players across ${stateName}${cityName ? `, including ${cityName}` : ""}. Our sweepstakes fish table and slot games are playable online from ${location}.`,
+      q: `Is Sweepstakes Hub available in ${location}?`,
+      a: `Yes — Sweepstakes Hub serves players across ${stateName}${cityName ? `, including ${cityName}` : ""}. Our sweepstakes fish table and slot games are playable online from ${location}.`,
     },
     {
       q: `How do I get started from ${location}?`,
-      a: `Create a free Spinora account, deposit via CashApp, Zelle, Bitcoin or USDT, then create a game account and load credits from your wallet.`,
+      a: `Create a free Sweepstakes Hub account, deposit via CashApp, Zelle, Bitcoin or USDT, then create a game account and load credits from your wallet.`,
     },
     {
       q: `How fast is support for ${location} players?`,
@@ -128,7 +128,7 @@ export function GeoPageTemplate({ state, city }: GeoPageTemplateProps) {
 
         <MarketingGameGrid
           title={`Games available in ${locationName}`}
-          lede={`All Spinora games are playable online from ${locationName}. Create your account, deposit, and load credits in minutes.`}
+          lede={`All Sweepstakes Hub games are playable online from ${locationName}. Create your account, deposit, and load credits in minutes.`}
         />
 
         <GeoFaqs stateName={state.name} stateAbbr={state.abbr} cityName={city?.name} />

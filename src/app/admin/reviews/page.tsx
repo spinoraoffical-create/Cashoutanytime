@@ -31,7 +31,7 @@ export default async function AdminReviewsPage() {
     <div className="mx-auto max-w-3xl">
       <AdminPageHeader
         title="Player Reviews"
-        description="Like reviews to feature them on the homepage (Team pick), reply as Spinora Team, or delete spam."
+        description="Like reviews to feature them on the homepage (Team pick), reply as Sweepstakes Hub Team, or delete spam."
       />
 
       <div className="mb-4 flex gap-3 text-sm text-muted-foreground">

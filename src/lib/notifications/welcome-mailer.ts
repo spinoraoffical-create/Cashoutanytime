@@ -24,7 +24,7 @@ export async function sendFreePlayerEmail({ to, subject, html }: EmailOptions): 
         Authorization: `Bearer ${resendApiKey}`,
       },
       body: JSON.stringify({
-        from: "Spinora Royale VIP <onboarding@resend.dev>",
+        from: "Sweepstakes Hub <onboarding@resend.dev>",
         to: [to],
         subject,
         html,
@@ -48,13 +48,13 @@ export function getWelcomeEmailTemplate(playerName: string): string {
   return `
 <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; background-color: #121212; color: #ffffff; padding: 24px; border-radius: 16px; border: 1px solid #eba030;">
   <div style="text-align: center; margin-bottom: 20px;">
-    <h1 style="color: #eba030; margin: 0; font-size: 24px;">👑 SPINORA ROYALE VIP</h1>
+    <h1 style="color: #eba030; margin: 0; font-size: 24px;">👑 SWEEPSTAKES HUB</h1>
     <p style="color: #10b981; font-weight: bold; margin-top: 4px; font-size: 12px; letter-spacing: 2px;">EXCLUSIVE PLAYER WELCOME</p>
   </div>
 
   <p style="font-size: 16px;">Hello <strong>${playerName}</strong>,</p>
   
-  <p>Welcome to <strong>Spinora Royale VIP</strong>! Your new player account has been activated.</p>
+  <p>Welcome to <strong>Sweepstakes Hub</strong>! Your new player account has been activated.</p>
 
   <div style="background-color: #1e1e1e; padding: 16px; border-radius: 12px; margin: 20px 0; border-left: 4px solid #eba030;">
     <h3 style="color: #eba030; margin-top: 0;">🎁 YOUR SIGN-UP BONUS MATCH IS READY</h3>
@@ -68,7 +68,7 @@ export function getWelcomeEmailTemplate(playerName: string): string {
   </div>
 
   <hr style="border: none; border-top: 1px solid #333333; margin: 20px 0;" />
-  <p style="font-size: 12px; color: #888888; text-align: center;">Need help? Contact 24/7 Live Support on your Spinora Dashboard.</p>
+  <p style="font-size: 12px; color: #888888; text-align: center;">Need help? Contact 24/7 Live Support on your Sweepstakes Hub Dashboard.</p>
 </div>
   `.trim();
 }
@@ -82,7 +82,7 @@ export function getDailySpinReminderTemplate(playerName: string): string {
 
   <p style="font-size: 16px;">Hey <strong>${playerName}</strong>,</p>
   
-  <p>Your free 24-hour Wheel of Fortune spin has refreshed on <strong>Spinora Royale VIP</strong>!</p>
+  <p>Your free 24-hour Wheel of Fortune spin has refreshed on <strong>Sweepstakes Hub</strong>!</p>
 
   <div style="text-align: center; margin: 28px 0;">
     <a href="http://localhost:3001/spin" style="background-color: #10b981; color: #000000; text-decoration: none; font-weight: bold; padding: 14px 28px; border-radius: 10px; display: inline-block;">

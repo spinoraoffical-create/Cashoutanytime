@@ -11,7 +11,7 @@ const REVIEW_AUTHOR_SELECT =
   "*, author:profiles!reviews_user_id_fkey(full_name, email, avatar_url, vip_tier)";
 
 const THANK_YOU_CHAT =
-  "Thank you so much for sharing your review! ⭐ Your feedback helps us improve Spinora for everyone. We really appreciate you being part of our community — keep enjoying the games and message us anytime if you need help!";
+  "Thank you so much for sharing your review! ⭐ Your feedback helps us improve Sweepstakes Hub for everyone. We really appreciate you being part of our community — keep enjoying the games and message us anytime if you need help!";
 
 async function sendReviewThankYouMessage(userId: string): Promise<void> {
   const admin = createAdminClient();

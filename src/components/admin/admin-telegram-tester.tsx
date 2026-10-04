@@ -20,7 +20,7 @@ export function AdminTelegramTester() {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          message: "🟢 <b>SPINORA ROYALE VIP BOT TEST</b>\n\nTelegram Bot is successfully connected and broadcasting daily offers!",
+          message: "🟢 <b>SWEEPSTAKES HUB BOT TEST</b>\n\nTelegram Bot is successfully connected and broadcasting daily offers!",
           imageUrl: "http://localhost:3000/images/promos/spinora_dealer_ten.jpg",
           schedule: "now",
         }),

@@ -51,7 +51,7 @@ export async function notifyAdminOfDeposit(input: {
     `<b>Method:</b> ${escapeTelegramHtml(method?.label ?? input.paymentMethod)}`,
     amountLine,
     "",
-    `<a href="${depositsUrl}">Review in Spinora</a>`,
+    `<a href="${depositsUrl}">Review in Sweepstakes Hub</a>`,
   ].filter(Boolean);
 
   const caption = captionLines.join("\n");

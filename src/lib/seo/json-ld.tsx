@@ -77,8 +77,8 @@ export function HomeGamesItemListSchema() {
       data={{
         "@context": "https://schema.org",
         "@type": "ItemList",
-        name: "Spinora Casino & Slot Games",
-        description: "Popular Juwa, Game Vault, fish games, and slot games available on Spinora.",
+        name: "Sweepstakes Hub Casino & Slot Games",
+        description: "Popular Juwa, Game Vault, fish games, and slot games available on Sweepstakes Hub.",
         numberOfItems: games.length,
         itemListElement: games.map((game, index) => ({
           "@type": "ListItem",

@@ -1,3 +1,5 @@
+# Historical Spinora-era notes. Reference only — never apply on a migrated database.
+
 # Spinora Admin Essentials (safe SQL bundle)
 
 **Folder:** `supabase/admin-essentials/`

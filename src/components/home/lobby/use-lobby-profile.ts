@@ -10,6 +10,8 @@ export interface LobbyProfile {
   level: number;
   xp: number;
   vipTier: string;
+  kycStatus: string | null;
+  email: string | null;
 }
 
 export function useLobbyProfile() {
@@ -44,7 +46,7 @@ export function useLobbyProfile() {
 
       const { data } = await supabase
         .from("profiles")
-        .select("full_name, avatar_url, vip_tier, vip_points, level, xp")
+        .select("full_name, avatar_url, vip_tier, vip_points, level, xp, kyc_status, email")
         .eq("id", user.id)
         .single();
 
@@ -58,6 +60,8 @@ export function useLobbyProfile() {
         level: Number(row?.level ?? 1),
         xp: Number(row?.xp ?? row?.vip_points ?? 0),
         vipTier: String(row?.vip_tier ?? "bronze"),
+        kycStatus: (row?.kyc_status as string) || null,
+        email: (row?.email as string) || user.email || null,
       });
       setReady(true);
     }
@@ -92,7 +96,7 @@ export function useLobbyProfile() {
     wallet,
     walletHidden,
     levelProgress,
-    displayName: profile?.name ?? "Spinora VIP",
+    displayName: profile?.name ?? "Sweepstakes Hub VIP",
     balance: wallet?.walletBalance ?? 0,
     fpBalance: wallet?.bonusWallet ?? profile?.xp ?? 0,
   };

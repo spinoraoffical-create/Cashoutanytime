@@ -6,7 +6,7 @@ import {
   refundFailedPaydoraPayout,
 } from "@/lib/payments/paydora-wallet";
 import { createClient } from "@/lib/supabase/server";
-import { rateLimit } from "@/lib/rate-limit";
+import { checkRateLimit, rateLimitUserMessage } from "@/lib/rate-limit";
 
 export async function POST(req: Request) {
   try {
@@ -16,9 +16,13 @@ export async function POST(req: Request) {
     } = await supabase.auth.getUser();
     if (!user) return NextResponse.json({ error: "Authentication required" }, { status: 401 });
 
-    const allowed = await rateLimit("paydoraPayout", user.id);
-    if (!allowed) {
-      return NextResponse.json({ error: "Too many payout requests. Please wait." }, { status: 429 });
+    const limited = await checkRateLimit("paydoraPayout", user.id);
+    if (!limited.allowed) {
+      const unavailable = limited.reason === "unavailable";
+      return NextResponse.json(
+        { error: rateLimitUserMessage(limited) },
+        { status: unavailable ? 503 : 429 }
+      );
     }
 
     const { data: profile } = await supabase

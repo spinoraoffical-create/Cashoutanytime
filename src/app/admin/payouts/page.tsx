@@ -17,7 +17,7 @@ import {
   profileDisplayName,
   profileHandle,
   profileNum,
-  type SpinoraProfileRow,
+  type ProfileRow,
 } from "@/lib/admin/spinora-profile";
 import { requirePermission } from "@/lib/data/admin";
 
@@ -52,7 +52,7 @@ export default async function AdminPayoutsPage() {
       .limit(25),
   ]);
 
-  const players = (owed ?? []) as SpinoraProfileRow[];
+  const players = (owed ?? []) as ProfileRow[];
   const ledger = history ?? [];
 
   const histUserIds = [...new Set(ledger.map((l) => l.user_id))];
@@ -60,7 +60,7 @@ export default async function AdminPayoutsPage() {
     ? await db.from("profiles").select(ADMIN_PROFILE_SELECT).in("id", histUserIds)
     : { data: [] };
   const nameById = new Map(
-    (histProfs ?? []).map((p) => [p.id, profileDisplayName(p as SpinoraProfileRow)])
+    (histProfs ?? []).map((p) => [p.id, profileDisplayName(p as ProfileRow)])
   );
 
   const totalOwed = players.reduce((sum, p) => sum + profileNum(p.cashout_wallet), 0);

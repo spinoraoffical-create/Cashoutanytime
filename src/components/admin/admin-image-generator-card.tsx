@@ -7,7 +7,7 @@ import { GlassCard } from "@/components/shared/glass-card";
 import { toast } from "sonner";
 import { Sparkles, Download, Image as ImageIcon, Wand2, RefreshCw } from "lucide-react";
 
-interface SpinoraPosterPreset {
+interface SitePosterPreset {
   id: string;
   name: string;
   badgeSubtitle: string;
@@ -16,7 +16,7 @@ interface SpinoraPosterPreset {
   glowColor: string;
 }
 
-const SPINORA_POSTER_PRESETS: SpinoraPosterPreset[] = [
+const SITE_POSTER_PRESETS: SitePosterPreset[] = [
   { id: "p10", name: "🃏 $10 Free Play Dealer Special", badgeSubtitle: "YOUR LUCK, YOUR WIN!", offerAmount: "GET $10 FREE PLAY", characterType: "dealer", glowColor: "#00f0ff" },
   { id: "p5", name: "💃 $5 Free Play Glamour Special", badgeSubtitle: "YOUR LUCK, YOUR WIN!", offerAmount: "GET $5 FREE PLAY", characterType: "woman", glowColor: "#ec4899" },
   { id: "p15", name: "🎰 $15 Free Play 777 Jackpot", badgeSubtitle: "YOUR LUCK, YOUR WIN!", offerAmount: "GET $15 FREE PLAY", characterType: "slot777", glowColor: "#f59e0b" },
@@ -26,8 +26,8 @@ const SPINORA_POSTER_PRESETS: SpinoraPosterPreset[] = [
 
 export function AdminImageGeneratorCard() {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
-  const [preset, setPreset] = useState<SpinoraPosterPreset>(SPINORA_POSTER_PRESETS[0]);
-  const [offerText, setOfferText] = useState(SPINORA_POSTER_PRESETS[0].offerAmount);
+  const [preset, setPreset] = useState<SitePosterPreset>(SITE_POSTER_PRESETS[0]);
+  const [offerText, setOfferText] = useState(SITE_POSTER_PRESETS[0].offerAmount);
   const [dateText, setDateText] = useState("");
   const [domainText, setDomainText] = useState("spinoracasinos.com");
 
@@ -46,10 +46,10 @@ export function AdminImageGeneratorCard() {
   }, [preset]);
 
   useEffect(() => {
-    renderOfficialSpinoraPoster();
+    renderOfficialSitePoster();
   }, [preset, offerText, dateText, domainText]);
 
-  function renderOfficialSpinoraPoster() {
+  function renderOfficialSitePoster() {
     const canvas = canvasRef.current;
     if (!canvas) return;
     const ctx = canvas.getContext("2d");
@@ -68,7 +68,7 @@ export function AdminImageGeneratorCard() {
     ctx.fillStyle = bgGrad;
     ctx.fillRect(0, 0, width, height);
 
-    // 2. LARGE BACKGROUND SPINORA LOGO WATERMARK (Signature Brand Feature)
+    // 2. LARGE BACKGROUND LOGO WATERMARK
     ctx.save();
     ctx.globalAlpha = 0.08;
     ctx.strokeStyle = preset.glowColor;
@@ -98,10 +98,10 @@ export function AdminImageGeneratorCard() {
 
     ctx.shadowBlur = 0;
 
-    // 4. Official Multi-Color Spinora Logo Emblem & Spiral at Top
+    // 4. Official Multi-Color Sweepstakes Hub Logo Emblem & Spiral at Top
     ctx.textAlign = "center";
 
-    // Multi-color Spinora Spiral Icon
+    // Multi-color Sweepstakes Hub Spiral Icon
     const spiralGrad = ctx.createConicGradient(0, width / 2, 85);
     spiralGrad.addColorStop(0, "#ff0055");
     spiralGrad.addColorStop(0.33, "#8b5cf6");
@@ -115,7 +115,7 @@ export function AdminImageGeneratorCard() {
 
     ctx.fillStyle = "#ffffff";
     ctx.font = "black 44px Arial, sans-serif";
-    ctx.fillText("Spinora", width / 2, 128);
+    ctx.fillText("Sweepstakes Hub", width / 2, 128);
 
     // Tagline: YOUR LUCK, YOUR WIN!
     ctx.fillStyle = preset.glowColor;
@@ -164,7 +164,7 @@ export function AdminImageGeneratorCard() {
       ctx.fillText("🎁✨💰🎲", width / 2, 475);
     }
 
-    // 7. Spinora Bullet Points Box
+    // 7. Sweepstakes Hub Bullet Points Box
     ctx.fillStyle = "rgba(0, 0, 0, 0.65)";
     ctx.fillRect(80, 635, width - 160, 240);
     ctx.strokeStyle = preset.glowColor;
@@ -221,10 +221,10 @@ export function AdminImageGeneratorCard() {
 
     const dataUrl = canvas.toDataURL("image/png");
     const link = document.createElement("a");
-    link.download = `spinora_brand_poster_${preset.id}_${Date.now()}.png`;
+    link.download = `sweepstakes-hub-poster_${preset.id}_${Date.now()}.png`;
     link.href = dataUrl;
     link.click();
-    toast.success("Downloaded Official Spinora Brand Poster with Logo Background (PNG)!");
+    toast.success("Downloaded Official Sweepstakes Hub Brand Poster with Logo Background (PNG)!");
   }
 
   return (
@@ -233,10 +233,10 @@ export function AdminImageGeneratorCard() {
         <div>
           <h2 className="text-lg font-bold text-foreground flex items-center gap-2">
             <Wand2 className="h-5 w-5 text-amber-400" />
-            Official Spinora Brand Poster Generator (With Logo Background)
+            Official Sweepstakes Hub Brand Poster Generator (With Logo Background)
           </h2>
           <p className="text-xs text-muted-foreground">
-            Generate 100% official Spinora promotional poster images with the signature background Spinora logo watermark and real-time dates.
+            Generate 100% official Sweepstakes Hub promotional poster images with the signature background Sweepstakes Hub logo watermark and real-time dates.
           </p>
         </div>
         <Badge className="bg-amber-500/20 text-amber-400 font-mono shrink-0">LOGO BACKGROUND FORMAT</Badge>
@@ -245,10 +245,10 @@ export function AdminImageGeneratorCard() {
       {/* Official Poster Presets */}
       <div className="mb-6 rounded-xl border border-amber-500/30 bg-amber-500/5 p-4">
         <p className="text-xs font-bold uppercase tracking-wider text-amber-400 mb-2.5 flex items-center gap-1.5">
-          <Sparkles className="h-3.5 w-3.5" /> Select Official Spinora Poster Format
+          <Sparkles className="h-3.5 w-3.5" /> Select Official Sweepstakes Hub Poster Format
         </p>
         <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-5">
-          {SPINORA_POSTER_PRESETS.map((p) => (
+          {SITE_POSTER_PRESETS.map((p) => (
             <button
               key={p.id}
               type="button"
@@ -310,7 +310,7 @@ export function AdminImageGeneratorCard() {
             onClick={handleDownloadPoster}
             className="w-full bg-amber-500 text-black hover:bg-amber-400 font-bold py-5 rounded-xl text-sm gap-2"
           >
-            <Download className="h-4 w-4" /> Download Official Spinora Poster (PNG)
+            <Download className="h-4 w-4" /> Download Official Sweepstakes Hub Poster (PNG)
           </Button>
         </div>
 

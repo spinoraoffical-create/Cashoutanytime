@@ -7,7 +7,7 @@ interface PageSEO {
   keywords: string[];
   path: string;
   ogImage?: string;
-  /** Overrides the default "{title} | Spinora" document title when set */
+  /** Overrides the default "{title} | Sweepstakes Hub" document title when set */
   documentTitle?: string;
 }
 
@@ -58,11 +58,11 @@ export function createMetadata({
 
 export const homeMetadata = createMetadata({
   title: SITE_NAME,
-  documentTitle: "Spinora | Juwa Casino, Slot Games & Fish Games",
+  documentTitle: "Sweepstakes Hub | Juwa Casino, Slot Games & Fish Games",
   description:
-    "Play Juwa casino, Game Vault, Fire Kirin, Panda Master, and top slot games on Spinora. Create your game account in minutes, claim deposit bonuses, earn VIP rewards, and get 24/7 live chat support.",
+    "Play Juwa casino, Game Vault, Fire Kirin, Panda Master, and top slot games on Sweepstakes Hub. Create your game account in minutes, claim deposit bonuses, earn VIP rewards, and get 24/7 live chat support.",
   keywords: [
-    "Spinora",
+    "Sweepstakes Hub",
     "juwa casino",
     "juwa 777",
     "juwa slots",
@@ -85,31 +85,31 @@ export const homeMetadata = createMetadata({
 export const promotionsMetadata = createMetadata({
   title: "Promotions & Bonuses",
   description:
-    "Discover exclusive Spinora promotions, bonuses, and limited-time offers for premium gaming accounts and VIP rewards.",
-  keywords: ["gaming promotions", "casino bonuses", "Spinora deals", "VIP bonuses", "gaming rewards"],
+    "Discover exclusive Sweepstakes Hub promotions, bonuses, and limited-time offers for premium gaming accounts and VIP rewards.",
+  keywords: ["gaming promotions", "casino bonuses", "Sweepstakes Hub deals", "VIP bonuses", "gaming rewards"],
   path: "/promotions",
 });
 
 export const vipMetadata = createMetadata({
   title: "VIP Rewards Program",
   description:
-    "Join the Spinora VIP program. Earn points, unlock Bronze to Platinum tiers, and enjoy exclusive gaming benefits and rewards.",
-  keywords: ["VIP gaming", "loyalty program", "gaming rewards", "Spinora VIP", "premium gaming"],
+    "Join the Sweepstakes Hub VIP program. Earn points, unlock Bronze to Platinum tiers, and enjoy exclusive gaming benefits and rewards.",
+  keywords: ["VIP gaming", "loyalty program", "gaming rewards", "Sweepstakes Hub VIP", "premium gaming"],
   path: "/vip",
 });
 
 export const aboutMetadata = createMetadata({
-  title: "About Spinora",
+  title: "About Sweepstakes Hub",
   description:
-    "Learn about Spinora — the premium gaming support platform trusted by thousands for game accounts, live support, and VIP rewards.",
-  keywords: ["about Spinora", "gaming support platform", "trusted gaming", "game account service"],
+    "Learn about Sweepstakes Hub — the premium gaming support platform trusted by thousands for game accounts, live support, and VIP rewards.",
+  keywords: ["about Sweepstakes Hub", "gaming support platform", "trusted gaming", "game account service"],
   path: "/about",
 });
 
 export const supportMetadata = createMetadata({
-  title: "Support & Help Center",
+  title: "Support | Sweepstakes Hub",
   description:
-    "Get help with Spinora. Contact our 24/7 live chat support team for game accounts, VIP questions, and technical assistance.",
-  keywords: ["gaming support", "live chat help", "Spinora support", "game account help", "customer service"],
+    "Get help with adding money, cash outs, Game Rooms, and your account. Chat with Sweepstakes Hub support.",
+  keywords: ["gaming support", "live chat help", "Sweepstakes Hub support", "game account help", "customer service"],
   path: "/support",
 });

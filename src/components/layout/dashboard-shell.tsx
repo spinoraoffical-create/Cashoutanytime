@@ -16,13 +16,13 @@ export function DashboardShell({ children, sidebar }: DashboardShellProps) {
 
   useEffect(() => {
     if (searchParams.get("verified") === "1") {
-      toast.success("Welcome to Spinora! Your email is verified.");
+      toast.success("Welcome to Sweepstakes Hub! Your email is verified.");
     }
   }, [searchParams]);
 
   return (
     <LobbyAppShell sidebar={sidebar}>
-      <div className="vip-page-content mx-auto w-full max-w-5xl px-3 py-2 sm:px-4 pb-[calc(4.5rem+env(safe-area-inset-bottom))] lg:pb-4">
+      <div className="vip-page-content mx-auto w-full max-w-lg px-1 py-2 lg:max-w-3xl pb-[calc(5rem+env(safe-area-inset-bottom))]">
         {children}
       </div>
     </LobbyAppShell>

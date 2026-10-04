@@ -12,32 +12,32 @@ const BLOG_PRESETS = [
   {
     name: "Juwa 777 Guide",
     topic: "Juwa 777 Download & Free Credits Strategy Guide 2026",
-    keywords: "juwa 777, juwa free credits, juwa login, spinora juwa",
+    keywords: "juwa 777, juwa free credits, juwa login, sweepstakes hub juwa",
   },
   {
     name: "Orion Stars Tips",
     topic: "Orion Stars Online Play & Secret Winning Strategies",
-    keywords: "orion stars, orion stars bonus, fish table tips, spinora gaming",
+    keywords: "orion stars, orion stars bonus, fish table tips, sweepstakes hub gaming",
   },
   {
     name: "Fire Kirin Cashout",
     topic: "Fire Kirin Fast Deposit & Payout Walkthrough",
-    keywords: "fire kirin, fire kirin deposit, fire kirin app, spinora bonus",
+    keywords: "fire kirin, fire kirin deposit, fire kirin app, sweepstakes hub bonus",
   },
   {
     name: "Game Vault VIP",
     topic: "Game Vault VIP Unlock Code & Bonus Rules",
-    keywords: "game vault, game vault 999, game vault login, spinora VIP",
+    keywords: "game vault, game vault 999, game vault login, sweepstakes hub VIP",
   },
   {
     name: "Fish Table Bosses",
     topic: "Top 5 Fish Table Games with Highest Payout Multipliers",
-    keywords: "fish table games, ocean king, fish game strategy, spinora slots",
+    keywords: "fish table games, ocean king, fish game strategy, sweepstakes hub slots",
   },
   {
-    name: "Spinora Cashout",
-    topic: "Spinora Instant Cashout & Daily Wheel Rewards Guide",
-    keywords: "spinora gaming, spinora cashout, spinora bonus wheel, fast payouts",
+    name: "Sweepstakes Hub Cashout",
+    topic: "Sweepstakes Hub Instant Cashout & Daily Wheel Rewards Guide",
+    keywords: "sweepstakes hub gaming, sweepstakes hub cashout, sweepstakes hub bonus wheel, fast payouts",
   },
 ];
 
@@ -139,7 +139,7 @@ export function AIBlogGeneratorCard() {
               type="text"
               value={keywords}
               onChange={(e) => setKeywords(e.target.value)}
-              placeholder="e.g. orion stars, spinora bonus code, fish table tips"
+              placeholder="e.g. orion stars, sweepstakes hub bonus code, fish table tips"
               className="w-full rounded-lg border border-border bg-background/60 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-ws-green"
               disabled={loading}
             />

@@ -24,7 +24,7 @@ export default async function PromotionsPage() {
               Promotions & <span className="gradient-text">Bonuses</span>
             </h1>
             <p className="text-muted-foreground max-w-2xl text-lg">
-              Live offers from Spinora — updated from the admin panel.
+              Live offers from Sweepstakes Hub — updated from the admin panel.
             </p>
           </div>
 

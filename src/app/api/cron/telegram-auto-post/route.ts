@@ -44,11 +44,11 @@ async function handleCron(request: Request) {
         content: latestPost.content,
         seo_title: latestPost.seo_title || latestPost.title,
         seo_description: latestPost.seo_description || latestPost.title,
-        seo_keywords: latestPost.tags?.length ? latestPost.tags : ["spinora"],
+        seo_keywords: latestPost.tags?.length ? latestPost.tags : ["sweepstakes hub"],
         cover_image: latestPost.cover_image_url || "",
         reading_time_minutes: 4,
         category: "Gaming",
-        tags: latestPost.tags || ["Spinora"],
+        tags: latestPost.tags || ["Sweepstakes Hub"],
       },
       {
         header: telegramSettings.template_header,

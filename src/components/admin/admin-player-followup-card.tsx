@@ -9,13 +9,13 @@ import { Mail, MessageCircle, Send, CheckCircle2, Zap, Smartphone } from "lucide
 
 export function AdminPlayerFollowupCard() {
   const [template, setTemplate] = useState<"welcome" | "spin_reminder" | "weekend_bonus">("welcome");
-  const [customSubject, setCustomSubject] = useState("👑 Welcome to Spinora Royale VIP — Claim Your $100 Bonus!");
+  const [customSubject, setCustomSubject] = useState("👑 Welcome to Sweepstakes Hub — Claim Your $100 Bonus!");
   const [sending, setSending] = useState(false);
 
   function handleTemplateChange(type: "welcome" | "spin_reminder" | "weekend_bonus") {
     setTemplate(type);
     if (type === "welcome") {
-      setCustomSubject("👑 Welcome to Spinora Royale VIP — Claim Your $100 Bonus!");
+      setCustomSubject("👑 Welcome to Sweepstakes Hub — Claim Your $100 Bonus!");
     } else if (type === "spin_reminder") {
       setCustomSubject("🎡 Your Free Daily Wheel Spin is Ready!");
     } else {
@@ -35,7 +35,7 @@ export function AdminPlayerFollowupCard() {
 
   function handleCopyWhatsAppLink() {
     const text = encodeURIComponent(
-      "👑 *SPINORA ROYALE VIP*: Your $100 Sign-Up Bonus Match is ready! Spin the daily bonus wheel free now: http://localhost:3001/dashboard"
+      "👑 *Sweepstakes Hub*: Your $100 Sign-Up Bonus Match is ready! Spin the daily bonus wheel free now: http://localhost:3001/dashboard"
     );
     const whatsappUrl = `https://wa.me/?text=${text}`;
     window.open(whatsappUrl, "_blank");

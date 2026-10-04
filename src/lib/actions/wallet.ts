@@ -1,5 +1,7 @@
 "use server";
 
+/** No non-atomic wallet writes. Use credit_wallet / debit_wallet / reset_wallet RPCs only. */
+
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import { createNotification } from "@/lib/actions/notifications";
@@ -84,7 +86,7 @@ export async function creditUserWallet(
 
   if (error) {
     if (error.message.includes("credit_wallet") || error.message.includes("wallet_balance")) {
-      return { error: "Wallet not set up. Run supabase/wallets.sql in Supabase." };
+      return { error: "Wallet RPC unavailable — database setup incomplete" };
     }
     return { error: error.message };
   }
@@ -429,7 +431,7 @@ export async function adminDeductWallet(
 
   if (error) {
     if (error.message.includes("debit_wallet")) {
-      return { error: "Run supabase/wallet-debit-reset.sql in Supabase." };
+      return { error: "Wallet RPC unavailable — database setup incomplete" };
     }
     return { error: error.message };
   }
@@ -454,7 +456,7 @@ export async function adminResetWallet(
 
   if (error) {
     if (error.message.includes("reset_wallet")) {
-      return { error: "Run supabase/wallet-debit-reset.sql in Supabase." };
+      return { error: "Wallet RPC unavailable — database setup incomplete" };
     }
     return { error: error.message };
   }

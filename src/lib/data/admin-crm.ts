@@ -4,7 +4,7 @@ import { unstable_cache } from "next/cache";
 
 import {
   ADMIN_PROFILE_SELECT,
-  type SpinoraProfileRow,
+  type ProfileRow,
 } from "@/lib/admin/spinora-profile";
 import { adminDb } from "@/lib/actions/admin/core";
 
@@ -20,7 +20,7 @@ export type CrmOverviewStats = {
 };
 
 export type CrmPlayerRow = {
-  profile: SpinoraProfileRow;
+  profile: ProfileRow;
   vip: { name: string; color: string } | null;
   deposits: { fulfilledCount: number; totalDeposited: number } | null;
 };
@@ -141,7 +141,7 @@ export async function getCrmPlayersPage(
   else if (segment === "banned") profileQuery = profileQuery.eq("is_suspended", true);
 
   const { data: profilesRaw, count: segmentCount } = await profileQuery.range(from, to);
-  const profiles = (profilesRaw ?? []) as SpinoraProfileRow[];
+  const profiles = (profilesRaw ?? []) as ProfileRow[];
   const total = segmentCount ?? 0;
   const totalPages = Math.max(1, Math.ceil(total / CRM_PAGE_SIZE));
   const profileIds = profiles.map((p) => p.id!).filter(Boolean);

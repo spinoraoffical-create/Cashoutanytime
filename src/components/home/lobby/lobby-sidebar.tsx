@@ -66,7 +66,7 @@ interface LobbySidebarProps {
 export function LobbySidebar({ activeMenu, onMenuChange, className }: LobbySidebarProps) {
   const { profile, levelProgress } = useLobbyProfile();
   const level = profile?.level ?? 28;
-  const displayName = "Spinora VIP";
+  const displayName = "Sweepstakes Hub VIP";
 
   return (
     <aside className={cn("lobby-sidebar flex flex-col h-full py-3 px-2.5", className)}>

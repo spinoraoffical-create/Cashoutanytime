@@ -144,7 +144,7 @@ function QuickChatPanel({
           <Headphones className="h-4 w-4 text-white" />
         </div>
         <div className="flex-1 min-w-0">
-          <p className="text-sm font-semibold text-white truncate">Spinora Support</p>
+          <p className="text-sm font-semibold text-white truncate">Sweepstakes Hub Support</p>
           <p className="text-[10px] text-emerald-300">Live chat</p>
         </div>
         <Link

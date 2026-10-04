@@ -15,7 +15,7 @@ const PLATFORM_KNOWLEDGE = [
   {
     keywords: ["juwa", "juwa777", "juwa download", "juwa account"],
     answer:
-      "🎮 <b>Juwa 777 Game Guide:</b>\nYou can request a Juwa account directly from your Spinora Dashboard under 'Game Requests'. Deposits are processed instantly via USDT, Chime, PayPal, or Cash App!",
+      "🎮 <b>Juwa 777 Game Guide:</b>\nYou can request a Juwa account directly from your Sweepstakes Hub Dashboard under 'Game Requests'. Deposits are processed instantly via USDT, Chime, PayPal, or Cash App!",
     confidence: 0.95,
   },
   {
@@ -27,7 +27,7 @@ const PLATFORM_KNOWLEDGE = [
   {
     keywords: ["orion stars", "orionstars"],
     answer:
-      "✨ <b>Orion Stars Guide:</b>\nOrion Stars features premium reel slots and sweepstakes games. Submit a request on Spinora and our automated bot will issue your credentials within minutes!",
+      "✨ <b>Orion Stars Guide:</b>\nOrion Stars features premium reel slots and sweepstakes games. Submit a request on Sweepstakes Hub and our automated bot will issue your credentials within minutes!",
     confidence: 0.95,
   },
   {
@@ -57,7 +57,7 @@ const PLATFORM_KNOWLEDGE = [
   {
     keywords: ["agent", "human", "support", "help", "admin", "ticket"],
     answer:
-      "🙋 <b>Connecting with Support:</b>\nI am escalating your conversation to a live Spinora Customer Support agent right now. A member of our team will reply here shortly!",
+      "🙋 <b>Connecting with Support:</b>\nI am escalating your conversation to a live Sweepstakes Hub Customer Support agent right now. A member of our team will reply here shortly!",
     confidence: 0.5,
   },
 ];

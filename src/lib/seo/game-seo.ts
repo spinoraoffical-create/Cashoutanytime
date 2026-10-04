@@ -56,7 +56,7 @@ export function getGameSeoDescription(game: Game): string {
 }
 
 export function getGameSeoKeywords(game: Game): string[] {
-  const base = [game.name, game.provider, game.category, "download", "game account", "Spinora"];
+  const base = [game.name, game.provider, game.category, "download", "game account", "Sweepstakes Hub"];
   const slugSpecific = GAME_KEYWORDS[game.slug] ?? [];
   const category = CATEGORY_KEYWORDS[game.category] ?? [];
   return [...new Set([...base, ...slugSpecific, ...category])];

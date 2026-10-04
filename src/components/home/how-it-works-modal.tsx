@@ -14,7 +14,7 @@ export function HowItWorksGuide() {
           ⚡ Quick Start Guide
         </span>
         <h2 className="text-2xl md:text-3xl font-black text-foreground mt-3">
-          How Spinora Royale VIP Works in 3 Easy Steps
+          How Sweepstakes Hub Works in 3 Easy Steps
         </h2>
         <p className="text-sm text-muted-foreground mt-2">
           Get your game account credentials and start playing Juwa, Game Vault, and Fire Kirin in under 2 minutes.
@@ -32,7 +32,7 @@ export function HowItWorksGuide() {
           </div>
           <h3 className="text-base font-bold text-foreground">Create Free Account</h3>
           <p className="text-xs text-muted-foreground mt-1.5 leading-relaxed">
-            Sign up on Spinora in 30 seconds with your email and phone number. Claim your $100 Sign-Up Bonus Match.
+            Sign up on Sweepstakes Hub in 30 seconds with your email and phone number. Claim your $100 Sign-Up Bonus Match.
           </p>
         </div>
 

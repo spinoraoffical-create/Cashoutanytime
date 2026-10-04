@@ -82,7 +82,7 @@ export async function getUserConversations(): Promise<ConversationPreview[]> {
 
     return {
       id: conv.id,
-      title: "Spinora Support",
+      title: "Sweepstakes Hub Support",
       subtitle: adminName,
       lastMessage: last ? messagePreview(last) : "Start a conversation with our team",
       lastMessageAt: last?.created_at ?? conv.updated_at,
@@ -283,7 +283,7 @@ export async function initUserMessagesInbox(): Promise<{
       : [
           {
             id: conversation.id,
-            title: "Spinora Support",
+            title: "Sweepstakes Hub Support",
             subtitle: "Support team",
             lastMessage: "Start a conversation with our team",
             lastMessageAt: conversation.updated_at,

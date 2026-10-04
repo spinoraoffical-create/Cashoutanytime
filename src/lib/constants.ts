@@ -1,4 +1,4 @@
-export const SITE_NAME = "Spinora";
+export const SITE_NAME = "Sweepstakes Hub";
 
 /** Daily spin wheel is live (win rates capped server-side in prize-engine). */
 export const DAILY_SPIN_ENABLED = true;
@@ -20,7 +20,7 @@ export const FREEPLAY_RULES = {
 export const REFERRAL_REWARD_POINTS = 10;
 export const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL || "https://spinoracasinos.com";
 export const SITE_DESCRIPTION =
-  "Spinora is your hub for Juwa casino, Game Vault, slot games, and fish games. Create game accounts fast, claim bonuses, earn VIP rewards, and get 24/7 live support.";
+  "Sweepstakes Hub for Juwa, Game Vault, slot games, and fish games. Create game accounts fast, claim bonuses, earn VIP rewards, and get 24/7 live support.";
 
 export const VIP_TIERS = [
   {
@@ -77,7 +77,7 @@ export const PUBLIC_ROUTES = [
   { path: "/register", priority: 0.5 },
 ] as const;
 
-/** Official Spinora social profile URLs — used in footer, tasks, and share buttons */
+/** Official Sweepstakes Hub social profile URLs — used in footer, tasks, and share buttons */
 export const SOCIAL_LINKS = {
   telegram:
     process.env.NEXT_PUBLIC_TELEGRAM_URL ||

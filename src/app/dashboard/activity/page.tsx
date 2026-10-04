@@ -1,157 +1,119 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { format } from "date-fns";
-import {
-  Award,
-  Coins,
-  Gift,
-  History,
-  Sparkles,
-  TrendingUp,
-  UserPlus,
-} from "lucide-react";
+import { History } from "lucide-react";
 
-import { EmptyState } from "@/components/shared/empty-state";
-import { GlassCard } from "@/components/shared/glass-card";
 import { Button } from "@/components/ui/button";
 import { requireUser } from "@/lib/data/dashboard";
 import { cn } from "@/lib/utils";
+import {
+  formatTransactionAmount,
+  transactionSummary,
+  type WalletTransactionRow,
+} from "@/lib/wallet/transaction-display";
 
-export const metadata: Metadata = { title: "Activity | Spinora" };
+export const metadata: Metadata = { title: "Activity | Sweepstakes Hub" };
 
-const PAGE_SIZE = 25;
+type Filter = "all" | "deposits" | "cashouts" | "bonuses";
 
-const ACTION_ICON: Record<string, typeof Gift> = {
-  reward_claimed: Gift,
-  promotion_claimed: Sparkles,
-  achievement_unlocked: Award,
-  referral_rewarded: UserPlus,
-  level_up: TrendingUp,
-};
+function bucket(tx: WalletTransactionRow): Filter {
+  if (tx.source === "deposit") return "deposits";
+  if (tx.source === "game_redeem" || tx.wallet_type === "cashout") return "cashouts";
+  if (
+    tx.wallet_type === "bonus" ||
+    tx.wallet_type === "bonus_redeem" ||
+    tx.source === "spin" ||
+    tx.source === "daily_task"
+  ) {
+    return "bonuses";
+  }
+  return "all";
+}
 
-const ACTION_ACCENT: Record<string, string> = {
-  reward_claimed: "text-ws-gold bg-ws-gold/10",
-  promotion_claimed: "text-ws-purple bg-ws-purple/10",
-  achievement_unlocked: "text-ws-cyan bg-ws-cyan/10",
-  referral_rewarded: "text-ws-emerald bg-ws-emerald/10",
-  level_up: "text-ws-gold bg-ws-gold/10",
-};
+const FILTERS: { id: Filter; label: string }[] = [
+  { id: "all", label: "All" },
+  { id: "deposits", label: "Deposits" },
+  { id: "cashouts", label: "Cash outs" },
+  { id: "bonuses", label: "Bonuses" },
+];
 
 export default async function ActivityPage({
   searchParams,
 }: {
-  searchParams: Promise<{ page?: string }>;
+  searchParams: Promise<{ filter?: string }>;
 }) {
   const { supabase, user } = await requireUser();
   const params = await searchParams;
-  const page = Math.max(1, Number(params.page) || 1);
-  const from = (page - 1) * PAGE_SIZE;
-  const to = from + PAGE_SIZE - 1;
+  const filter = (FILTERS.some((f) => f.id === params.filter) ? params.filter : "all") as Filter;
 
-  const { data, count } = await supabase
-    .from("activity_log")
-    .select("id, action, description, metadata, created_at", { count: "exact" })
+  const { data } = await supabase
+    .from("wallet_transactions")
+    .select("id, amount, wallet_type, transaction_type, source, description, created_at")
     .eq("user_id", user.id)
     .order("created_at", { ascending: false })
-    .range(from, to);
+    .limit(80);
 
-  const items = data ?? [];
-  const total = count ?? 0;
-  const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE));
+  const rows = (data ?? []) as WalletTransactionRow[];
+  const items = filter === "all" ? rows : rows.filter((tx) => bucket(tx) === filter);
 
   return (
-    <div className="mx-auto max-w-3xl space-y-6">
+    <div className="mx-auto max-w-lg space-y-5">
       <div>
-        <h1 className="text-2xl sm:text-3xl">Activity History</h1>
+        <h1 className="text-3xl font-extrabold">Activity</h1>
         <p className="mt-1 text-sm text-muted-foreground">
-          A full ledger of your claims, unlocks, referrals and level-ups.
+          Deposits, cash outs, game transfers, and rewards in one history.
         </p>
       </div>
 
-      {items.length === 0 ? (
-        <EmptyState
-          icon={<History />}
-          title="No activity yet"
-          description="Claim your daily reward to start your history."
-          action={
-            <Button asChild>
-              <Link href="/dashboard/rewards">Go to Rewards</Link>
-            </Button>
-          }
-        />
-      ) : (
-        <>
-          <GlassCard className="overflow-hidden">
-            <ul className="divide-y divide-foreground/8">
-              {items.map((item) => {
-                const Icon = ACTION_ICON[item.action] ?? Coins;
-                const accent =
-                  ACTION_ACCENT[item.action] ?? "text-muted-foreground bg-foreground/5";
-                const meta = (item.metadata ?? {}) as Record<string, unknown>;
-                const coins = Number(meta.coins ?? 0);
-                const xp = Number(meta.xp ?? 0);
-                return (
-                  <li key={item.id} className="flex items-center gap-4 p-4">
-                    <span
-                      className={cn(
-                        "flex size-10 shrink-0 items-center justify-center rounded-xl",
-                        accent
-                      )}
-                    >
-                      <Icon className="size-5" aria-hidden />
-                    </span>
-                    <div className="min-w-0 flex-1">
-                      <p className="truncate text-sm font-medium">{item.description}</p>
-                      <time dateTime={item.created_at} className="text-xs text-muted-foreground">
-                        {format(new Date(item.created_at), "MMM d, yyyy · HH:mm")}
-                      </time>
-                    </div>
-                    {(coins > 0 || xp > 0) && (
-                      <div className="shrink-0 text-right">
-                        {coins > 0 && (
-                          <p className="tnum text-sm font-semibold text-ws-gold">
-                            +{coins.toLocaleString()}
-                          </p>
-                        )}
-                        {xp > 0 && (
-                          <p className="tnum text-xs font-medium text-ws-cyan">
-                            +{xp.toLocaleString()} XP
-                          </p>
-                        )}
-                      </div>
-                    )}
-                  </li>
-                );
-              })}
-            </ul>
-          </GlassCard>
+      <div className="flex gap-2 overflow-x-auto scrollbar-hide">
+        {FILTERS.map((f) => (
+          <Link
+            key={f.id}
+            href={f.id === "all" ? "/dashboard/activity" : `/dashboard/activity?filter=${f.id}`}
+            className={cn(
+              "rounded-full px-4 py-1.5 text-sm font-semibold whitespace-nowrap",
+              filter === f.id ? "bg-primary text-white" : "bg-white/8 text-muted-foreground"
+            )}
+          >
+            {f.label}
+          </Link>
+        ))}
+      </div>
 
-          {totalPages > 1 && (
-            <div className="flex items-center justify-between">
-              <Button
-                asChild
-                variant="outline"
-                size="sm"
-                disabled={page <= 1}
-                className={cn(page <= 1 && "pointer-events-none opacity-50")}
-              >
-                <Link href={`/dashboard/activity?page=${page - 1}`}>Previous</Link>
-              </Button>
-              <p className="tnum text-sm text-muted-foreground">
-                Page {page} of {totalPages}
-              </p>
-              <Button
-                asChild
-                variant="outline"
-                size="sm"
-                disabled={page >= totalPages}
-                className={cn(page >= totalPages && "pointer-events-none opacity-50")}
-              >
-                <Link href={`/dashboard/activity?page=${page + 1}`}>Next</Link>
-              </Button>
-            </div>
-          )}
-        </>
+      {items.length === 0 ? (
+        <div className="hub-card flex flex-col items-center gap-2 rounded-[24px] py-14 text-center">
+          <History className="h-10 w-10 text-foreground/15" />
+          <p className="font-semibold">No transactions yet</p>
+          <p className="max-w-xs text-sm text-muted-foreground">
+            Add money or load a Game Room — receipts show up here.
+          </p>
+          <Button asChild className="mt-2 rounded-full">
+            <Link href="/dashboard/deposit">Add money</Link>
+          </Button>
+        </div>
+      ) : (
+        <ul className="hub-card divide-y divide-white/5 rounded-[24px] px-4">
+          {items.map((tx) => {
+            const credit = tx.transaction_type !== "debit";
+            return (
+              <li key={tx.id} className="flex items-center gap-3 py-3.5">
+                <div className="min-w-0 flex-1">
+                  <p className="truncate text-sm font-medium">{transactionSummary(tx)}</p>
+                  <p className="text-xs text-muted-foreground">
+                    {new Date(tx.created_at).toLocaleString("en-US", {
+                      month: "short",
+                      day: "numeric",
+                      hour: "numeric",
+                      minute: "2-digit",
+                    })}
+                  </p>
+                </div>
+                <p className={cn("tnum text-sm font-bold", credit && "text-emerald-400")}>
+                  {formatTransactionAmount(tx.amount, tx.transaction_type)}
+                </p>
+              </li>
+            );
+          })}
+        </ul>
       )}
     </div>
   );

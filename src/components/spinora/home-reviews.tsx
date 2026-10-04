@@ -19,7 +19,7 @@ export function HomeReviews({ reviews }: { reviews: ReviewWithAuthor[] }) {
           Trusted by thousands of players
         </h2>
         <p className="mt-2 max-w-2xl text-sm text-muted-foreground sm:text-base">
-          Real feedback from Spinora members on instant accounts, fast cash-outs and our support.
+          Real feedback from Sweepstakes Hub members on instant accounts, fast cash-outs and our support.
         </p>
       </div>
 
@@ -52,7 +52,7 @@ export function HomeReviews({ reviews }: { reviews: ReviewWithAuthor[] }) {
             </blockquote>
             {review.admin_comment && (
               <p className="mt-3 border-l-2 border-orange-500/40 pl-3 text-xs leading-relaxed text-orange-200/80">
-                <span className="font-semibold text-orange-300">Spinora Team: </span>
+                <span className="font-semibold text-orange-300">Sweepstakes Hub Team: </span>
                 {review.admin_comment}
               </p>
             )}

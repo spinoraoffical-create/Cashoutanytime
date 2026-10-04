@@ -113,7 +113,7 @@ export function ReviewForm({ existingReview }: ReviewFormProps) {
           id="review-comment"
           value={comment}
           onChange={(e) => setComment(e.target.value)}
-          placeholder="Tell us about your experience with Spinora — support, games, VIP rewards..."
+          placeholder="Tell us about your experience with Sweepstakes Hub — support, games, VIP rewards..."
           rows={4}
           required
           minLength={3}

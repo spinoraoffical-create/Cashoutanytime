@@ -32,7 +32,7 @@ export function campaignToSimpleForm(c?: NewsletterCampaign): SimpleNewsletterIn
     vibe: "gold",
     name: c.name ?? "",
     subject: c.subject ?? "",
-    eyebrow: c.eyebrow ?? "Spinora",
+    eyebrow: c.eyebrow ?? "Sweepstakes Hub",
     heading: c.heading ?? "",
     subhead: c.subhead ?? "",
     message: (c.body ?? "").replace(/<br\s*\/?>/gi, "\n"),
@@ -56,7 +56,7 @@ export function simpleFormToCampaignPayload(v: SimpleNewsletterInput) {
   return {
     name: v.name.trim() || subject,
     subject,
-    eyebrow: v.eyebrow.trim() || "Spinora",
+    eyebrow: v.eyebrow.trim() || "Sweepstakes Hub",
     heading,
     subhead: v.subhead.trim(),
     body: message.replace(/\n/g, "<br>"),

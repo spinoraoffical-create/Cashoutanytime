@@ -5,8 +5,8 @@ import { VipPageLayout } from "@/components/layout/vip-page-layout";
 import { Breadcrumbs } from "@/components/seo/breadcrumbs";
 
 export const metadata: Metadata = {
-  title: "Privacy Policy | Spinora",
-  description: "How Spinora collects, uses, and protects your information.",
+  title: "Privacy Policy | Sweepstakes Hub",
+  description: "How Sweepstakes Hub collects, uses, and protects your information.",
   alternates: { canonical: "/privacy" },
 };
 

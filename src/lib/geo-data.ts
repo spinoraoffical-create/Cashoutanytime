@@ -17,13 +17,13 @@ export interface StateData {
 export const GEO_STATES: Record<string, StateData> = {
   texas: {
     name: "Texas", abbr: "TX", slug: "texas",
-    heroLede: "Spinora is available to players across Texas — Houston, Dallas, San Antonio, Austin, Fort Worth, El Paso and more.",
+    heroLede: "Sweepstakes Hub is available to players across Texas — Houston, Dallas, San Antonio, Austin, Fort Worth, El Paso and more.",
     metaDescription: "Play Fire Kirin, Juwa, Orion Stars, Game Vault and sweepstakes fish table games online in Texas. 50% welcome bonus.",
     cities: [
       { name: "Houston", slug: "houston", descriptionSnippet: "Houston's most popular sweepstakes fish table platform" },
       { name: "Dallas", slug: "dallas", descriptionSnippet: "Dallas players enjoy Fire Kirin, Juwa and 10 more games" },
       { name: "San Antonio", slug: "san-antonio", descriptionSnippet: "San Antonio sweepstakes gaming — account ready instantly" },
-      { name: "Austin", slug: "austin", descriptionSnippet: "Austin players can access all 12 Spinora games" },
+      { name: "Austin", slug: "austin", descriptionSnippet: "Austin players can access all 12 Sweepstakes Hub games" },
       { name: "Fort Worth", slug: "fort-worth", descriptionSnippet: "Fort Worth online fish table games" },
       { name: "El Paso", slug: "el-paso", descriptionSnippet: "El Paso online sweepstakes games" },
       { name: "Arlington", slug: "arlington", descriptionSnippet: "Arlington TX sweepstakes slots" },
@@ -32,7 +32,7 @@ export const GEO_STATES: Record<string, StateData> = {
   },
   florida: {
     name: "Florida", abbr: "FL", slug: "florida",
-    heroLede: "Spinora serves players across Florida — Miami, Orlando, Jacksonville, Tampa, Fort Lauderdale, St Petersburg and beyond.",
+    heroLede: "Sweepstakes Hub serves players across Florida — Miami, Orlando, Jacksonville, Tampa, Fort Lauderdale, St Petersburg and beyond.",
     metaDescription: "Play Fire Kirin, Juwa, Orion Stars and sweepstakes games online in Florida. 50% welcome bonus.",
     cities: [
       { name: "Miami", slug: "miami", descriptionSnippet: "Miami players get 50% bonus on their first deposit" },
@@ -45,7 +45,7 @@ export const GEO_STATES: Record<string, StateData> = {
   },
   california: {
     name: "California", abbr: "CA", slug: "california",
-    heroLede: "Spinora serves players across California — Los Angeles, San Diego, San Francisco, Sacramento, San Jose, Fresno.",
+    heroLede: "Sweepstakes Hub serves players across California — Los Angeles, San Diego, San Francisco, Sacramento, San Jose, Fresno.",
     metaDescription: "Play Fire Kirin, Juwa, Orion Stars and sweepstakes games online in California. 50% welcome bonus.",
     cities: [
       { name: "Los Angeles", slug: "los-angeles", descriptionSnippet: "LA players get Fire Kirin, Juwa and 10 more games online" },
@@ -53,12 +53,12 @@ export const GEO_STATES: Record<string, StateData> = {
       { name: "San Francisco", slug: "san-francisco", descriptionSnippet: "San Francisco online fish table games" },
       { name: "Sacramento", slug: "sacramento", descriptionSnippet: "Sacramento online fish table games" },
       { name: "San Jose", slug: "san-jose", descriptionSnippet: "San Jose sweepstakes games" },
-      { name: "Fresno", slug: "fresno", descriptionSnippet: "Fresno players access all 12 Spinora sweepstakes games" },
+      { name: "Fresno", slug: "fresno", descriptionSnippet: "Fresno players access all 12 Sweepstakes Hub sweepstakes games" },
     ],
   },
   georgia: {
     name: "Georgia", abbr: "GA", slug: "georgia",
-    heroLede: "Spinora is available to players across Georgia including Atlanta, Augusta, Savannah, Columbus, Macon, Athens.",
+    heroLede: "Sweepstakes Hub is available to players across Georgia including Atlanta, Augusta, Savannah, Columbus, Macon, Athens.",
     metaDescription: "Play Fire Kirin, Juwa, Orion Stars and sweepstakes games online in Georgia. 50% welcome bonus.",
     cities: [
       { name: "Atlanta", slug: "atlanta", descriptionSnippet: "Atlanta's #1 sweepstakes fish table gaming platform" },
@@ -71,7 +71,7 @@ export const GEO_STATES: Record<string, StateData> = {
   },
   "north-carolina": {
     name: "North Carolina", abbr: "NC", slug: "north-carolina",
-    heroLede: "Spinora is available to players across North Carolina including Charlotte, Raleigh, Greensboro, Durham, Fayetteville.",
+    heroLede: "Sweepstakes Hub is available to players across North Carolina including Charlotte, Raleigh, Greensboro, Durham, Fayetteville.",
     metaDescription: "Play Fire Kirin, Juwa, Orion Stars and sweepstakes games online in North Carolina.",
     cities: [
       { name: "Charlotte", slug: "charlotte", descriptionSnippet: "Charlotte's leading online sweepstakes fish table platform" },
@@ -83,12 +83,12 @@ export const GEO_STATES: Record<string, StateData> = {
   },
   ohio: {
     name: "Ohio", abbr: "OH", slug: "ohio",
-    heroLede: "Spinora serves players across Ohio — Columbus, Cleveland, Cincinnati, Toledo, Akron, Dayton.",
+    heroLede: "Sweepstakes Hub serves players across Ohio — Columbus, Cleveland, Cincinnati, Toledo, Akron, Dayton.",
     metaDescription: "Play Fire Kirin, Juwa, Orion Stars and sweepstakes games online in Ohio.",
     cities: [
       { name: "Columbus", slug: "columbus-oh", descriptionSnippet: "Columbus OH sweepstakes gaming" },
       { name: "Cleveland", slug: "cleveland", descriptionSnippet: "Cleveland online fish table games" },
-      { name: "Cincinnati", slug: "cincinnati", descriptionSnippet: "Cincinnati players access all 12 Spinora games online" },
+      { name: "Cincinnati", slug: "cincinnati", descriptionSnippet: "Cincinnati players access all 12 Sweepstakes Hub games online" },
       { name: "Toledo", slug: "toledo", descriptionSnippet: "Toledo OH sweepstakes" },
       { name: "Akron", slug: "akron", descriptionSnippet: "Akron OH slots" },
       { name: "Dayton", slug: "dayton", descriptionSnippet: "Dayton OH games" },

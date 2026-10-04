@@ -22,7 +22,7 @@ function displayName(review: ReviewWithAuthor) {
   if (email && !email.endsWith("@phone.spinora.local")) {
     return email.split("@")[0];
   }
-  return "Spinora Player";
+  return "Sweepstakes Hub Player";
 }
 
 interface ReviewCardProps {
@@ -121,7 +121,7 @@ export function ReviewCard({ review, isAdmin, isOwn }: ReviewCardProps) {
         <div className="mt-4 rounded-lg border border-orange-500/20 bg-orange-500/5 p-3 sm:p-4">
           <div className="flex items-center gap-2 mb-2">
             <Shield className="h-4 w-4 text-orange-400 shrink-0" />
-            <p className="text-xs font-semibold text-orange-300">Spinora Team</p>
+            <p className="text-xs font-semibold text-orange-300">Sweepstakes Hub Team</p>
             {review.admin_commented_at && (
               <span className="text-[10px] text-muted-foreground">
                 · {formatRelativeTime(review.admin_commented_at)}

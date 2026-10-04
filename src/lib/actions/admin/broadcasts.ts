@@ -8,7 +8,7 @@ import {
   authorize,
   writeAudit,
 } from "@/lib/actions/admin/core";
-import { rateLimit } from "@/lib/rate-limit";
+import { checkRateLimit } from "@/lib/rate-limit";
 import { createClient } from "@/lib/supabase/server";
 import type { BroadcastSegment } from "@/lib/database.types";
 
@@ -42,8 +42,15 @@ export async function sendBroadcastAction(input: {
   const auth = await authorize("notifications.broadcast");
   if ("error" in auth) return { ok: false, error: auth.error };
 
-  if (!(await rateLimit("broadcast", auth.staff.userId))) {
-    return { ok: false, error: "Too many broadcasts in a short window. Pause a moment." };
+  const limited = await checkRateLimit("broadcast", auth.staff.userId);
+  if (!limited.allowed) {
+    return {
+      ok: false,
+      error:
+        limited.reason === "unavailable"
+          ? "Temporarily unavailable. Please try again shortly."
+          : "Too many broadcasts in a short window. Pause a moment.",
+    };
   }
 
   const parsed = schema.safeParse(input);

@@ -59,7 +59,7 @@ export function LobbyAccountSidebar({ walletSlot, className }: LobbyAccountSideb
   const { count: unreadMessages } = useUnreadMessages();
   const { profile, levelProgress } = useLobbyProfile();
   const level = profile?.level ?? 28;
-  const displayName = "Spinora VIP";
+  const displayName = "Sweepstakes Hub VIP";
 
   function warmRoute(href: string) {
     if (prefetched.current.has(href) || href.startsWith("/#")) return;

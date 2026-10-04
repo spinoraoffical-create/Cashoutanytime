@@ -36,7 +36,7 @@ const INITIAL_QUESTS: Quest[] = [
   },
   {
     id: "refer_friend",
-    title: "Invite a Friend to Spinora",
+    title: "Invite a Friend to Sweepstakes Hub",
     rewardPoints: 250,
     completed: false,
     href: "/dashboard",

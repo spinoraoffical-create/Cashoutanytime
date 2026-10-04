@@ -5,8 +5,8 @@ import { GlassCard } from "@/components/shared/glass-card";
 import { Button } from "@/components/ui/button";
 
 export const metadata: Metadata = {
-  title: "Access Restricted | Spinora",
-  description: "Spinora sweepstakes games are not available in your state due to local regulations.",
+  title: "Access Restricted | Sweepstakes Hub",
+  description: "Sweepstakes Hub sweepstakes games are not available in your state due to local regulations.",
 };
 
 export default function RestrictedPage() {
@@ -32,7 +32,7 @@ export default function RestrictedPage() {
 
         <div className="my-6 border-y border-purple-500/15 py-4 text-sm text-muted-foreground leading-relaxed text-left space-y-3">
           <p>
-            Spinora enforces strict geographic boundaries to comply with state-level sweepstakes regulations. 
+            Sweepstakes Hub enforces strict geographic boundaries to comply with state-level sweepstakes regulations. 
             Our platform does not offer online slot play, fish shooter accounts, or wallet loading services in your state.
           </p>
           <p className="text-xs bg-white/5 border border-white/5 rounded-lg p-2.5 font-mono text-purple-200/50">

@@ -1,5 +1,5 @@
 /**
- * Verify Trail-web / Spinora setup after Section A + env config.
+ * Verify Trail-web / Sweepstakes Hub setup after Section A + env config.
  * Run: node scripts/verify-setup.mjs
  */
 import { readFileSync } from "fs";

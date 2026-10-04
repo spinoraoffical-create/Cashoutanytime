@@ -35,8 +35,8 @@ export async function POST(req: Request) {
     }
 
     const result = await broadcastPromoToTelegram(
-      "Spinora Promo Announcement",
-      "Check your Spinora Dashboard for exclusive deposit matches and free wheel spins!"
+      "Sweepstakes Hub Promo Announcement",
+      "Check your Sweepstakes Hub Dashboard for exclusive deposit matches and free wheel spins!"
     );
     if (!result.ok) {
       return NextResponse.json({ ok: false, error: result.error }, { status: 500 });

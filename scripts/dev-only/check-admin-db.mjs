@@ -19,7 +19,7 @@ function loadEnv() {
 }
 
 const TABLES = [
-  // Spinora core
+  // Sweepstakes Hub core
   "profiles",
   "conversations",
   "messages",
@@ -91,7 +91,7 @@ async function checkTable(name) {
 }
 
 async function main() {
-  console.log("=== Spinora Admin DB Check ===\n");
+  console.log("=== Sweepstakes Hub Admin DB Check ===\n");
 
   const { data: profile, error: profileErr } = await db
     .from("profiles")
@@ -140,8 +140,8 @@ async function main() {
   const pageTests = [
     ["Overview signups", () => db.from("profiles").select("id, email, full_name, created_at").limit(1)],
     ["Users page", () => db.from("profiles").select("id, email, full_name, wallet_balance, cashout_wallet, is_suspended, created_at").limit(1)],
-    ["Deposits (Spinora)", () => db.from("deposit_requests").select("*, user:profiles!deposit_requests_user_id_fkey(full_name, email)").limit(1)],
-    ["Chat (Spinora)", () => db.from("conversations").select("id, user_id, updated_at, user:profiles!conversations_user_id_fkey(full_name, email, is_online, last_seen_at)").limit(1)],
+    ["Deposits (Sweepstakes Hub)", () => db.from("deposit_requests").select("*, user:profiles!deposit_requests_user_id_fkey(full_name, email)").limit(1)],
+    ["Chat (Sweepstakes Hub)", () => db.from("conversations").select("id, user_id, updated_at, user:profiles!conversations_user_id_fkey(full_name, email, is_online, last_seen_at)").limit(1)],
     ["Game loads", () => db.from("game_load_requests").select("id, status").limit(1)],
     ["Promotions", () => db.from("promotions").select("id, title, status").limit(1)],
     ["Roles", () => db.from("roles").select("id, key, name").limit(3)],

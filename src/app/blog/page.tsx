@@ -9,9 +9,9 @@ import { getPublishedBlogPosts } from "@/lib/data/marketing";
 export const revalidate = 300;
 
 export const metadata: Metadata = {
-  title: "Game Guides, Bonuses & Tips | Spinora Blog",
+  title: "Game Guides, Bonuses & Tips | Sweepstakes Hub Blog",
   description:
-    "How-to guides on fish table games, deposits, bonuses and winning strategies at Spinora.",
+    "How-to guides on fish table games, deposits, bonuses and winning strategies at Sweepstakes Hub.",
   alternates: { canonical: "/blog" },
 };
 
@@ -30,7 +30,7 @@ export default async function BlogPage() {
               Game Guides, <span className="gradient-text">Bonuses &amp; Tips</span>
             </h1>
             <p className="text-muted-foreground text-lg">
-              Everything you need to know about playing at Spinora — account setup, deposits, bonus claims and winning strategies.
+              Everything you need to know about playing at Sweepstakes Hub — account setup, deposits, bonus claims and winning strategies.
             </p>
           </div>
 

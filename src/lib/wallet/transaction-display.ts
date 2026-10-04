@@ -26,13 +26,13 @@ export interface BonusGameLoadRow {
 }
 
 const SOURCE_LABELS: Record<string, string> = {
-  game_load: "Game load",
+  game_load: "Load",
   game_load_refund: "Load refund",
-  game_redeem: "Game redeem",
-  deposit: "Deposit",
-  admin: "Admin adjustment",
-  spin: "Spin prize",
-  daily_task: "Daily task",
+  game_redeem: "Redeem",
+  deposit: "Add money",
+  admin: "Adjustment",
+  spin: "Freeplay spin",
+  daily_task: "Reward",
 };
 
 export function transactionSourceLabel(source: string): string {

@@ -208,7 +208,7 @@ export function OtpAuthForm({ mode, redirect = "/", referralCodeFromUrl }: OtpAu
 
     setLoading(false);
 
-    toast.success(mode === "register" ? "Account created! Welcome to Spinora." : "Welcome back!");
+    toast.success(mode === "register" ? "Account created! Welcome to Sweepstakes Hub." : "Welcome back!");
     router.push(redirect);
     router.refresh();
   }

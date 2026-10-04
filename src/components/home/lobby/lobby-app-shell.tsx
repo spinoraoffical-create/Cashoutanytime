@@ -43,17 +43,15 @@ export function LobbyAppShell({ children, sidebar }: LobbyAppShellProps) {
   }
 
   return (
-    <div className="lobby-cosmic h-screen overflow-hidden flex flex-col">
-      <div className="lobby-layout flex flex-1 min-h-0">
-        {/* Full-height sidebar — flush left, spans top to bottom nav */}
-        <aside className="lobby-sidebar-rail hidden lg:flex flex-col w-[188px] xl:w-[200px] shrink-0 overflow-y-auto scrollbar-hide">
+    <div className="h-screen overflow-hidden flex flex-col bg-background">
+      <div className="lobby-layout flex flex-1 min-h-0 mx-auto w-full max-w-lg lg:max-w-5xl">
+        <aside className="lobby-sidebar-rail hidden xl:flex flex-col w-[200px] shrink-0 overflow-y-auto scrollbar-hide border-r border-white/6">
           {sidebar}
         </aside>
 
-        {/* Main column: top bar + scrollable content */}
         <div className="lobby-main-col flex flex-col flex-1 min-w-0 min-h-0">
           <LobbyTopBar onMenuClick={() => setMobileOpen(true)} />
-          <div className="lobby-scroll flex-1 min-h-0 overflow-y-auto overflow-x-hidden scrollbar-hide px-2 sm:px-3 pb-24 sm:pb-20 pt-1.5">
+          <div className="lobby-scroll flex-1 min-h-0 overflow-y-auto overflow-x-hidden scrollbar-hide px-3 sm:px-4 pb-24 pt-3">
             {children}
           </div>
         </div>

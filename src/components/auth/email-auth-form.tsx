@@ -50,7 +50,7 @@ function EmailConfirmationNotice({
         {variant === "register" ? (
           <>
             Your account was created but is <strong className="text-foreground">not active yet</strong>.
-            Open the email and click the confirmation link. You&apos;ll be redirected to Spinora and
+            Open the email and click the confirmation link. You&apos;ll be redirected to Sweepstakes Hub and
             signed in automatically once verified.
           </>
         ) : (
@@ -250,7 +250,7 @@ export function EmailAuthForm({ mode, redirect = "/", referralCodeFromUrl }: Ema
     await linkSignupSecurity(deviceId);
 
     setLoading(false);
-    toast.success("Account created! Welcome to Spinora.");
+    toast.success("Account created! Welcome to Sweepstakes Hub.");
     router.push(redirect);
     router.refresh();
   }

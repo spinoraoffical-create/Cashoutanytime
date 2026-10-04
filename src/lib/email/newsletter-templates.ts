@@ -1,5 +1,5 @@
 /**
- * Spinora marketing/newsletter emails — promo campaigns via Resend.
+ * Sweepstakes Hub marketing/newsletter emails — promo campaigns via Resend.
  */
 
 import { SITE_NAME, SITE_URL } from "@/lib/constants";

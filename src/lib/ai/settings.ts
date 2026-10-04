@@ -40,7 +40,7 @@ export type ChatbotAiSettings = {
 const DEFAULT_BLOG: BlogAiSettings = {
   is_enabled: true,
   topics: ["Online Gaming", "Fish Table Games", "Slot Strategies", "Casino Bonuses"],
-  target_keywords: ["spinora bonus code", "juwa 777 download", "online slots"],
+  target_keywords: ["sweepstakes hub bonus code", "juwa 777 download", "online slots"],
   posting_frequency_hours: 24,
   ai_provider: "smart_auto",
   ai_model: "gpt-4o-mini",
@@ -52,7 +52,7 @@ const DEFAULT_BLOG: BlogAiSettings = {
 const DEFAULT_TELEGRAM: TelegramAiSettings = {
   auto_post_blog: true,
   auto_post_promos: true,
-  template_header: "🔥 <b>SPINORA GAMING UPDATE</b> 🔥",
+  template_header: "🔥 <b>SWEEPSTAKES HUB GAMING UPDATE</b> 🔥",
   template_footer: "👉 Join now & claim your instant deposit bonus! 🚀",
   autopilot_enabled: true,
   last_autopilot_at: null,
@@ -60,9 +60,9 @@ const DEFAULT_TELEGRAM: TelegramAiSettings = {
 
 const DEFAULT_CHATBOT: ChatbotAiSettings = {
   is_enabled: true,
-  bot_name: "Spinora AI Assistant",
+  bot_name: "Sweepstakes Hub AI Assistant",
   system_prompt:
-    "You are Spinora AI Assistant, a friendly gaming support bot. Help with game accounts (Juwa, Fire Kirin, Game Vault), deposits, cashouts, VIP tiers, and bonuses. Keep answers concise.",
+    "You are Sweepstakes Hub AI Assistant, a friendly gaming support bot. Help with game accounts (Juwa, Fire Kirin, Game Vault), deposits, cashouts, VIP tiers, and bonuses. Keep answers concise.",
   auto_reply_enabled: true,
   human_handover_threshold: 0.6,
   telegram_escalation_enabled: true,

@@ -56,7 +56,7 @@ export default async function AdminOverviewPage() {
     <div className="mx-auto max-w-6xl">
       <AdminPageHeader
         title="Overview"
-        description={`Welcome back, ${ctx.email ?? "admin"}. Here's the pulse of Spinora.`}
+        description={`Welcome back, ${ctx.email ?? "admin"}. Here's the pulse of Sweepstakes Hub.`}
       />
 
       <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">

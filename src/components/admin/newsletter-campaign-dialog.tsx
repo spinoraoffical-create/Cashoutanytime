@@ -160,7 +160,7 @@ export function NewsletterCampaignDialog({
               <Label htmlFor="nl-subject">Email subject *</Label>
               <Input
                 id="nl-subject"
-                placeholder="Your 50% welcome bonus is ready at Spinora"
+                placeholder="Your 50% welcome bonus is ready at Sweepstakes Hub"
                 value={values.subject}
                 onChange={(e) => setValues((v) => ({ ...v, subject: e.target.value }))}
               />

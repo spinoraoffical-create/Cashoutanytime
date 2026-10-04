@@ -24,7 +24,7 @@ export async function generateMetadata({
   const imageUrl = post.cover_image_url || "https://spinoracasinos.com/images/promos/spinora_dealer_ten.jpg";
 
   return {
-    title: `${post.seo_title ?? post.title} | Spinora Royale VIP`,
+    title: `${post.seo_title ?? post.title} | Sweepstakes Hub`,
     description: post.seo_description ?? post.excerpt ?? undefined,
     alternates: { canonical: `/blog/${slug}` },
     openGraph: {
@@ -67,12 +67,12 @@ export default async function BlogPostPage({
     datePublished: post.published_at || new Date().toISOString(),
     author: {
       "@type": "Organization",
-      name: "Spinora Royale VIP Editorial Team",
+      name: "Sweepstakes Hub Editorial Team",
       url: "https://spinoracasinos.com",
     },
     publisher: {
       "@type": "Organization",
-      name: "Spinora Royale VIP",
+      name: "Sweepstakes Hub",
       logo: {
         "@type": "ImageObject",
         url: "https://spinoracasinos.com/favicon.ico",

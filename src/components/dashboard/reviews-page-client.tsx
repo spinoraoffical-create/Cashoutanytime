@@ -64,7 +64,7 @@ export function ReviewsPageClient() {
     <div>
       <DashboardPageHeader
         title="Community Reviews"
-        description="Share your experience and read what other players think about Spinora"
+        description="Share your experience and read what other players think about Sweepstakes Hub"
       />
 
       <div className="grid lg:grid-cols-3 gap-6 mb-8">

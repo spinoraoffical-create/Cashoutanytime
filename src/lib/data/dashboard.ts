@@ -494,7 +494,7 @@ export async function getWalletData() {
   const { supabase, user } = await requireUser();
   const { data: profile } = await supabase
     .from("profiles")
-    .select("wallet_balance, cashout_wallet")
+    .select("wallet_balance, cashout_wallet, bonus_wallet")
     .eq("id", user.id)
     .single();
   const { data: transactions } = await supabase
@@ -506,6 +506,7 @@ export async function getWalletData() {
   return {
     balance: Number(profile?.wallet_balance ?? 0),
     cashout: Number(profile?.cashout_wallet ?? 0),
+    freeplay: Number(profile?.bonus_wallet ?? 0),
     transactions: (transactions ?? []) as import("@/lib/wallet/transaction-display").WalletTransactionRow[],
   };
 }

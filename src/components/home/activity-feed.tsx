@@ -29,7 +29,7 @@ export function ActivityFeed() {
           </h2>
           <LiveBadge />
         </div>
-        <p className="text-muted-foreground text-sm">Live updates from the Spinora community</p>
+        <p className="text-muted-foreground text-sm">Live updates from the Sweepstakes Hub community</p>
       </motion.div>
 
       <div className="space-y-3 max-w-2xl mx-auto">

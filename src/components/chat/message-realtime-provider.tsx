@@ -169,7 +169,7 @@ export function MessageRealtimeProvider({ children }: { children: ReactNode }) {
     async (msg: Message, href: string) => {
       const adminView = isAdminRef.current;
 
-      let title = adminView ? "New customer message" : "Spinora Support";
+      let title = adminView ? "New customer message" : "Sweepstakes Hub Support";
 
       if (adminView) {
         const supabase = createClient();

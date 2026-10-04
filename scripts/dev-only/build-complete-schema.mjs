@@ -23,7 +23,7 @@ const header = `-- =============================================================
 --
 -- HOW TO RUN IN SUPABASE SQL EDITOR (Dashboard → SQL → New query):
 --
---   EXISTING Spinora database (fixes KYC, load, redeem, bots, deposits):
+--   EXISTING Sweepstakes Hub database (fixes KYC, load, redeem, bots, deposits):
 --     Run ONLY SECTION A (from "SECTION A START" through "SECTION A END")
 --
 --   BRAND NEW empty Supabase project:

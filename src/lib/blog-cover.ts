@@ -86,7 +86,7 @@ export function resolveBlogCoverUrl(slug: string, url: string | null): string {
     }
   }
 
-  // 2. High-res local Spinora game posters fallback
+  // 2. High-res local Sweepstakes Hub game posters fallback
   const hash = hashString(slug);
   return LOCAL_GAME_POSTERS[hash % LOCAL_GAME_POSTERS.length];
 }

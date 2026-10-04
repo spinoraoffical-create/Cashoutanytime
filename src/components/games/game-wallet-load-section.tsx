@@ -496,7 +496,7 @@ export function GameWalletLoadSection({
     if (result.error) {
       toast.error(result.error);
     } else {
-      if (result.requestId) pendingJobIdsRef.current.add(result.requestId);
+      if ("requestId" in result && result.requestId) pendingJobIdsRef.current.add(result.requestId);
       toast.success(
         hasSavedAccount
           ? `Replacing your ${game.name} account…`
@@ -539,7 +539,7 @@ export function GameWalletLoadSection({
     });
     if (result.error) toast.error(result.error);
     else {
-      if (result.requestId) pendingJobIdsRef.current.add(result.requestId);
+      if ("requestId" in result && result.requestId) pendingJobIdsRef.current.add(result.requestId);
       toast.success("Checking your live game balance…");
     }
     void refreshLoads();
@@ -571,7 +571,7 @@ export function GameWalletLoadSection({
 
     if (result.error) toast.error(result.error);
     else {
-      if (result.requestId) pendingJobIdsRef.current.add(result.requestId);
+      if ("requestId" in result && result.requestId) pendingJobIdsRef.current.add(result.requestId);
       toast.success(`Load queued! $${parsedAmount.toFixed(2)} — bot will credit ${game.name} shortly.`);
       void refreshWallet();
       void refreshLoads();
@@ -630,7 +630,7 @@ export function GameWalletLoadSection({
     const destLabel = "Deposit Redeem";
     if (result.error) toast.error(result.error);
     else {
-      if (result.requestId) pendingJobIdsRef.current.add(result.requestId);
+      if ("requestId" in result && result.requestId) pendingJobIdsRef.current.add(result.requestId);
       toast.success(
         redeemAll
           ? `Redeem queued — bot will cash out your full game balance to your ${destLabel} wallet.`

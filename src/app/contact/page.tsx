@@ -8,8 +8,8 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 
 export const metadata: Metadata = {
-  title: "Contact | Spinora",
-  description: "Reach Spinora support for deposits, game accounts, and VIP questions.",
+  title: "Contact | Sweepstakes Hub",
+  description: "Reach Sweepstakes Hub support for deposits, game accounts, and VIP questions.",
   alternates: { canonical: "/contact" },
 };
 
@@ -22,7 +22,7 @@ export default function ContactPage() {
 
           <div className="mb-12 max-w-2xl">
             <h1 className="text-4xl font-bold mb-4">
-              Contact <span className="gradient-text">Spinora</span>
+              Contact <span className="gradient-text">Sweepstakes Hub</span>
             </h1>
             <p className="text-muted-foreground text-lg">
               24/7 support for deposits, game accounts, and VIP questions.

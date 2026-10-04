@@ -1,4 +1,4 @@
-# Spinora — Premium Gaming Support Platform
+# Sweepstakes Hub — Premium Gaming Support Platform
 
 A production-ready gaming portal built with Next.js 15, TypeScript, Tailwind CSS, ShadCN UI, Supabase, and Framer Motion.
 
@@ -75,6 +75,18 @@ public/
 - **Backend:** Supabase (Auth, Database, Realtime)
 - **Payments:** Paydora
 - **Animation:** Framer Motion
+
+## Brand IDs left unchanged (would break auth/assets/live site)
+
+- Phone-auth emails: `@phone.spinora.local`
+- Device fingerprint cookie/storage: `spinora_did` / `spinora_device_id`
+- Production hostname / email domain: `spinoracasinos.com`
+- Promo image paths: `/images/promos/spinora_*.jpg`
+- Chat sender env: `SPINORA_BOT_SENDER_ID`
+- Setup script path: `supabase/archive/SPINORA-COMPLETE-SCHEMA.sql` (generated artifact name)
+- Import path: `src/lib/admin/spinora-profile.ts`
+- Historical blog slugs containing `spinora`
+- Social handles that still live on Instagram/TikTok (`spinora09`)
 
 ## License
 

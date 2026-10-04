@@ -6,6 +6,7 @@ import { useSearchParams } from "next/navigation";
 import { toast } from "sonner";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { EmailAuthForm } from "@/components/auth/email-auth-form";
+import { GoogleAuthButton } from "@/components/auth/google-auth-button";
 
 function LoginForm() {
   const searchParams = useSearchParams();
@@ -26,12 +27,13 @@ function LoginForm() {
   }, [searchParams]);
 
   return (
-    <Card>
-      <CardHeader>
-        <CardTitle>Welcome Back</CardTitle>
-        <CardDescription>Sign in with your email and password</CardDescription>
+    <Card className="border-0 bg-transparent shadow-none text-zinc-900">
+      <CardHeader className="px-0">
+        <CardTitle className="text-zinc-900">Sign in</CardTitle>
+        <CardDescription className="text-zinc-500">Email and password, or Google</CardDescription>
       </CardHeader>
-      <CardContent className="space-y-6">
+      <CardContent className="space-y-6 px-0">
+        <GoogleAuthButton redirect={redirect} />
         <EmailAuthForm mode="login" redirect={redirect} />
 
         <p className="text-sm text-muted-foreground text-center">

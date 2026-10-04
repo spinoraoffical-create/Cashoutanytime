@@ -20,7 +20,7 @@ const INITIAL_MESSAGES: ChatMessage[] = [
   {
     id: "1",
     sender: "bot",
-    text: "👋 Welcome to Spinora Royale VIP! I'm your 24/7 AI Casino Support. You can chat with me, send deposit receipt photos/videos, or ask how to load Juwa 777 / Game Vault!",
+    text: "👋 Welcome to Sweepstakes Hub! I'm your 24/7 AI Casino Support. You can chat with me, send deposit receipt photos/videos, or ask how to load Juwa 777 / Game Vault!",
     time: "Just now",
   },
 ];
@@ -297,7 +297,7 @@ export function LiveCasinoChatWidget() {
             {typing && (
               <div className="flex gap-2 items-center text-muted-foreground text-xs font-mono">
                 <Bot className="h-4 w-4 text-amber-400 animate-spin" />
-                <span>Spinora AI is typing...</span>
+                <span>Sweepstakes Hub AI is typing...</span>
               </div>
             )}
             <div ref={messagesEndRef} />

@@ -127,7 +127,7 @@ export async function sendAdminMessage(
 const DEFAULT_MAINTENANCE_NOTICE = {
   title: "Site under maintenance",
   message:
-    "Spinora is currently under maintenance. No requests (loads, redeems, new accounts, or deposits) will be approved until further notice. Thank you for your patience — we will update you when service resumes.",
+    "Sweepstakes Hub is currently under maintenance. No requests (loads, redeems, new accounts, or deposits) will be approved until further notice. Thank you for your patience — we will update you when service resumes.",
 } as const;
 
 /** Send an in-app notification (+ support chat message) to every non-admin user. */

@@ -41,7 +41,7 @@ export default async function AdminReferralsPage() {
     <div className="mx-auto max-w-6xl">
       <AdminPageHeader
         title="Referrals"
-        description="Spinora referral signups and reward points."
+        description="Sweepstakes Hub referral signups and reward points."
       />
 
       <div className="mb-6 grid gap-4 sm:grid-cols-2">

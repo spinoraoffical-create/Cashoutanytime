@@ -20,7 +20,7 @@ export async function generateMetadata({
   const city = await getGeoCity(stateSlug, citySlug);
   if (!city) return {};
 
-  const title = `Fish Table Games in ${city.name} | Spinora`;
+  const title = `Fish Table Games in ${city.name} | Sweepstakes Hub`;
   return {
     title,
     description: city.descriptionSnippet,

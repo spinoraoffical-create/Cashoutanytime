@@ -74,7 +74,7 @@ export async function notifyAdminOfWalletActivity(input: {
     }
   }
 
-  lines.push("", `<a href="${loadsUrl}">Open Wallet Loads in Spinora</a>`);
+  lines.push("", `<a href="${loadsUrl}">Open Wallet Loads in Sweepstakes Hub</a>`);
 
   // Same as deposit alerts: always send. Silent push when an admin tab is open.
   const disableNotification = await isAnyAdminOnline();

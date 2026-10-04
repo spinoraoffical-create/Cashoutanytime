@@ -10,8 +10,8 @@ import { DAILY_SPIN_ENABLED } from "@/lib/constants";
 export const metadata = createMetadata({
   title: "Spin the Wheel",
   description:
-    "Spin the Spinora prize wheel and win cash bonuses, VIP points, and exclusive rewards. Free daily spins for all members.",
-  keywords: ["spin wheel", "casino rewards", "free spins", "Spinora prizes", "VIP bonuses"],
+    "Spin the Sweepstakes Hub prize wheel and win cash bonuses, VIP points, and exclusive rewards. Free daily spins for all members.",
+  keywords: ["spin wheel", "casino rewards", "free spins", "Sweepstakes Hub prizes", "VIP bonuses"],
   path: "/spin",
 });
 

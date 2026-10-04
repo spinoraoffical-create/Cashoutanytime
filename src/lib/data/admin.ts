@@ -30,7 +30,7 @@ const STAFF_ROLES: AppRole[] = [
   "moderator",
 ];
 
-async function legacySpinoraAdminContext(
+async function legacyAdminContext(
   supabase: Awaited<ReturnType<typeof createClient>>,
   userId: string,
   email: string | null
@@ -77,7 +77,7 @@ export const getStaffContext = cache(async (): Promise<StaffContext | null> => {
 
   const isStaff = roles.some((r) => STAFF_ROLES.includes(r));
   if (!isStaff) {
-    return legacySpinoraAdminContext(supabase, user.id, user.email ?? null);
+    return legacyAdminContext(supabase, user.id, user.email ?? null);
   }
 
   const isSuperAdmin = roles.includes("super_admin");

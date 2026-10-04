@@ -20,7 +20,7 @@ export function ReferralPreview() {
             Refer & <span className="gradient-text">Earn Rewards</span>
           </h2>
           <p className="text-muted-foreground mb-6 text-sm sm:text-base">
-            Share your unique referral link and earn VIP points for every friend who joins Spinora.
+            Share your unique referral link and earn VIP points for every friend who joins Sweepstakes Hub.
           </p>
           <Button asChild>
             <Link href="/register">Start Referring</Link>

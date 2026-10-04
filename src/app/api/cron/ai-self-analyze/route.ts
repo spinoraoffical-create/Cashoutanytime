@@ -19,7 +19,7 @@ async function handleCron(request: Request) {
 
   if (report.healthScore < 90) {
     const alertMsg = `
-⚡ <b>SPINORA AI HEALTH REPORT</b> ⚡
+⚡ <b>SWEEPSTAKES HUB AI HEALTH REPORT</b> ⚡
 
 <b>Health Score:</b> ${report.healthScore}/100
 <b>Published SEO Posts:</b> ${report.seoMetrics.publishedPostsCount}

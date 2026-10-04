@@ -14,8 +14,8 @@ import {
 import { cn } from "@/lib/utils";
 
 export const metadata: Metadata = {
-  title: "Leaderboard | Spinora",
-  description: "Top Spinora players by XP — daily, weekly, monthly and all-time rankings.",
+  title: "Leaderboard | Sweepstakes Hub",
+  description: "Top Sweepstakes Hub players by XP — daily, weekly, monthly and all-time rankings.",
   alternates: { canonical: "/leaderboard" },
 };
 

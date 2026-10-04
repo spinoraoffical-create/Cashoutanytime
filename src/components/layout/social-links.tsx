@@ -61,7 +61,7 @@ export function SocialLinks({ className = "" }: { className?: string }) {
           href={item.href}
           target="_blank"
           rel="noopener noreferrer"
-          aria-label={`Follow Spinora on ${item.name}`}
+          aria-label={`Follow Sweepstakes Hub on ${item.name}`}
           className="flex h-10 w-10 items-center justify-center rounded-full bg-muted/50 text-muted-foreground border border-border hover:text-white hover:border-primary hover:bg-primary/20 transition-all duration-200"
         >
           {item.icon}
@@ -81,7 +81,7 @@ export function FloatingSocialLinks() {
           href={item.href}
           target="_blank"
           rel="noopener noreferrer"
-          aria-label={`Open Spinora on ${item.name}`}
+          aria-label={`Open Sweepstakes Hub on ${item.name}`}
           className="flex h-11 w-11 items-center justify-center rounded-full border border-white/10 bg-[#1a1a1a]/95 text-white/80 shadow-lg backdrop-blur-sm transition-all duration-200 hover:border-primary/50 hover:bg-primary/20 hover:text-white"
         >
           {item.icon}

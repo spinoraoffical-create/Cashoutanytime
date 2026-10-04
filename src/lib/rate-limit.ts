@@ -31,27 +31,61 @@ export function clientIp(request: Request): string {
   );
 }
 
+/** Money / mass-action paths deny the request if limiter infra is down. */
+const FAIL_CLOSED_ACTIONS = new Set<keyof typeof RATE_LIMITS>([
+  "paydoraCreate",
+  "paydoraPayout",
+  "gameLoad",
+  "broadcast",
+]);
+
+export type RateLimitOutcome = {
+  allowed: boolean;
+  reason?: "limited" | "unavailable";
+};
+
 /**
  * Fixed-window rate limit via the check_rate_limit RPC (service role).
- * Returns true when ALLOWED. Fails open on infra error so a transient DB
- * blip never blocks legitimate members.
+ * Fail-open: public/read/chat/auth so a DB blip does not lock members out.
+ * Fail-closed: deposits, payouts, game loads, broadcasts — never move money
+ * if the limiter cannot be evaluated.
  */
-export async function rateLimit(
+export async function checkRateLimit(
   action: keyof typeof RATE_LIMITS,
   identifier: string
-): Promise<boolean> {
+): Promise<RateLimitOutcome> {
   const rule = RATE_LIMITS[action];
+  const failClosed = FAIL_CLOSED_ACTIONS.has(action);
   try {
     const admin = createAdminClient();
-    if (!admin) return true;
+    if (!admin) {
+      return failClosed ? { allowed: false, reason: "unavailable" } : { allowed: true };
+    }
     const { data, error } = await admin.rpc("check_rate_limit", {
       p_bucket: `${action}:${identifier}`,
       p_max_hits: rule.max,
       p_window_seconds: rule.windowSeconds,
     });
-    if (error) return true;
-    return data === true;
+    if (error) {
+      return failClosed ? { allowed: false, reason: "unavailable" } : { allowed: true };
+    }
+    if (data === true) return { allowed: true };
+    return { allowed: false, reason: "limited" };
   } catch {
-    return true;
+    return failClosed ? { allowed: false, reason: "unavailable" } : { allowed: true };
   }
+}
+
+export async function rateLimit(
+  action: keyof typeof RATE_LIMITS,
+  identifier: string
+): Promise<boolean> {
+  return (await checkRateLimit(action, identifier)).allowed;
+}
+
+export function rateLimitUserMessage(outcome: RateLimitOutcome): string {
+  if (outcome.reason === "unavailable") {
+    return "Temporarily unavailable. Please try again shortly.";
+  }
+  return "Too many requests. Please wait a moment.";
 }

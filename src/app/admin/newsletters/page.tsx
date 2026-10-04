@@ -48,7 +48,7 @@ export default async function AdminNewslettersPage() {
       <div className="mx-auto max-w-3xl">
         <AdminPageHeader
           title="Email promos"
-          description="Send promo emails to players who signed up on Spinora."
+          description="Send promo emails to players who signed up on Sweepstakes Hub."
         />
         <GlassCard className="p-6 text-sm text-muted-foreground">
           Newsletter tables are not set up yet. Run{" "}
@@ -65,7 +65,7 @@ export default async function AdminNewslettersPage() {
     <div className="mx-auto max-w-5xl">
       <AdminPageHeader
         title="Email promos"
-        description="Send promo emails to players who signed up on Spinora."
+        description="Send promo emails to players who signed up on Sweepstakes Hub."
         action={
           <NewsletterCampaignDialog
             title="New email promo"

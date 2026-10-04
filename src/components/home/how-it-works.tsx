@@ -37,7 +37,7 @@ export function HowItWorks() {
         className="text-center mb-10"
       >
         <h2 className="text-2xl sm:text-3xl font-bold mb-3">
-          How <span className="gradient-text">Spinora</span> Works
+          How <span className="gradient-text">Sweepstakes Hub</span> Works
         </h2>
         <p className="text-muted-foreground max-w-2xl mx-auto text-sm sm:text-base">
           Get started in minutes with our simple 4-step process.

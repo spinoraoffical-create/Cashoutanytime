@@ -4,9 +4,9 @@ import Link from "next/link";
 import { cn } from "@/lib/utils";
 
 const sizes = {
-  sm: { mark: 28, text: "text-lg" },
-  md: { mark: 36, text: "text-xl" },
-  lg: { mark: 48, text: "text-2xl" },
+  sm: { mark: 28, text: "text-sm" },
+  md: { mark: 36, text: "text-base" },
+  lg: { mark: 48, text: "text-xl" },
 } as const;
 
 export function Logo({
@@ -26,14 +26,14 @@ export function Logo({
     <span className={cn("inline-flex items-center gap-2.5", className)}>
       <Image
         src="/logo.webp"
-        alt={withWordmark ? "" : "Spinora"}
+        alt={withWordmark ? "" : "Sweepstakes Hub"}
         width={s.mark}
         height={s.mark}
         priority
       />
       {withWordmark && (
         <span className={cn("gradient-text font-extrabold tracking-tight", s.text)}>
-          SPINORA
+          Sweepstakes Hub
         </span>
       )}
     </span>
@@ -44,7 +44,7 @@ export function Logo({
   return (
     <Link
       href={href}
-      aria-label="Spinora home"
+      aria-label="Sweepstakes Hub home"
       className="rounded-lg outline-none focus-visible:ring-2 focus-visible:ring-ring"
     >
       {content}

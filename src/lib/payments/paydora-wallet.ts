@@ -1,5 +1,7 @@
 import { createAdminClient } from "@/lib/supabase/admin";
 
+/** No non-atomic wallet writes. Credits/debits go through Paydora RPCs only. */
+
 const ALLOWED_METHODS = new Set(["paypal", "chime", "cashapp", "bitcoin", "usdt", "venmo"]);
 
 export function paydoraProofPath(depositId: string) {
