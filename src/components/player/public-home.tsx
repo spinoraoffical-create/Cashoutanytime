@@ -42,7 +42,9 @@ export function PublicHome({ games }: { games?: Game[] }) {
       <section className="overflow-hidden rounded-[24px] bg-[#121826] text-center">
         <div className="flex justify-between px-4 pt-4">
           <Link href="/" className="flex items-center gap-2">
-            <Image src="/logo.webp" alt="" width={36} height={36} className="rounded-xl" />
+            <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-primary text-[11px] font-black text-white">
+              SH
+            </span>
             <span className="text-left text-sm font-extrabold leading-tight">
               {SITE_NAME}
             </span>
@@ -56,10 +58,8 @@ export function PublicHome({ games }: { games?: Game[] }) {
             </Button>
           </div>
         </div>
-        <div className="relative mx-auto mt-4 h-52 w-52">
-          <Image src="/logo.webp" alt={SITE_NAME} fill className="object-contain drop-shadow-2xl" priority />
-        </div>
-        <div className="space-y-3 px-6 pb-8 pt-2">
+        <div className="space-y-3 px-6 pb-8 pt-10">
+          <p className="text-xs font-bold uppercase tracking-[0.18em] text-primary">{SITE_NAME}</p>
           <h1 className="text-3xl font-extrabold tracking-tight">
             Play sweepstakes games.
             <br />

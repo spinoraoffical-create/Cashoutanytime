@@ -6,7 +6,7 @@ import { Home, Gamepad2, Wallet, History } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 const TABS = [
-  { label: "Home", href: "/", icon: Home, match: (p: string) => p === "/" },
+  { label: "Home", href: "/", icon: Home, match: (p: string) => p === "/" || p === "/home" },
   {
     label: "Play",
     href: "/play",
@@ -18,6 +18,7 @@ const TABS = [
     href: "/dashboard/wallet",
     icon: Wallet,
     match: (p: string) =>
+      p === "/wallet" ||
       p.startsWith("/dashboard/wallet") ||
       p.startsWith("/dashboard/deposit") ||
       p.startsWith("/dashboard/withdraw"),
@@ -26,7 +27,7 @@ const TABS = [
     label: "Activity",
     href: "/dashboard/activity",
     icon: History,
-    match: (p: string) => p.startsWith("/dashboard/activity"),
+    match: (p: string) => p === "/activity" || p.startsWith("/dashboard/activity"),
   },
 ] as const;
 
@@ -35,7 +36,7 @@ export function LobbyBottomNav() {
 
   return (
     <nav className="lobby-bottom-nav shrink-0 z-50" aria-label="Player navigation">
-      <div className="mx-auto flex max-w-lg items-center justify-around px-2 pb-[max(0.4rem,env(safe-area-inset-bottom))] pt-2">
+      <div className="mx-auto flex max-w-[480px] items-center justify-around px-2 pb-[max(0.4rem,env(safe-area-inset-bottom))] pt-2">
         {TABS.map(({ label, href, icon: Icon, match }) => {
           const active = match(pathname);
           return (

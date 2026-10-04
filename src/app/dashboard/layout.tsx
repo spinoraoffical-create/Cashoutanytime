@@ -3,13 +3,10 @@ import { redirect } from "next/navigation";
 
 export const dynamic = "force-dynamic";
 import { DashboardShell } from "@/components/layout/dashboard-shell";
-import { LobbyAccountSidebar } from "@/components/home/lobby/lobby-account-sidebar";
 import { CompleteProfilePrompt } from "@/components/auth/complete-profile-prompt";
-import { WalletCardWithSync } from "@/components/wallet/wallet-card-with-sync";
 import { DashboardProfileProvider } from "@/lib/dashboard/dashboard-profile-context";
 import { DashboardRoutePrefetch } from "@/components/dashboard/dashboard-route-prefetch";
 import { getAuthUser, getProfile } from "@/lib/supabase/session";
-import { walletBalanceFromProfile } from "@/lib/wallet/map-profile-wallet";
 
 export default async function DashboardLayout({ children }: { children: React.ReactNode }) {
   const user = await getAuthUser();
@@ -25,17 +22,12 @@ export default async function DashboardLayout({ children }: { children: React.Re
 
   const needsPhone = !profile?.phone;
   const email = profile?.email || user.email || "";
-  const initialWallet = walletBalanceFromProfile(profile);
-
-  const sidebar = (
-    <LobbyAccountSidebar walletSlot={<WalletCardWithSync initial={initialWallet} />} />
-  );
 
   return (
     <DashboardProfileProvider userId={user.id} profile={profile}>
       <DashboardRoutePrefetch />
       <Suspense fallback={null}>
-        <DashboardShell sidebar={sidebar}>
+        <DashboardShell>
           {needsPhone && email && !email.endsWith("@phone.spinora.local") && (
             <CompleteProfilePrompt email={email} fullName={profile?.full_name} />
           )}

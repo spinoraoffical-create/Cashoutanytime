@@ -1,49 +1,50 @@
-import { HeroStatic } from "@/components/home/hero-static";
 import { HomeLandingShell } from "@/components/home/home-landing-shell";
-import { LiveWinFeed } from "@/components/home/live-win-feed";
-import { JackpotCounter } from "@/components/home/jackpot-counter";
-import { PlayByStateSection } from "@/components/marketing/play-by-state-section";
-import { HomeFaq } from "@/components/spinora/home-faq";
-import { HomeGuides } from "@/components/spinora/home-guides";
-import { HomeReviews } from "@/components/spinora/home-reviews";
 import { getLinkedGameSlugs } from "@/lib/data/dashboard";
-import { getFaqs, getHomepageReviews, getLatestBlogPosts, getGames } from "@/lib/data/marketing";
+import { getGames } from "@/lib/data/marketing";
+import { getActivePromotions } from "@/lib/data/promotions-public";
 import { buildLobbyCatalog } from "@/lib/games-marketing";
-import { getAuthUser } from "@/lib/supabase/session";
+import { DAILY_SPIN_ENABLED } from "@/lib/constants";
+import { getAuthUser, getProfile } from "@/lib/supabase/session";
 
 export const dynamic = "force-dynamic";
 
 export default async function HomePage() {
   const user = await getAuthUser();
-  const [faqs, reviews, guides, linkedGameSlugs, dbGames] = await Promise.all([
-    getFaqs(),
-    getHomepageReviews(),
-    getLatestBlogPosts(),
+  const profile = user ? await getProfile() : null;
+  const [linkedGameSlugs, dbGames, promotions] = await Promise.all([
     user ? getLinkedGameSlugs(user.id) : Promise.resolve([] as string[]),
     getGames(),
+    getActivePromotions().catch(() => [] as Awaited<ReturnType<typeof getActivePromotions>>),
   ]);
 
   const lobbyCatalog = buildLobbyCatalog(dbGames);
-
-  const cmsSections = (
-    <div className="space-y-10 py-4">
-      {/* Stake/Roobet Style Live Winner Ticker & Progressive Jackpot Counter */}
-      <LiveWinFeed />
-      <JackpotCounter />
-
-      {guides.length > 0 && <HomeGuides posts={guides} />}
-      {reviews.length > 0 && <HomeReviews reviews={reviews} />}
-      <PlayByStateSection />
-      {faqs.length > 0 && <HomeFaq faqs={faqs} />}
-    </div>
-  );
+  const row = profile as typeof profile & { kyc_status?: string | null };
+  const needsPhone = Boolean(row && !row.phone);
+  const needsKyc = Boolean(row && row.kyc_status && row.kyc_status !== "verified");
+  const verify =
+    needsPhone || needsKyc
+      ? {
+          show: true,
+          href: "/dashboard/kyc",
+          title: needsPhone
+            ? "Add your phone to keep cash-outs moving"
+            : "Finish verification to keep cash-outs moving",
+          body: "Email, phone, and ID when required.",
+        }
+      : null;
 
   return (
     <HomeLandingShell
-      hero={<HeroStatic />}
-      cmsSections={cmsSections}
       linkedGameSlugs={linkedGameSlugs}
       lobbyCatalog={lobbyCatalog}
+      promotions={promotions}
+      wallet={{
+        balance: Number(profile?.wallet_balance ?? 0),
+        cashout: Number(profile?.cashout_wallet ?? 0),
+        freeplay: Number(profile?.bonus_wallet ?? 0),
+      }}
+      verify={verify}
+      dailySpinEnabled={DAILY_SPIN_ENABLED}
       initialLoggedIn={Boolean(user)}
     />
   );

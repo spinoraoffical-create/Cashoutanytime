@@ -33,7 +33,7 @@ export function AppShell({
   sidebar,
   onSearchClick,
   showFooter = true,
-  showTicker = true,
+  showTicker = false,
 }: AppShellProps) {
   const [mobileOpen, setMobileOpen] = useState(false);
 

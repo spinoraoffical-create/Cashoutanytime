@@ -24,6 +24,15 @@ const nextConfig: NextConfig = {
       },
     ],
   },
+  async redirects() {
+    return [
+      { source: "/home", destination: "/", permanent: false },
+      { source: "/wallet", destination: "/dashboard/wallet", permanent: false },
+      { source: "/activity", destination: "/dashboard/activity", permanent: false },
+      { source: "/me", destination: "/dashboard", permanent: false },
+      { source: "/account", destination: "/dashboard", permanent: false },
+    ];
+  },
   experimental: {
     serverActions: {
       bodySizeLimit: "10mb",

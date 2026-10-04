@@ -7,7 +7,6 @@ import { MessageRealtimeProvider } from "@/components/chat/message-realtime-prov
 import { createClient } from "@/lib/supabase/client";
 import { MessageRealtimeStubProvider } from "@/lib/chat/message-realtime-stub";
 
-import { LiveWinPopup } from "@/components/ui/live-win-popup";
 import { WelcomePromoModal } from "@/components/ui/welcome-promo-modal";
 
 const REALTIME_ROUTE_PREFIXES = ["/dashboard", "/admin", "/spin"];
@@ -56,7 +55,6 @@ export function ClientProviders({ children }: { children: ReactNode }) {
     <>
       <Provider>{children}</Provider>
       <Toaster richColors closeButton position="top-center" />
-      <LiveWinPopup />
       <WelcomePromoModal />
     </>
   );

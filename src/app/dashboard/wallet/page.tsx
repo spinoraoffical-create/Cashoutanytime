@@ -3,12 +3,14 @@ import Link from "next/link";
 import { ArrowDownLeft, ArrowUpRight, Wallet } from "lucide-react";
 
 import { getWalletData } from "@/lib/data/dashboard";
+import { getProfile } from "@/lib/supabase/session";
 import {
   formatTransactionAmount,
   transactionSummary,
   type WalletTransactionRow,
 } from "@/lib/wallet/transaction-display";
 import { Button } from "@/components/ui/button";
+import { ClaimVerifyBanner } from "@/components/player/claim-verify-banner";
 
 export const metadata: Metadata = { title: "Wallet | Sweepstakes Hub" };
 
@@ -40,56 +42,77 @@ function TxRow({ tx }: { tx: WalletTransactionRow }) {
 
 export default async function WalletPage() {
   const wallet = await getWalletData();
+  const profile = await getProfile();
+  const row = profile as typeof profile & { kyc_status?: string | null };
+  const needsPhone = Boolean(row && !row.phone);
+  const needsKyc = Boolean(row && row.kyc_status && row.kyc_status !== "verified");
+  const showBanner = needsPhone || needsKyc;
   const main = wallet.balance;
   const cash = wallet.cashout;
   const freeplay = wallet.freeplay;
 
   return (
-    <div className="mx-auto max-w-lg space-y-5">
-      <div>
+    <div className="space-y-5">
+      {showBanner ? (
+        <ClaimVerifyBanner
+          href="/dashboard/kyc"
+          title={needsPhone ? "Add your phone to keep cash-outs moving" : "Finish verification to keep cash-outs moving"}
+          body="Required before some cash outs."
+        />
+      ) : null}
+
+      <div className="flex items-end justify-between">
         <h1 className="text-3xl font-extrabold">Wallet</h1>
-        <p className="mt-1 text-sm text-muted-foreground">Main Wallet, cash out, and freeplay — kept separate.</p>
+        <span className="inline-flex items-center gap-1 text-xs font-semibold text-emerald-400">
+          <span className="h-1.5 w-1.5 rounded-full bg-emerald-400" /> Live
+        </span>
       </div>
 
-      <section className="hub-card hub-card-glow rounded-[24px] p-5">
-        <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Main Wallet</p>
-        <p className="mt-2 text-4xl font-extrabold tabular-nums">${main.toFixed(2)}</p>
-        <p className="mt-1 text-sm text-muted-foreground">Cash + Freeplay stay listed below.</p>
-        <div className="mt-4 grid grid-cols-2 gap-2">
-          <Button asChild className="rounded-full">
-            <Link href="/dashboard/deposit">Add money</Link>
-          </Button>
-          <Button asChild variant="outline" className="rounded-full">
-            <Link href="/dashboard/withdraw">Cash out</Link>
-          </Button>
+      <section className="hub-card hub-card-glow overflow-hidden rounded-[24px]">
+        <div className="flex items-start justify-between p-5 pb-2">
+          <div>
+            <p className="text-lg font-extrabold">Main Wallet</p>
+            <p className="text-sm text-muted-foreground">Cash + Freeplay</p>
+          </div>
+          <span className="flex h-14 w-14 items-center justify-center rounded-2xl bg-primary text-sm font-black text-white">
+            SH
+          </span>
+        </div>
+        <div className="px-5 pb-5">
+          <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-muted-foreground">
+            Ready when you are
+          </p>
+          <p className="mt-1 text-5xl font-extrabold tabular-nums">${main.toFixed(2)}</p>
+          <div className="mt-4 grid grid-cols-2 gap-3">
+            <div className="rounded-2xl bg-white/5 p-3">
+              <p className="text-xs text-muted-foreground">Available to cash out</p>
+              <p className="mt-1 text-lg font-extrabold tabular-nums">${cash.toFixed(2)}</p>
+              <p className="text-[11px] text-muted-foreground">Cash</p>
+            </div>
+            <div className="rounded-2xl bg-white/5 p-3">
+              <p className="text-xs text-muted-foreground">Freeplay</p>
+              <p className="mt-1 text-lg font-extrabold tabular-nums">${freeplay.toFixed(2)}</p>
+              <p className="text-[11px] text-muted-foreground">Play only</p>
+            </div>
+          </div>
+          <div className="mt-4 grid grid-cols-2 gap-2">
+            <Button asChild className="rounded-full">
+              <Link href="/dashboard/deposit">+ Add money</Link>
+            </Button>
+            <Button asChild variant="outline" className="rounded-full">
+              <Link href="/dashboard/withdraw">Cash out</Link>
+            </Button>
+          </div>
         </div>
       </section>
 
-      <div className="grid grid-cols-2 gap-3">
-        <div className="hub-card rounded-2xl p-4">
-          <p className="text-xs text-muted-foreground">Available to cash out</p>
-          <p className="mt-1 text-xl font-extrabold tabular-nums">${cash.toFixed(2)}</p>
-          <p className="mt-1 text-[11px] text-muted-foreground">Cash</p>
-        </div>
-        <div className="hub-card rounded-2xl p-4">
-          <p className="text-xs text-muted-foreground">Freeplay</p>
-          <p className="mt-1 text-xl font-extrabold tabular-nums">${freeplay.toFixed(2)}</p>
-          <p className="mt-1 text-[11px] text-muted-foreground">Play only</p>
-        </div>
-      </div>
-
-      <Link href="/dashboard/activity" className="block text-sm font-semibold text-primary">
-        Activity & receipts →
+      <Link
+        href="/dashboard/activity"
+        className="hub-card flex items-center justify-between rounded-2xl px-4 py-3 text-sm font-semibold"
+      >
+        Activity & receipts
+        <span className="text-primary">→</span>
       </Link>
-
-      <div className="hub-card rounded-2xl p-4 text-sm text-muted-foreground">
-        <p className="font-semibold text-foreground">Destinations</p>
-        <ul className="mt-2 space-y-1.5">
-          <li>Main Wallet → add money / cash out</li>
-          <li>Game Room balances → load + redeem per game</li>
-          <li>Freeplay → play only where shown</li>
-        </ul>
-      </div>
 
       <div className="hub-card rounded-[24px] p-5">
         <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Recent</p>

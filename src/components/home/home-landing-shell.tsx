@@ -1,55 +1,39 @@
 "use client";
 
-import { useEffect, useState, type ReactNode } from "react";
-import dynamic from "next/dynamic";
 import { useLobbyProfile } from "@/components/home/lobby/use-lobby-profile";
 import { LobbyAppShell } from "@/components/home/lobby/lobby-app-shell";
-import { LobbySidebar, type LobbyMenuId } from "@/components/home/lobby/lobby-sidebar";
-import { LoggedInHomeStrip, PublicHome } from "@/components/player/public-home";
+import { PublicHome } from "@/components/player/public-home";
+import { PlayerHome } from "@/components/player/player-home";
 import { GAMES, type Game } from "@/lib/games";
-
-const ActivityToast = dynamic(
-  () => import("@/components/ui/ActivityToast").then((m) => m.ActivityToast),
-  { ssr: false, loading: () => null }
-);
-
-function DeferredActivityToast() {
-  const [ready, setReady] = useState(false);
-
-  useEffect(() => {
-    if ("requestIdleCallback" in window) {
-      const id = window.requestIdleCallback(() => setReady(true), { timeout: 8000 });
-      return () => window.cancelIdleCallback(id);
-    }
-    const timer = setTimeout(() => setReady(true), 5000);
-    return () => clearTimeout(timer);
-  }, []);
-
-  if (!ready) return null;
-  return <ActivityToast />;
-}
+import type { PublicPromotion } from "@/lib/data/promotions-public";
 
 interface HomeLandingShellProps {
   initialLoggedIn?: boolean;
   linkedGameSlugs?: string[];
   lobbyCatalog?: Game[];
-  hero?: ReactNode;
-  cmsSections?: ReactNode;
+  promotions?: PublicPromotion[];
+  wallet?: { balance: number; cashout: number; freeplay: number };
+  verify?: { show: boolean; href: string; title: string; body?: string } | null;
+  dailySpinEnabled?: boolean;
 }
 
 export function HomeLandingShell({
   initialLoggedIn = false,
   lobbyCatalog = GAMES,
+  linkedGameSlugs = [],
+  promotions = [],
+  wallet = { balance: 0, cashout: 0, freeplay: 0 },
+  verify = null,
+  dailySpinEnabled = false,
 }: HomeLandingShellProps) {
-  const { isLoggedIn, ready: authReady, profile } = useLobbyProfile();
+  const { isLoggedIn, ready: authReady } = useLobbyProfile();
   const loggedIn = authReady ? isLoggedIn : initialLoggedIn;
-  const [lobbyMenu, setLobbyMenu] = useState<LobbyMenuId>("lobby");
 
   if (!authReady) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-background">
+      <div className="flex min-h-screen items-center justify-center bg-background">
         <div
-          className="w-10 h-10 rounded-full border-2 border-primary/40 border-t-primary animate-spin"
+          className="h-10 w-10 animate-spin rounded-full border-2 border-primary/40 border-t-primary"
           aria-label="Loading"
         />
       </div>
@@ -58,11 +42,15 @@ export function HomeLandingShell({
 
   if (loggedIn) {
     return (
-      <LobbyAppShell
-        sidebar={<LobbySidebar activeMenu={lobbyMenu} onMenuChange={setLobbyMenu} />}
-      >
-        <LoggedInHomeStrip games={lobbyCatalog} kycStatus={profile?.kycStatus} />
-        <DeferredActivityToast />
+      <LobbyAppShell>
+        <PlayerHome
+          games={lobbyCatalog}
+          linkedSlugs={linkedGameSlugs}
+          promotions={promotions}
+          wallet={wallet}
+          verify={verify}
+          dailySpinEnabled={dailySpinEnabled}
+        />
       </LobbyAppShell>
     );
   }

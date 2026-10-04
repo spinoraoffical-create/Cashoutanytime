@@ -48,7 +48,12 @@ export function GoogleAuthButton({
     });
 
     if (error) {
-      toast.error(error.message);
+      const raw = `${error.message} ${error.code ?? ""}`.toLowerCase();
+      toast.error(
+        raw.includes("provider is not enabled") || error.code === "validation_failed"
+          ? "Google is not enabled on this project. Sign in with email, or turn on Google in Supabase → Authentication → Providers."
+          : error.message
+      );
       setLoading(false);
       return;
     }

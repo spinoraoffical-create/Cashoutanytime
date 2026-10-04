@@ -7,11 +7,10 @@ import { LobbyAppShell } from "@/components/home/lobby/lobby-app-shell";
 
 interface DashboardShellProps {
   children: React.ReactNode;
-  sidebar: ReactNode;
+  sidebar?: ReactNode;
 }
 
-/** Dashboard uses the same VIP casino shell as the lobby. */
-export function DashboardShell({ children, sidebar }: DashboardShellProps) {
+export function DashboardShell({ children }: DashboardShellProps) {
   const searchParams = useSearchParams();
 
   useEffect(() => {
@@ -20,11 +19,5 @@ export function DashboardShell({ children, sidebar }: DashboardShellProps) {
     }
   }, [searchParams]);
 
-  return (
-    <LobbyAppShell sidebar={sidebar}>
-      <div className="vip-page-content mx-auto w-full max-w-lg px-1 py-2 lg:max-w-3xl pb-[calc(5rem+env(safe-area-inset-bottom))]">
-        {children}
-      </div>
-    </LobbyAppShell>
-  );
+  return <LobbyAppShell>{children}</LobbyAppShell>;
 }

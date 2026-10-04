@@ -1,9 +1,9 @@
 "use client";
 
 import { useState, useEffect, useRef } from "react";
-import { MessageSquare, X, Send, Bot, User, Paperclip, Image as ImageIcon, Video, CheckCircle2, AlertCircle, RefreshCw } from "lucide-react";
+import { usePathname } from "next/navigation";
+import { X, Send, Bot, User, Paperclip, Image as ImageIcon, Video, RefreshCw } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
 import { createClient } from "@/lib/supabase/client";
 
@@ -20,12 +20,20 @@ const INITIAL_MESSAGES: ChatMessage[] = [
   {
     id: "1",
     sender: "bot",
-    text: "👋 Welcome to Sweepstakes Hub! I'm your 24/7 AI Casino Support. You can chat with me, send deposit receipt photos/videos, or ask how to load Juwa 777 / Game Vault!",
+    text: "Hi — this is Sweepstakes Hub support. Ask about Game Rooms, wallet loads, or cash outs. Sign in for private help with balances and payments.",
     time: "Just now",
   },
 ];
 
+const CHAT_HISTORY_KEY = "hub_support_chat_history";
+
+function isSupportChatRoute(pathname: string | null): boolean {
+  if (!pathname) return false;
+  return pathname === "/support" || pathname.startsWith("/dashboard");
+}
+
 export function LiveCasinoChatWidget() {
+  const pathname = usePathname();
   const [open, setOpen] = useState(false);
   const [messages, setMessages] = useState<ChatMessage[]>(INITIAL_MESSAGES);
   const [input, setInput] = useState("");
@@ -39,7 +47,7 @@ export function LiveCasinoChatWidget() {
   // Load chat history from localStorage on initial load
   useEffect(() => {
     try {
-      const saved = localStorage.getItem("spin_chat_history");
+      const saved = localStorage.getItem(CHAT_HISTORY_KEY);
       if (saved) {
         const parsed = JSON.parse(saved);
         if (Array.isArray(parsed) && parsed.length > 0) {
@@ -55,7 +63,7 @@ export function LiveCasinoChatWidget() {
   useEffect(() => {
     try {
       if (messages.length > 0) {
-        localStorage.setItem("spin_chat_history", JSON.stringify(messages));
+        localStorage.setItem(CHAT_HISTORY_KEY, JSON.stringify(messages));
       }
     } catch {
       // ignore
@@ -81,20 +89,13 @@ export function LiveCasinoChatWidget() {
     }
   }, []);
 
-  // Auto-open chat popup after 4 seconds
-  useEffect(() => {
-    const timer = setTimeout(() => {
-      setOpen(true);
-    }, 4000);
-    return () => clearTimeout(timer);
-  }, []);
-
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages, typing]);
 
   function handleClearHistory() {
     setMessages(INITIAL_MESSAGES);
+    localStorage.removeItem(CHAT_HISTORY_KEY);
     localStorage.removeItem("spin_chat_history");
     toast.success("Chat history cleared.");
   }
@@ -182,6 +183,10 @@ export function LiveCasinoChatWidget() {
     }
   }
 
+  if (!isSupportChatRoute(pathname)) {
+    return null;
+  }
+
   return (
     <div className="fixed bottom-20 right-4 sm:bottom-6 sm:right-6 z-50">
       {/* Floating Chat Trigger Button */}
@@ -189,13 +194,9 @@ export function LiveCasinoChatWidget() {
         <button
           onClick={() => setOpen(true)}
           className="relative flex h-14 w-14 items-center justify-center rounded-full bg-gradient-to-r from-amber-500 to-amber-400 text-black shadow-2xl hover:scale-110 transition-transform shadow-amber-500/40 border-2 border-amber-300"
-          aria-label="Open Live Casino Chat"
+          aria-label="Open Sweepstakes Hub support"
         >
           <Bot className="h-7 w-7" />
-          <span className="absolute -top-1 -right-1 flex h-4 w-4">
-            <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
-            <span className="relative inline-flex rounded-full h-4 w-4 bg-emerald-500 text-[9px] font-bold text-black items-center justify-center">1</span>
-          </span>
         </button>
       )}
 
@@ -213,10 +214,9 @@ export function LiveCasinoChatWidget() {
               </div>
               <div>
                 <div className="flex items-center gap-1.5">
-                  <h3 className="text-sm font-bold text-foreground">AI Live Casino Support</h3>
-                  <Badge className="bg-emerald-500/20 text-emerald-400 font-mono text-[9px]">SAVED 24/7</Badge>
+                  <h3 className="text-sm font-bold text-foreground">Sweepstakes Hub Support</h3>
                 </div>
-                <p className="text-[10px] text-muted-foreground">Multi-turn AI + Saved in Database</p>
+                <p className="text-[10px] text-muted-foreground">Questions about play, wallet, and cash outs</p>
               </div>
             </div>
 
@@ -297,7 +297,7 @@ export function LiveCasinoChatWidget() {
             {typing && (
               <div className="flex gap-2 items-center text-muted-foreground text-xs font-mono">
                 <Bot className="h-4 w-4 text-amber-400 animate-spin" />
-                <span>Sweepstakes Hub AI is typing...</span>
+                <span>Support is typing...</span>
               </div>
             )}
             <div ref={messagesEndRef} />

@@ -18,7 +18,7 @@ export default async function PlayPage() {
 
   return (
     <VipPageLayout>
-      <main className="pb-20 pt-4">
+      <main>
         <PlayCatalog games={games} />
       </main>
     </VipPageLayout>

@@ -4,14 +4,9 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import Image from "next/image";
 import { useRouter } from "next/navigation";
 import {
-  BadgeCheck,
-  ChevronDown,
-  ChevronUp,
   Download,
   Info,
-  MapPin,
   Sparkles,
-  Trophy,
   UserPlus,
 } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
@@ -22,16 +17,9 @@ import {
   UPCOMING_GAME_MESSAGE,
   type Game,
 } from "@/lib/games";
-import {
-  generateRandomMoreWinnersCount,
-  generateRandomWinner,
-  generateRandomWinnersList,
-  type GameWinner,
-} from "@/lib/games/recent-winners";
 import { GameOtherGames } from "@/components/games/game-other-games";
 import { GameDepositSection } from "@/components/games/game-deposit-section";
 import { GameWalletLoadSection } from "@/components/games/game-wallet-load-section";
-import { LiveBadge } from "@/components/ui/LiveBadge";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
 
@@ -61,16 +49,7 @@ export function GameLandingClient({
     initialGameAccount?.game_username ? "has" : "loading"
   );
   const [resolvedAccount, setResolvedAccount] = useState(initialGameAccount ?? null);
-  const [winner, setWinner] = useState<GameWinner | null>(null);
-  const [moreWinners, setMoreWinners] = useState(0);
-  const [showAllWinners, setShowAllWinners] = useState(false);
-  const [extraWinners, setExtraWinners] = useState<GameWinner[]>([]);
   const otherGames = getOtherGames(game.slug);
-
-  useEffect(() => {
-    setWinner(generateRandomWinner());
-    setMoreWinners(generateRandomMoreWinnersCount());
-  }, []);
 
   function openWalletPanel() {
     setTimeout(() => {
@@ -196,13 +175,6 @@ export function GameLandingClient({
     }, 50);
   }
 
-  function toggleWinnersList() {
-    if (!showAllWinners && extraWinners.length === 0 && winner) {
-      setExtraWinners(generateRandomWinnersList(moreWinners, winner.username));
-    }
-    setShowAllWinners((v) => !v);
-  }
-
   const rules = GAME_BONUS_RULES;
   const showWalletPanel = Boolean(walletLoadEnabled && !game.upcoming);
   const hasAccount =
@@ -258,84 +230,6 @@ export function GameLandingClient({
 
       {/* Account panel — first thing after hero when wallet load is enabled */}
       {walletSection}
-
-      {/* Recent winners */}
-      <section className="rounded-2xl border border-white/10 bg-[#1a1a1a] p-4 sm:p-5">
-        <div className="flex items-center justify-between mb-4">
-          <div className="flex items-center gap-2">
-            <Trophy className="h-5 w-5 text-amber-400" />
-            <h2 className="font-bold text-white">Recent winners</h2>
-          </div>
-          <LiveBadge />
-        </div>
-
-        <div className="rounded-xl border border-emerald-500/20 bg-emerald-500/[0.06] p-4 flex items-center justify-between gap-3 min-h-[72px]">
-          {winner ? (
-            <>
-              <div className="min-w-0">
-                <div className="flex items-center gap-1.5 flex-wrap">
-                  <span className="font-bold text-white">{winner.username}</span>
-                  {winner.verified && (
-                    <BadgeCheck className="h-4 w-4 text-sky-400 shrink-0" aria-label="Verified" />
-                  )}
-                </div>
-                <p className="text-xs text-muted-foreground flex items-center gap-1 mt-1">
-                  <MapPin className="h-3 w-3 shrink-0" />
-                  from {winner.state}
-                </p>
-              </div>
-              <span className="text-xl sm:text-2xl font-bold text-emerald-400 shrink-0">
-                ${winner.amount}
-              </span>
-            </>
-          ) : (
-            <div className="w-full h-10 rounded-lg bg-white/5 animate-pulse" aria-hidden />
-          )}
-        </div>
-
-        {winner && (
-        <button
-          type="button"
-          onClick={toggleWinnersList}
-          className="w-full text-center text-xs text-orange-400 hover:text-orange-300 mt-3 flex items-center justify-center gap-1 transition-colors"
-        >
-          {showAllWinners ? (
-            <>
-              Show less <ChevronUp className="h-3.5 w-3.5" />
-            </>
-          ) : (
-            <>
-              + {moreWinners} more winners <ChevronDown className="h-3.5 w-3.5" />
-            </>
-          )}
-        </button>
-        )}
-
-        {showAllWinners && extraWinners.length > 0 && (
-          <ul className="mt-3 space-y-2 max-h-64 overflow-y-auto pr-1">
-            {extraWinners.map((w, i) => (
-              <li
-                key={`${w.username}-${i}`}
-                className="flex items-center justify-between gap-3 rounded-lg border border-white/5 bg-[#242424]/80 px-3 py-2.5"
-              >
-                <div className="min-w-0">
-                  <div className="flex items-center gap-1.5">
-                    <span className="text-sm font-semibold text-white truncate">{w.username}</span>
-                    {w.verified && (
-                      <BadgeCheck className="h-3.5 w-3.5 text-sky-400 shrink-0" aria-label="Verified" />
-                    )}
-                  </div>
-                  <p className="text-[10px] text-muted-foreground flex items-center gap-1 mt-0.5">
-                    <MapPin className="h-2.5 w-2.5 shrink-0" />
-                    {w.state}
-                  </p>
-                </div>
-                <span className="text-sm font-bold text-emerald-400 shrink-0">${w.amount}</span>
-              </li>
-            ))}
-          </ul>
-        )}
-      </section>
 
       {/* Bonuses & Rules */}
       <section className="rounded-2xl border border-white/10 bg-[#1a1a1a] p-4 sm:p-5">

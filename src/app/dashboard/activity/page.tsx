@@ -30,10 +30,10 @@ function bucket(tx: WalletTransactionRow): Filter {
 }
 
 const FILTERS: { id: Filter; label: string }[] = [
-  { id: "all", label: "All" },
-  { id: "deposits", label: "Deposits" },
-  { id: "cashouts", label: "Cash outs" },
-  { id: "bonuses", label: "Bonuses" },
+  { id: "all", label: "ALL" },
+  { id: "deposits", label: "DEPOSITS" },
+  { id: "cashouts", label: "CASHOUTS" },
+  { id: "bonuses", label: "BONUSES" },
 ];
 
 export default async function ActivityPage({
@@ -56,7 +56,7 @@ export default async function ActivityPage({
   const items = filter === "all" ? rows : rows.filter((tx) => bucket(tx) === filter);
 
   return (
-    <div className="mx-auto max-w-lg space-y-5">
+    <div className="space-y-5">
       <div>
         <h1 className="text-3xl font-extrabold">Activity</h1>
         <p className="mt-1 text-sm text-muted-foreground">
