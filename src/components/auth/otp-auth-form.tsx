@@ -14,7 +14,7 @@ import {
   PHONE_EXAMPLES,
 } from "@/lib/auth/phone";
 import { isEmailIdentifier, normalizeEmail, maskEmail, formatAuthErrorMessage } from "@/lib/auth/identifier";
-import { resolveLoginEmail, isPhoneAvailable, isEmailAvailable, saveUserContactInfo } from "@/lib/actions/auth";
+import { sendLoginOtp, verifyLoginOtp, isPhoneAvailable, isEmailAvailable, saveUserContactInfo } from "@/lib/actions/auth";
 import { checkSignupAllowed, linkSignupSecurity } from "@/lib/actions/security";
 import { getDeviceId } from "@/lib/security/device-fingerprint";
 
@@ -34,6 +34,7 @@ export function OtpAuthForm({ mode, redirect = "/", referralCodeFromUrl }: OtpAu
   const [referralCode, setReferralCode] = useState(referralCodeFromUrl || "");
   const [otp, setOtp] = useState("");
   const [targetEmail, setTargetEmail] = useState("");
+  const [emailHint, setEmailHint] = useState("");
   const [pendingPhone, setPendingPhone] = useState("");
   const [pendingFullName, setPendingFullName] = useState("");
   const [loading, setLoading] = useState(false);
@@ -95,18 +96,18 @@ export function OtpAuthForm({ mode, redirect = "/", referralCodeFromUrl }: OtpAu
         return;
       }
     } else {
-      // Email typed directly on login — use it; phone goes through lookup
-      if (isEmailIdentifier(identifier)) {
-        email = normalizeEmail(identifier);
-      } else {
-        const resolved = await resolveLoginEmail(identifier);
-        if (!resolved.email) {
-          toast.error(resolved.error ?? "Account not found");
-          setLoading(false);
-          return;
-        }
-        email = resolved.email;
+      const sent = await sendLoginOtp(identifier);
+      if (!sent.ok) {
+        toast.error(sent.error ?? "Could not send code");
+        setLoading(false);
+        return;
       }
+      setEmailHint(sent.emailHint || "your email");
+      setTargetEmail("");
+      setStep("otp");
+      toast.success(`Verification code sent to ${sent.emailHint || "your email"}`);
+      setLoading(false);
+      return;
     }
 
     const supabase = createClient();
@@ -140,6 +141,7 @@ export function OtpAuthForm({ mode, redirect = "/", referralCodeFromUrl }: OtpAu
     }
 
     setTargetEmail(email);
+    setEmailHint(maskEmail(email));
     if (mode === "register" && phone) {
       setPendingPhone(phone);
       setPendingFullName(fullName.trim());
@@ -156,6 +158,21 @@ export function OtpAuthForm({ mode, redirect = "/", referralCodeFromUrl }: OtpAu
     }
 
     setLoading(true);
+
+    if (mode === "login") {
+      const verified = await verifyLoginOtp(identifier, otp.trim());
+      if (!verified.ok) {
+        setLoading(false);
+        toast.error(verified.error ?? "Invalid code");
+        return;
+      }
+      setLoading(false);
+      toast.success("Welcome back!");
+      router.push(redirect);
+      router.refresh();
+      return;
+    }
+
     const supabase = createClient();
     if (!supabase) {
       toast.error("Authentication is not configured");
@@ -202,7 +219,7 @@ export function OtpAuthForm({ mode, redirect = "/", referralCodeFromUrl }: OtpAu
         <div className="rounded-xl border border-orange-500/40 bg-orange-500/10 p-4 text-center">
           <p className="text-base font-semibold text-orange-400">Enter your 6-digit code</p>
           <p className="text-sm text-muted-foreground mt-1">
-            Sent to <strong className="text-foreground">{maskEmail(targetEmail)}</strong>
+            Sent to <strong className="text-foreground">{emailHint || maskEmail(targetEmail)}</strong>
           </p>
         </div>
         <form onSubmit={handleVerifyOtp} className="space-y-4">

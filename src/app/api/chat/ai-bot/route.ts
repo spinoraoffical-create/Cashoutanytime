@@ -4,7 +4,7 @@ import { processAIChatQuery } from "@/lib/ai/chatbot";
 import { clientIp, rateLimit } from "@/lib/api/rate-limit";
 
 export async function POST(request: Request) {
-  const limited = rateLimit(`ai-bot:${clientIp(request)}`, 30, 60_000);
+  const limited = await rateLimit(`ai-bot:${clientIp(request)}`, 30, 60_000);
   if (!limited.ok) {
     return NextResponse.json(
       { error: "Too many requests. Please wait." },

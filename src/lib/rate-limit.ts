@@ -14,7 +14,22 @@ export const RATE_LIMITS = {
   broadcast: { max: 5, windowSeconds: 60 },
   telegramAdmin: { max: 30, windowSeconds: 60 },
   telegramCustomer: { max: 20, windowSeconds: 60 },
+  paydoraCreate: { max: 8, windowSeconds: 60 },
+  paydoraPayout: { max: 5, windowSeconds: 300 },
+  paydoraStatus: { max: 30, windowSeconds: 60 },
+  authOtp: { max: 5, windowSeconds: 300 },
+  gameLoad: { max: 10, windowSeconds: 60 },
+  chatLiveBot: { max: 30, windowSeconds: 60 },
+  chatAiBot: { max: 30, windowSeconds: 60 },
 } as const satisfies Record<string, RateLimitRule>;
+
+export function clientIp(request: Request): string {
+  return (
+    request.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ||
+    request.headers.get("x-real-ip") ||
+    "unknown"
+  );
+}
 
 /**
  * Fixed-window rate limit via the check_rate_limit RPC (service role).
@@ -34,9 +49,9 @@ export async function rateLimit(
       p_max_hits: rule.max,
       p_window_seconds: rule.windowSeconds,
     });
-    if (error) return true; // fail open
+    if (error) return true;
     return data === true;
   } catch {
-    return true; // fail open
+    return true;
   }
 }

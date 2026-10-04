@@ -1,4 +1,4 @@
-import { ensureGameAccountUsername } from "./account-username";
+import { ensureGameAccountUsername, generateGamePassword } from "./account-username";
 
 function profileNameStem(profile: {
   full_name?: string | null;
@@ -30,13 +30,13 @@ function profileNameStem(profile: {
   return base.replace(/[^a-z0-9_]/g, "").slice(0, 13);
 }
 
-/** Juwa: ≤13 chars, letters/underscore/numbers. Password matches account. */
+/** Juwa: ≤13 chars, letters/underscore/numbers. Password is random, never the username. */
 export function buildJuwaCredentials(profile: {
   full_name?: string | null;
   email?: string | null;
 }): { username: string; password: string } {
   const username = ensureGameAccountUsername(profileNameStem(profile), "juwa");
-  return { username, password: username };
+  return { username, password: generateGamePassword() };
 }
 
 export function previewJuwaUsername(fullName?: string | null, email?: string | null): string {

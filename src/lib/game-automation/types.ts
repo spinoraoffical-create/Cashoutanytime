@@ -28,7 +28,7 @@ export interface GameLoadRequest {
   completed_at: string | null;
 }
 
-/** Games with a dedicated bot worker in `workers/*-bot/` */
+/** Games with agent API automation (no local workers). */
 export const AUTOMATED_GAME_SLUGS = [
   "juwa",
   "vegas-sweeps",
@@ -44,15 +44,3 @@ export type AutomatedGameSlug = (typeof AUTOMATED_GAME_SLUGS)[number];
 export function isAutomatedGameSlug(slug: string): slug is AutomatedGameSlug {
   return (AUTOMATED_GAME_SLUGS as readonly string[]).includes(slug);
 }
-
-/** Folder name under `workers/` for each automated game bot */
-export const AUTOMATED_BOT_WORKER_DIR: Record<AutomatedGameSlug, string> = {
-  juwa: "juwa-bot",
-  "vegas-sweeps": "vegas-bot",
-  "game-vault": "gamevault-bot",
-  gameroom: "gameroom-bot",
-  "cash-machine": "cashmachine-bot",
-  "mr-all-in-one": "mr-all-in-one-bot",
-  mafia: "mafia-bot",
-  "cash-frenzy": "cash-frenzy-bot",
-};

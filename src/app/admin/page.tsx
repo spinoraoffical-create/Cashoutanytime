@@ -23,7 +23,6 @@ import {
 } from "@/lib/admin/spinora-profile";
 import { requireStaff } from "@/lib/data/admin";
 import { getDashboardStats } from "@/lib/data/admin-stats";
-import { AdminGameBotWorkerCard } from "@/components/admin/admin-game-bot-worker-card";
 
 export default async function AdminOverviewPage() {
   const ctx = await requireStaff();
@@ -116,11 +115,6 @@ export default async function AdminOverviewPage() {
         />
       </div>
 
-      {/* 🎮 Juwa 777 & Game Platform Bot Worker Control Card */}
-      <div className="mt-6">
-        <AdminGameBotWorkerCard />
-      </div>
-
       {/* Non-Coder Friendly Quick Action Command Center */}
       <GlassCard className="mt-6 p-6">
         <div className="flex items-center justify-between border-b border-border/50 pb-3 mb-4">
@@ -170,19 +164,6 @@ export default async function AdminOverviewPage() {
             <div>
               <p className="text-sm font-bold text-foreground">Marketing Hub</p>
               <p className="text-xs text-muted-foreground">1-Click promo codes</p>
-            </div>
-          </Link>
-
-          <Link
-            href="/admin/bot-status"
-            className="flex items-center gap-3 p-3 rounded-lg border border-emerald-500/40 bg-emerald-500/10 hover:bg-emerald-500/20 transition-all group"
-          >
-            <div className="flex size-10 items-center justify-center rounded-lg bg-emerald-500/30 text-emerald-300 group-hover:scale-110 transition-transform">
-              🤖
-            </div>
-            <div>
-              <p className="text-sm font-bold text-foreground">8-Bot Control Room</p>
-              <p className="text-xs text-muted-foreground">24/7 worker status</p>
             </div>
           </Link>
 

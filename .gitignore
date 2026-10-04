@@ -32,12 +32,6 @@ yarn-error.log*
 # env files
 .env
 .env*.local
-workers/bot-env-pack/
-workers/bot-env-pack.zip
-
-# juwa bot debug screenshots
-workers/juwa-bot/debug/
-workers/juwa-bot/chrome-bot-profile/
 
 # vercel
 .vercel

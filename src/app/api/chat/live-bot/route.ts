@@ -7,7 +7,7 @@ import { isTelegramConfigured, sendTelegramMessage, escapeTelegramHtml } from "@
 import { SITE_URL } from "@/lib/constants";
 
 export async function POST(req: Request) {
-  const limited = rateLimit(`live-bot:${clientIp(req)}`, 30, 60_000);
+  const limited = await rateLimit(`live-bot:${clientIp(req)}`, 30, 60_000);
   if (!limited.ok) {
     return NextResponse.json(
       { error: "Too many requests. Please wait." },

@@ -6,6 +6,16 @@ export const CASH_FRENZY_USERNAME_MAX = 20;
 export const GAME_ACCOUNT_PASSWORD_MIN = 7;
 export const GAME_ACCOUNT_PASSWORD_MAX = 13;
 
+const PASSWORD_ALPHABET = "ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz23456789";
+
+/** 12-char alphanumeric password (fits panel max of 13). Never equals the username. */
+export function generateGamePassword(length = 12): string {
+  const n = Math.min(GAME_ACCOUNT_PASSWORD_MAX, Math.max(12, length));
+  const bytes = new Uint8Array(n);
+  crypto.getRandomValues(bytes);
+  return Array.from(bytes, (b) => PASSWORD_ALPHABET[b % PASSWORD_ALPHABET.length]).join("");
+}
+
 function cleanAccountStem(raw: string): string {
   return raw.toLowerCase().replace(/[^a-z0-9_]/g, "");
 }

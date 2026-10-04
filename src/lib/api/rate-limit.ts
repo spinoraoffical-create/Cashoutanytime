@@ -1,31 +1,15 @@
-const buckets = new Map<string, { count: number; resetAt: number }>();
+import { clientIp, rateLimit as dbRateLimit, RATE_LIMITS } from "@/lib/rate-limit";
 
-/** Simple in-memory rate limiter for public API routes. */
-export function rateLimit(
+export { clientIp };
+
+/** DB-backed limiter with the previous in-memory call shape. */
+export async function rateLimit(
   key: string,
-  maxRequests: number,
-  windowMs: number
-): { ok: true } | { ok: false; retryAfterSec: number } {
-  const now = Date.now();
-  const bucket = buckets.get(key);
-
-  if (!bucket || now >= bucket.resetAt) {
-    buckets.set(key, { count: 1, resetAt: now + windowMs });
-    return { ok: true };
-  }
-
-  if (bucket.count >= maxRequests) {
-    return { ok: false, retryAfterSec: Math.ceil((bucket.resetAt - now) / 1000) };
-  }
-
-  bucket.count += 1;
-  return { ok: true };
-}
-
-export function clientIp(request: Request): string {
-  return (
-    request.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ||
-    request.headers.get("x-real-ip") ||
-    "unknown"
-  );
+  _maxRequests?: number,
+  _windowMs?: number
+): Promise<{ ok: true } | { ok: false; retryAfterSec: number }> {
+  const action = key.startsWith("ai-bot") ? "chatAiBot" : "chatLiveBot";
+  const ok = await dbRateLimit(action, key);
+  if (ok) return { ok: true };
+  return { ok: false, retryAfterSec: RATE_LIMITS[action].windowSeconds };
 }

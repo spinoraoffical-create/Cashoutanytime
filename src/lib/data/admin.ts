@@ -214,7 +214,6 @@ export const ADMIN_MODULES = [
   { href: "/admin/analyzer", label: "AI Self-Analyzer", icon: "Activity", permission: "analytics.read", group: "AI Automation" },
   { href: "/admin/requests", label: "Deposit Requests", icon: "Inbox", permission: "requests.manage", group: "Operations" },
   { href: "/admin/payments", label: "Payment Methods", icon: "Wallet", permission: "cms.manage", group: "Operations" },
-  { href: "/admin/provision-jobs", label: "Bot Jobs", icon: "Bot", permission: "requests.manage", group: "Operations" },
   { href: "/admin/payouts", label: "Cash-out Payouts", icon: "Banknote", permission: "requests.manage", group: "Operations" },
   { href: "/admin/support", label: "Support Tickets", icon: "LifeBuoy", permission: "support.manage", group: "Operations" },
   { href: "/admin/chat", label: "Live Chat", icon: "MessageSquare", permission: "support.manage", group: "Operations" },

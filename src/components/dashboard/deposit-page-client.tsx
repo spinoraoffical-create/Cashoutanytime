@@ -31,7 +31,7 @@ export function DepositPageClient() {
     <div>
       <DashboardPageHeader
         title="Deposit"
-        description="Choose a payment method, send your deposit, then upload a screenshot. We credit your game account after verification."
+        description="Choose an instant Paydora method or send a manual payment and upload a screenshot."
       />
 
       <div className="mb-4 rounded-xl border border-white/10 bg-[#161616] p-4">

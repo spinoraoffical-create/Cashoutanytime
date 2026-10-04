@@ -19,6 +19,7 @@ import {
   DEPOSIT_PAYMENT_METHODS,
   type DepositPaymentMethodId,
 } from "@/lib/payments/methods";
+import { DollarPayDepositSection } from "@/components/payments/dollarpay-deposit-modal";
 import type { Game } from "@/lib/games";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
@@ -132,12 +133,13 @@ export function GameDepositSection({ game, hideSectionAnchor }: GameDepositSecti
     >
       <div className="flex items-center gap-2 mb-4">
         <Banknote className="h-5 w-5 text-emerald-400" />
-        <h2 className="font-bold text-white">Deposit</h2>
+        <h2 className="font-bold text-white">Deposit to {game.name}</h2>
       </div>
 
-      <p className="text-xs text-muted-foreground mb-4">
-        Choose a payment method, send your deposit, then upload a screenshot. Our team will credit your{" "}
-        {game.name} account after verification.
+      <DollarPayDepositSection gameSlug={game.slug} gameName={game.name} />
+
+      <p className="text-xs text-muted-foreground my-5">
+        Or pay manually: send to a QR / handle below, then upload a screenshot. We credit {game.name} after verification.
       </p>
 
       <div className="flex flex-wrap gap-2 mb-5">

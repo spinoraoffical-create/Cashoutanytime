@@ -5,14 +5,131 @@ import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { createNotification } from "@/lib/actions/notifications";
 import { notifyAdminOfWalletActivity } from "@/lib/telegram/notify-admin-wallet-activity";
-import { getJuwaAdminPanelUrl, getVegasAdminPanelUrl, getGameVaultAdminPanelUrl, getCashFrenzyAdminPanelUrl, isWalletLoadEnabledForGame, WALLET_LOAD_LIMITS } from "@/lib/game-automation/config";
-import { validateCustomGameAccountCredentials } from "@/lib/game-automation/account-username";
+import { rateLimit } from "@/lib/rate-limit";
+import { generateGamePassword, validateCustomGameAccountCredentials } from "@/lib/game-automation/account-username";
+import { getJuwaAdminPanelUrl, getVegasAdminPanelUrl, getGameVaultAdminPanelUrl, getCashFrenzyAdminPanelUrl, getFireKirinAdminPanelUrl, isWalletLoadEnabledForGame, WALLET_LOAD_LIMITS } from "@/lib/game-automation/config";
 import type { GameLoadWalletType } from "@/lib/game-automation/types";
 import {
   depositRolloverBounds,
   DEPOSIT_LOAD_TYPES,
   type DepositRolloverBounds,
 } from "@/lib/wallet/deposit-redeem-rollover";
+import { autoFulfillCashMachineRequest, isCashMachineApiConfigured } from "@/lib/game-automation/cashmachine-service";
+import { autoFulfillCashFrenzyRequest, isCashFrenzyApiConfigured } from "@/lib/game-automation/cashfrenzy-service";
+import { autoFulfillGameroomRequest, isGameroomApiConfigured } from "@/lib/game-automation/gameroom-service";
+import { autoFulfillMrAllInOneRequest, isMrAllInOneApiConfigured } from "@/lib/game-automation/mrallinone-service";
+import { autoFulfillGameVaultRequest, isGameVaultApiConfigured } from "@/lib/game-automation/gamevault-service";
+import { autoFulfillMafiaRequest, isMafiaApiConfigured } from "@/lib/game-automation/mafia-service";
+import { autoFulfillOrionStarsRequest } from "@/lib/game-automation/orionstars-service";
+import { isOrionStarsApiConfigured } from "@/lib/game-automation/orionstars-api";
+import { autoFulfillMilkyWayRequest } from "@/lib/game-automation/milkyway-service";
+import { isMilkyWayApiConfigured } from "@/lib/game-automation/milkyway-api";
+import { autoFulfillFireKirinRequest } from "@/lib/game-automation/firekirin-service";
+import { isFireKirinApiConfigured } from "@/lib/game-automation/firekirin-api";
+import { autoFulfillJuwaRequest } from "@/lib/game-automation/juwa-service";
+import { isJuwaApiConfigured } from "@/lib/game-automation/juwa-api";
+import { autoFulfillVegasRequest } from "@/lib/game-automation/vegas-service";
+import { isVegasApiConfigured } from "@/lib/game-automation/vegas-api";
+
+const API_CONFIGURED_GAMES = ["cash-machine", "cash-frenzy", "gameroom", "game-vault", "mafia", "juwa", "vegas-sweeps", "mr-all-in-one", "orion-stars", "milky-way", "fire-kirin"];
+
+async function autoFulfillGameRequest(
+  gameSlug: string,
+  requestId: string,
+  loadType: "create_account" | "new_account" | "check_balance" | "load" | "reload" | "redeem",
+  input: {
+    userId: string;
+    gameUsername?: string | null;
+    amount?: number | null;
+    requestedUsername?: string | null;
+    requestedPassword?: string | null;
+  }
+): Promise<{ success: boolean; error?: string } | null> {
+  if (gameSlug === "juwa" && isJuwaApiConfigured()) {
+    const targetAccount = input.gameUsername || input.requestedUsername || `juwa_${input.userId.slice(0, 8)}`;
+    const mapType = loadType === "new_account" ? "create_account" : loadType === "reload" ? "load" : loadType;
+    const res = await autoFulfillJuwaRequest({
+      requestId,
+      gameSlug,
+      loadType: mapType as "create_account" | "check_balance" | "load" | "redeem",
+      accountName: targetAccount,
+      password: input.requestedPassword || undefined,
+      amount: input.amount || 0,
+    });
+    return { success: res.success, error: res.success ? undefined : res.message };
+  }
+  if (gameSlug === "vegas-sweeps" && isVegasApiConfigured()) {
+    const targetAccount = input.gameUsername || input.requestedUsername || `vegas_${input.userId.slice(0, 8)}`;
+    const mapType = loadType === "new_account" ? "create_account" : loadType === "reload" ? "load" : loadType;
+    const res = await autoFulfillVegasRequest({
+      requestId,
+      gameSlug,
+      loadType: mapType as "create_account" | "check_balance" | "load" | "redeem",
+      accountName: targetAccount,
+      password: input.requestedPassword || undefined,
+      amount: input.amount || 0,
+    });
+    return { success: res.success, error: res.success ? undefined : res.message };
+  }
+  if (gameSlug === "cash-machine" && isCashMachineApiConfigured()) {
+    return autoFulfillCashMachineRequest(requestId, loadType, input);
+  }
+  if (gameSlug === "cash-frenzy" && isCashFrenzyApiConfigured()) {
+    return autoFulfillCashFrenzyRequest(requestId, loadType, input);
+  }
+  if (gameSlug === "gameroom" && isGameroomApiConfigured()) {
+    return autoFulfillGameroomRequest(requestId, loadType, input);
+  }
+  if (gameSlug === "mr-all-in-one" && isMrAllInOneApiConfigured()) {
+    return autoFulfillMrAllInOneRequest(requestId, loadType, input);
+  }
+  if (gameSlug === "game-vault" && isGameVaultApiConfigured()) {
+    return autoFulfillGameVaultRequest(requestId, loadType, input);
+  }
+  if (gameSlug === "mafia" && isMafiaApiConfigured()) {
+    return autoFulfillMafiaRequest(requestId, loadType, input);
+  }
+  if (gameSlug === "orion-stars" && isOrionStarsApiConfigured()) {
+    const targetAccount = input.gameUsername || input.requestedUsername || `os_${input.userId.slice(0, 8)}`;
+    const mapType = loadType === "new_account" ? "create_account" : loadType === "reload" ? "load" : loadType;
+    const res = await autoFulfillOrionStarsRequest({
+      requestId,
+      gameSlug,
+      loadType: mapType as "create_account" | "check_balance" | "load" | "redeem",
+      accountName: targetAccount,
+      password: input.requestedPassword || undefined,
+      amount: input.amount || 0,
+    });
+    return { success: res.success, error: res.success ? undefined : res.message };
+  }
+  if (gameSlug === "milky-way" && isMilkyWayApiConfigured()) {
+    const targetAccount = input.gameUsername || input.requestedUsername || `mw_${input.userId.slice(0, 8)}`;
+    const mapType = loadType === "new_account" ? "create_account" : loadType === "reload" ? "load" : loadType;
+    const res = await autoFulfillMilkyWayRequest({
+      requestId,
+      gameSlug,
+      loadType: mapType as "create_account" | "check_balance" | "load" | "redeem",
+      accountName: targetAccount,
+      password: input.requestedPassword || undefined,
+      amount: input.amount || 0,
+    });
+    return { success: res.success, error: res.success ? undefined : res.message };
+  }
+  if (gameSlug === "fire-kirin" && isFireKirinApiConfigured()) {
+    const targetAccount = input.gameUsername || input.requestedUsername || `fk_${input.userId.slice(0, 8)}`;
+    const mapType = loadType === "new_account" ? "create_account" : loadType === "reload" ? "load" : loadType;
+    const res = await autoFulfillFireKirinRequest({
+      requestId,
+      gameSlug,
+      loadType: mapType as "create_account" | "check_balance" | "load" | "redeem",
+      accountName: targetAccount,
+      password: input.requestedPassword || undefined,
+      amount: input.amount || 0,
+    });
+    return { success: res.success, error: res.success ? undefined : res.message };
+  }
+  return null;
+}
 
 function isMissingRpcError(message: string): boolean {
   return /could not find the function|schema cache|function.*does not exist/i.test(message);
@@ -157,6 +274,9 @@ export async function requestGameAccountCreate(input: {
   } = await supabase.auth.getUser();
   if (!user) return { error: "Not authenticated" };
 
+  const allowed = await rateLimit("gameLoad", user.id);
+  if (!allowed) return { error: "Too many requests. Please wait a moment." };
+
   if (!isWalletLoadEnabledForGame(input.gameSlug)) {
     return { error: "Wallet load is not enabled for this game yet." };
   }
@@ -192,6 +312,8 @@ export async function requestGameAccountCreate(input: {
     if (!validated.ok) return { error: validated.error };
     username = validated.username;
     finalPassword = validated.password;
+  } else {
+    finalPassword = generateGamePassword();
   }
 
   // Fast non-blocking RPC call with instant fallback
@@ -205,6 +327,16 @@ export async function requestGameAccountCreate(input: {
     });
 
     if (!error && requestId) {
+      const fulfillResult = await autoFulfillGameRequest(input.gameSlug, requestId as string, "create_account", {
+        userId: user.id,
+        requestedUsername: username,
+        requestedPassword: finalPassword,
+      });
+      if (fulfillResult && !fulfillResult.success && fulfillResult.error) {
+        revalidatePath(`/games/${input.gameSlug}`);
+        revalidatePath("/admin/game-loads");
+        return { error: fulfillResult.error, requestId: requestId as string };
+      }
       revalidatePath(`/games/${input.gameSlug}`);
       revalidatePath("/dashboard");
       revalidatePath("/dashboard/games");
@@ -242,12 +374,26 @@ export async function requestGameAccountCreate(input: {
       return { error: insertError.message };
     }
 
+    const createdId = (directInsert?.id as string) || "";
+    if (createdId) {
+      const fulfillResult = await autoFulfillGameRequest(input.gameSlug, createdId, "create_account", {
+        userId: user.id,
+        requestedUsername: username,
+        requestedPassword: finalPassword,
+      });
+      if (fulfillResult && !fulfillResult.success && fulfillResult.error) {
+        revalidatePath(`/games/${input.gameSlug}`);
+        revalidatePath("/admin/game-loads");
+        return { error: fulfillResult.error, requestId: createdId };
+      }
+    }
+
     revalidatePath(`/games/${input.gameSlug}`);
     revalidatePath("/dashboard");
     revalidatePath("/dashboard/games");
     revalidatePath("/admin/game-loads");
 
-    return { success: true, requestId: directInsert?.id || "" };
+    return { success: true, requestId: createdId };
   }
 
   return { error: "Could not queue account creation. Run request_game_account_create migration in Supabase." };
@@ -270,6 +416,19 @@ export async function requestGameCheckBalance(input: {
 
   if (!input.gameUsername?.trim()) {
     return { error: "Create your game account first." };
+  }
+
+  if (API_CONFIGURED_GAMES.includes(input.gameSlug)) {
+    const admin = createAdminClient();
+    if (admin) {
+      await admin
+        .from("game_load_requests")
+        .update({ status: "cancelled", updated_at: new Date().toISOString() })
+        .eq("user_id", user.id)
+        .eq("game_slug", input.gameSlug)
+        .eq("load_type", "check_balance")
+        .in("status", ["pending", "processing"]);
+    }
   }
 
   const { data: pending } = await supabase
@@ -297,6 +456,16 @@ export async function requestGameCheckBalance(input: {
     return { error: error.message };
   }
 
+  const fulfillResult = await autoFulfillGameRequest(input.gameSlug, requestId as string, "check_balance", {
+    userId: user.id,
+    gameUsername: input.gameUsername.trim(),
+  });
+  if (fulfillResult && !fulfillResult.success && fulfillResult.error) {
+    revalidatePath(`/games/${input.gameSlug}`);
+    revalidatePath("/admin/game-loads");
+    return { error: fulfillResult.error, requestId: requestId as string };
+  }
+
   revalidatePath(`/games/${input.gameSlug}`);
   revalidatePath("/admin/game-loads");
   return { success: true, requestId: requestId as string };
@@ -314,6 +483,9 @@ export async function requestGameLoad(input: {
     data: { user },
   } = await supabase.auth.getUser();
   if (!user) return { error: "Not authenticated" };
+
+  const allowed = await rateLimit("gameLoad", user.id);
+  if (!allowed) return { error: "Too many requests. Please wait a moment." };
 
   if (!isWalletLoadEnabledForGame(input.gameSlug)) {
     return { error: "Wallet load is not enabled for this game yet." };
@@ -432,6 +604,17 @@ export async function requestGameLoad(input: {
     }
   }
 
+  const fulfillLoad = await autoFulfillGameRequest(input.gameSlug, requestId, "load", {
+    userId: user.id,
+    gameUsername: input.gameUsername.trim(),
+    amount,
+  });
+  if (fulfillLoad && !fulfillLoad.success && fulfillLoad.error) {
+    revalidatePath(`/games/${input.gameSlug}`);
+    revalidatePath("/admin/game-loads");
+    return { error: fulfillLoad.error, requestId };
+  }
+
   revalidatePath(`/games/${input.gameSlug}`);
   revalidatePath("/dashboard");
     revalidatePath("/dashboard/games");
@@ -463,6 +646,9 @@ export async function requestGameRedeem(input: {
     data: { user },
   } = await supabase.auth.getUser();
   if (!user) return { error: "Not authenticated" };
+
+  const allowed = await rateLimit("gameLoad", user.id);
+  if (!allowed) return { error: "Too many requests. Please wait a moment." };
 
   const { data: profile } = await supabase
     .from("profiles")
@@ -586,6 +772,17 @@ export async function requestGameRedeem(input: {
     requestId = rpcId as string;
   } else {
     requestId = fallback.requestId;
+  }
+
+  const fulfillRedeem = await autoFulfillGameRequest(input.gameSlug, requestId, "redeem", {
+    userId: user.id,
+    gameUsername: input.gameUsername.trim(),
+    amount: redeemAll ? null : input.amount,
+  });
+  if (fulfillRedeem && !fulfillRedeem.success && fulfillRedeem.error) {
+    revalidatePath(`/games/${input.gameSlug}`);
+    revalidatePath("/admin/game-loads");
+    return { error: fulfillRedeem.error, requestId };
   }
 
   revalidatePath(`/games/${input.gameSlug}`);
@@ -798,16 +995,16 @@ export async function healStaleGameLoads(gameSlug: string, staleMinutes = 15) {
   } = await supabase.auth.getUser();
   if (!user) return { healed: 0 };
 
-  const { data, error } = await supabase.rpc("fail_stale_game_loads", {
+  const admin = createAdminClient();
+  if (!admin) return { healed: 0 };
+
+  const { data, error } = await admin.rpc("fail_stale_game_loads", {
     p_stale_minutes: staleMinutes,
     p_user_id: user.id,
     p_game_slug: gameSlug,
   });
 
   if (!error) return { healed: Number(data ?? 0) };
-
-  const admin = createAdminClient();
-  if (!admin) return { healed: 0 };
 
   const now = Date.now();
   const cutoff = new Date(now - staleMinutes * 60 * 1000).toISOString();
@@ -928,6 +1125,12 @@ export async function getAdminPanelUrlForGame(gameSlug: string) {
   if (gameSlug === "cash-frenzy") {
     const url = getCashFrenzyAdminPanelUrl();
     if (!url) return { error: "CASHFRENZY_ADMIN_URL not configured" };
+    return { url };
+  }
+
+  if (gameSlug === "fire-kirin") {
+    const url = getFireKirinAdminPanelUrl();
+    if (!url) return { error: "FIREKIRIN_ADMIN_URL not configured" };
     return { url };
   }
 

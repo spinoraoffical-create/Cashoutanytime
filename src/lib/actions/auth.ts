@@ -7,10 +7,12 @@ import {
   parseValidInternationalPhone,
   phoneLookupVariants,
 } from "@/lib/auth/phone";
-import { isEmailIdentifier, normalizeEmail, formatAuthErrorMessage } from "@/lib/auth/identifier";
+import { isEmailIdentifier, normalizeEmail, formatAuthErrorMessage, maskEmail } from "@/lib/auth/identifier";
 import { buildAuthCallbackUrl } from "@/lib/auth/callback-url";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
+import { rateLimit } from "@/lib/rate-limit";
+import { headers } from "next/headers";
 
 async function findProfileByPhone(phone: string) {
   const admin = createAdminClient();
@@ -33,8 +35,8 @@ async function findProfileByPhone(phone: string) {
   return { profile: data?.[0] ?? null, error: null };
 }
 
-/** Resolve phone number to the account email (OTP is always sent to email) */
-export async function resolveLoginEmail(
+/** Resolve phone/email to account email server-side. Never return this to the client. */
+async function resolveAccountEmail(
   identifier: string
 ): Promise<{ email: string | null; error?: string }> {
   const trimmed = identifier.trim();
@@ -76,6 +78,52 @@ export async function resolveLoginEmail(
   }
 
   return { email: normalizeEmail(profile.email) };
+}
+
+async function otpRateLimitKey(identifier: string) {
+  const h = await headers();
+  const ip = h.get("x-forwarded-for")?.split(",")[0]?.trim() || h.get("x-real-ip") || "unknown";
+  return `${ip}:${identifier.trim().toLowerCase().slice(0, 48)}`;
+}
+
+export async function sendLoginOtp(
+  identifier: string
+): Promise<{ ok: boolean; emailHint?: string; error?: string }> {
+  const allowed = await rateLimit("authOtp", await otpRateLimitKey(identifier));
+  if (!allowed) return { ok: false, error: "Too many login codes. Please wait a few minutes." };
+
+  const resolved = await resolveAccountEmail(identifier);
+  if (!resolved.email) return { ok: false, error: resolved.error ?? "Account not found" };
+
+  const supabase = await createClient();
+  const { error } = await supabase.auth.signInWithOtp({
+    email: resolved.email,
+    options: { shouldCreateUser: false },
+  });
+
+  if (error) return { ok: false, error: formatAuthErrorMessage(error) };
+  return { ok: true, emailHint: maskEmail(resolved.email) };
+}
+
+export async function verifyLoginOtp(
+  identifier: string,
+  token: string
+): Promise<{ ok: boolean; error?: string }> {
+  const allowed = await rateLimit("authOtp", `verify:${await otpRateLimitKey(identifier)}`);
+  if (!allowed) return { ok: false, error: "Too many attempts. Please wait a few minutes." };
+
+  const resolved = await resolveAccountEmail(identifier);
+  if (!resolved.email) return { ok: false, error: resolved.error ?? "Account not found" };
+
+  const supabase = await createClient();
+  const { error } = await supabase.auth.verifyOtp({
+    email: resolved.email,
+    token: token.trim(),
+    type: "email",
+  });
+
+  if (error) return { ok: false, error: formatAuthErrorMessage(error) };
+  return { ok: true };
 }
 
 /** Check phone is not already linked to another account (register) */

@@ -47,6 +47,10 @@ export function getMafiaAdminPanelUrl(): string | null {
   return process.env.MAFIA_ADMIN_URL?.trim() || "https://agentserver.mafia77777.com/admin/login";
 }
 
+export function getFireKirinAdminPanelUrl(): string | null {
+  return process.env.FIREKIRIN_ADMIN_URL?.trim() || "http://start.firekirin.xyz:8580/";
+}
+
 export function getAutomationSecret(): string | null {
   return process.env.GAME_AUTOMATION_SECRET?.trim() || null;
 }

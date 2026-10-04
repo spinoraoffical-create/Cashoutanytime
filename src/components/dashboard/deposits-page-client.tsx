@@ -87,7 +87,7 @@ export function DepositsPageClient() {
                       ${Number(dep.amount).toFixed(2)}
                     </p>
                   )}
-                  {dep.proof_url && <DepositProofImage path={dep.proof_url} />}
+                  {dep.proof_url && !dep.proof_url.startsWith("paydora/") && <DepositProofImage path={dep.proof_url} />}
                   <p className="text-xs text-muted-foreground mt-2">{formatDate(dep.created_at)}</p>
                 </CardContent>
               </Card>
