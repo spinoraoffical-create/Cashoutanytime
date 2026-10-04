@@ -5,11 +5,13 @@ import {
   getCashFrenzyApiClient,
   CashFrenzyApiClient,
 } from "./cashfrenzy-api";
+import { hasAnyEnv } from "./env";
 
 export function isCashFrenzyApiConfigured(): boolean {
-  const username = process.env.CASHFRENZY_AGENT_USERNAME || process.env.CASHFRENZY_USERNAME || "Funstorr111";
-  const password = process.env.CASHFRENZY_AGENT_PASSWORD || process.env.CASHFRENZY_PASSWORD || "Fun@123@";
-  return Boolean(username?.trim() && password?.trim());
+  return (
+    hasAnyEnv("CASHFRENZY_AGENT_USERNAME", "CASHFRENZY_USERNAME") &&
+    hasAnyEnv("CASHFRENZY_AGENT_PASSWORD", "CASHFRENZY_PASSWORD")
+  );
 }
 
 export async function createCashFrenzyAccount(
@@ -17,7 +19,7 @@ export async function createCashFrenzyAccount(
   client?: CashFrenzyApiClient
 ) {
   const api = client || getCashFrenzyApiClient();
-  const password = params.password || "123456";
+  const password = params.password || generateGamePassword();
   const nickname = (params.nickname && params.nickname !== "-") ? params.nickname : params.username;
   const res = await api.addPlayer(params.username, password, nickname, "0");
   return { success: true, account: res.data.account, password: res.data.password };

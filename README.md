@@ -5,13 +5,12 @@ A production-ready gaming portal built with Next.js 15, TypeScript, Tailwind CSS
 ## Features
 
 - **SEO Optimized** — Metadata API, sitemap, robots.txt, JSON-LD structured data
-- **Authentication** — Supabase Auth (login, register, password reset)
-- **Game Requests** — Request and track game accounts with admin management
+- **Authentication** — Supabase Auth (email OTP; optional phone identifier)
+- **Game loads** — Wallet load / redeem via agent APIs (Juwa, Vegas, Game Vault, and others)
+- **Payments** — Paydora deposits and payouts
 - **Live Chat** — Real-time messaging via Supabase Realtime
-- **VIP System** — Bronze → Platinum tiers with progress tracking
-- **Referral Program** — Unique referral links and reward tracking
-- **Admin Dashboard** — User management, chat, requests, analytics
-- **Premium UI** — Dark theme, glassmorphism, Framer Motion animations
+- **VIP / referrals** — Tiers, unique links, reward tracking
+- **Admin Dashboard** — Users, KYC, requests, analytics, Telegram
 
 ## Getting Started
 
@@ -21,21 +20,17 @@ A production-ready gaming portal built with Next.js 15, TypeScript, Tailwind CSS
 npm install
 ```
 
-### 2. Set up Supabase
+### 2. Environment
 
-1. Create a project at [supabase.com](https://supabase.com)
-2. Run the SQL in `supabase/schema.sql` in the SQL Editor
-3. Copy `.env.example` to `.env.local` and fill in your credentials:
+Copy `.env.example` to `.env.local` and fill every value you use. **Do not commit secrets.**
 
-```env
-NEXT_PUBLIC_SUPABASE_URL=your_project_url
-NEXT_PUBLIC_SUPABASE_ANON_KEY=your_anon_key
-NEXT_PUBLIC_SITE_URL=http://localhost:3000
-```
+Game-automation credentials were removed from source. Set `JUWA_*`, `VEGAS_*`, `GAMEVAULT_*`, and the other `*_AGENT_*` / `*_SECRET_*` vars for each game you enable, then **rotate those keys** if they ever lived in git.
 
-### 3. Create an admin user
+### 3. Set up Supabase
 
-After registering, update your profile role in Supabase:
+See [supabase/README.md](supabase/README.md). Apply `supabase/migrations/` in timestamp order, then `supabase/paydora-security-hardening.sql` if the Paydora RPCs are not already on the project.
+
+Create an admin user after first signup:
 
 ```sql
 UPDATE profiles SET role = 'admin' WHERE email = 'your@email.com';
@@ -53,22 +48,22 @@ Open [http://localhost:3000](http://localhost:3000).
 
 ```
 src/
-├── app/                  # Next.js App Router pages
-│   ├── (auth)/           # Login, register, reset password
-│   ├── dashboard/        # User dashboard (protected)
-│   ├── admin/            # Admin panel (role-protected)
-│   ├── promotions/       # SEO public pages
-│   ├── vip/
-│   ├── about/
-│   └── support/
-├── components/           # Reusable UI components
-├── lib/                  # Utilities, Supabase, actions, SEO
-└── types/                # TypeScript types
+├── app/                  # Next.js App Router
+│   ├── (auth)/           # Login / register
+│   ├── dashboard/        # Member dashboard
+│   ├── admin/            # Staff panel
+│   └── api/              # Route handlers (Paydora, cron, chat)
+├── components/           # UI
+├── lib/                  # Supabase, payments, game automation, actions
+└── types/
 supabase/
-└── schema.sql            # Database schema + RLS policies
+├── migrations/           # Authoritative schema (apply in order)
+├── paydora-security-hardening.sql
+└── archive/              # Legacy combined dumps (reference only)
+scripts/                  # Setup + optional dev-only helpers
 public/
-├── logo.jpeg             # Spinora brand logo
-└── games/                # Game platform images
+├── logo.webp             # Brand logo
+└── games/                # Game images
 ```
 
 ## Tech Stack
@@ -78,15 +73,8 @@ public/
 - **Styling:** Tailwind CSS v4
 - **UI:** ShadCN UI (Radix primitives)
 - **Backend:** Supabase (Auth, Database, Realtime)
+- **Payments:** Paydora
 - **Animation:** Framer Motion
-
-## SEO
-
-- Unique metadata per page (title, description, keywords, OG, Twitter)
-- Auto-generated `/sitemap.xml`
-- `/robots.txt` blocking `/dashboard`, `/admin`, `/chat`
-- JSON-LD: Organization, Website, Breadcrumbs
-- SSR/SSG for all public pages
 
 ## License
 

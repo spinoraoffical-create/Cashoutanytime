@@ -1,4 +1,5 @@
 import crypto from "crypto";
+import { hasAllEnv, optionalEnv, requiredEnv } from "./env";
 import https from "https";
 import { HttpsProxyAgent } from "https-proxy-agent";
 
@@ -117,28 +118,14 @@ export class FireKirinApiClient {
       "https://52.41.26.140:8034/ws/service.ashx"
     ).trim();
 
-    this.agentName = (
-      config.agentName ||
-      process.env.FIREKIRIN_AGENT_USERNAME ||
-      "Darklord1121"
-    ).trim();
-
-    const rawPass =
-      config.agentPassword ||
-      process.env.FIREKIRIN_AGENT_PASSWORD ||
-      "Darklord1121";
-
-    this.agentPasswdHash = md5(rawPass.trim());
+    this.agentName = (config.agentName || requiredEnv("FIREKIRIN_AGENT_USERNAME")).trim();
+    this.agentPasswdHash = md5((config.agentPassword || requiredEnv("FIREKIRIN_AGENT_PASSWORD")).trim());
 
     if (config.proxyUrl === null) {
       this.proxyUrl = undefined;
     } else {
-      this.proxyUrl = (
-        config.proxyUrl ||
-        process.env.FIREKIRIN_PROXY_URL ||
-        process.env.GAMEVAULT_PROXY_URL ||
-        ""
-      ).trim() || undefined;
+      this.proxyUrl =
+        (config.proxyUrl || optionalEnv("FIREKIRIN_PROXY_URL", "GAMEVAULT_PROXY_URL") || "").trim() || undefined;
     }
   }
 
@@ -318,7 +305,5 @@ export class FireKirinApiClient {
 }
 
 export function isFireKirinApiConfigured(): boolean {
-  const username = process.env.FIREKIRIN_AGENT_USERNAME || "Darklord1121";
-  const password = process.env.FIREKIRIN_AGENT_PASSWORD || "Darklord1121";
-  return Boolean(username?.trim() && password?.trim());
+  return hasAllEnv("FIREKIRIN_AGENT_USERNAME", "FIREKIRIN_AGENT_PASSWORD");
 }

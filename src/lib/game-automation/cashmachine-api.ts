@@ -10,6 +10,9 @@
  * 6. Player withdrawal (POST /api/player/playerWithdraw)
  */
 
+import { generateGamePassword } from "./account-username";
+import { firstRequiredEnv } from "./env";
+
 export interface CashMachineLoginResponse {
   status_code: number;
   message: string;
@@ -112,16 +115,12 @@ export class CashMachineApiClient {
     ).replace(/\/+$/, "");
 
     this.agentUsername =
-      config.username ||
-      process.env.CASHMACHINE_AGENT_USERNAME ||
-      process.env.CASHMACHINE_USERNAME ||
-      "Tupac12cm";
+      config.username?.trim() ||
+      firstRequiredEnv("CASHMACHINE_AGENT_USERNAME", "CASHMACHINE_USERNAME");
 
     this.agentPassword =
-      config.password ||
-      process.env.CASHMACHINE_AGENT_PASSWORD ||
-      process.env.CASHMACHINE_PASSWORD ||
-      "Test@2023";
+      config.password?.trim() ||
+      firstRequiredEnv("CASHMACHINE_AGENT_PASSWORD", "CASHMACHINE_PASSWORD");
   }
 
   /**
@@ -277,7 +276,7 @@ export class CashMachineApiClient {
    */
   async addPlayer(
     username: string,
-    password: string = "123456",
+    password: string = generateGamePassword(),
     nickname?: string,
     money: string | number = "0"
   ): Promise<CashMachineAddPlayerResponse> {

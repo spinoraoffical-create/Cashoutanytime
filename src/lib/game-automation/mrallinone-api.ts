@@ -1,4 +1,6 @@
 import { createHash } from "crypto";
+import { generateGamePassword } from "./account-username";
+import { firstRequiredEnv, optionalEnv } from "./env";
 import https from "https";
 import tls from "tls";
 import net from "net";
@@ -262,25 +264,13 @@ export class MrAllInOneApiClient {
     ).replace(/\/+$/, "");
 
     this.agentUsername = (
-      config.username ||
-      process.env.MRALLINONE_AGENT_USERNAME ||
-      process.env.MRALLINONE_USERNAME ||
-      ""
-    ).trim();
-
+      config.username?.trim() || firstRequiredEnv("MRALLINONE_AGENT_USERNAME", "MRALLINONE_USERNAME")
+    );
     this.agentPassword = (
-      config.password ||
-      process.env.MRALLINONE_AGENT_PASSWORD ||
-      process.env.MRALLINONE_PASSWORD ||
-      ""
-    ).trim();
-
-    this.proxyUrl = (
-      config.proxyUrl ||
-      process.env.MRALLINONE_PROXY_URL ||
-      process.env.GAMEVAULT_PROXY_URL ||
-      ""
-    ).trim() || undefined;
+      config.password?.trim() || firstRequiredEnv("MRALLINONE_AGENT_PASSWORD", "MRALLINONE_PASSWORD")
+    );
+    this.proxyUrl =
+      (config.proxyUrl || optionalEnv("MRALLINONE_PROXY_URL", "GAMEVAULT_PROXY_URL") || "").trim() || undefined;
   }
 
   private async ensureAuthenticated(): Promise<string> {
@@ -401,7 +391,7 @@ export class MrAllInOneApiClient {
 
   async addPlayer(
     username: string,
-    password = "123456",
+    password = generateGamePassword(),
     nickname?: string,
     money: string | number = "0"
   ): Promise<MrAllInOneAddPlayerResponse> {

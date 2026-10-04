@@ -1,3 +1,4 @@
+import { hasAnyEnv } from "./env";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { formatGameAutomationError } from "./error-formatter";
 import { generateGamePassword } from "./account-username";
@@ -7,9 +8,10 @@ import {
 } from "./gameroom-api";
 
 export function isGameroomApiConfigured(): boolean {
-  const username = process.env.GAMEROOM_AGENT_USERNAME || process.env.GAMEROOM_USERNAME || "House0011";
-  const password = process.env.GAMEROOM_AGENT_PASSWORD || process.env.GAMEROOM_PASSWORD || "David@123#";
-  return Boolean(username?.trim() && password?.trim());
+  return (
+    hasAnyEnv("GAMEROOM_AGENT_USERNAME", "GAMEROOM_USERNAME") &&
+    hasAnyEnv("GAMEROOM_AGENT_PASSWORD", "GAMEROOM_PASSWORD")
+  );
 }
 
 export async function createGameroomAccount(
@@ -17,7 +19,7 @@ export async function createGameroomAccount(
   client?: GameroomApiClient
 ) {
   const api = client || getGameroomApiClient();
-  const password = params.password || "123456";
+  const password = params.password || generateGamePassword();
   const nickname = (params.nickname && params.nickname !== "-") ? params.nickname : params.username;
   const res = await api.addPlayer(params.username, password, nickname, "0");
   return { success: true, account: res.data.account, password: res.data.password };

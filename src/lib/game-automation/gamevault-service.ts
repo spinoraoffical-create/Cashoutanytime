@@ -1,3 +1,4 @@
+import { hasAllEnv } from "./env";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { formatGameAutomationError } from "./error-formatter";
 import { generateGamePassword } from "./account-username";
@@ -7,9 +8,7 @@ import {
 } from "./gamevault-api";
 
 export function isGameVaultApiConfigured(): boolean {
-  const agentId = process.env.GAMEVAULT_AGENT_ID || "160496";
-  const secretKey = process.env.GAMEVAULT_SECRET_KEY || "6f56ce873171c0a455a8a60c039b3b90";
-  return Boolean(agentId?.trim() && secretKey?.trim());
+  return hasAllEnv("GAMEVAULT_AGENT_ID", "GAMEVAULT_SECRET_KEY");
 }
 
 export async function createGameVaultAccount(

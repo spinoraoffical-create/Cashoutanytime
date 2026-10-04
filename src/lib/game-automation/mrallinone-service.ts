@@ -14,7 +14,7 @@ export async function createMrAllInOneAccount(
   client?: MrAllInOneApiClient
 ) {
   const api = client || getMrAllInOneApiClient();
-  const password = params.password || "123456";
+  const password = params.password || generateGamePassword();
   const nickname = params.nickname && params.nickname !== "-" ? params.nickname : params.username;
   const res = await api.addPlayer(params.username, password, nickname, "0");
   return { success: true, account: res.data.account, password: res.data.password };

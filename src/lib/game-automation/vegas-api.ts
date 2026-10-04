@@ -1,4 +1,5 @@
 import { createHash } from "crypto";
+import { optionalEnv, requiredEnv } from "./env";
 import https from "https";
 import tls from "tls";
 import net from "net";
@@ -264,14 +265,10 @@ export class VegasApiClient {
       .trim()
       .replace(/\/+$/, "");
 
-    this.agentId = (config.agentId || process.env.VEGAS_AGENT_ID || "").trim();
-    this.secretKey = (config.secretKey || process.env.VEGAS_SECRET_KEY || "").trim();
-    this.proxyUrl = (
-      config.proxyUrl ||
-      process.env.VEGAS_PROXY_URL ||
-      process.env.GAMEVAULT_PROXY_URL ||
-      ""
-    ).trim() || undefined;
+    this.agentId = (config.agentId || requiredEnv("VEGAS_AGENT_ID")).trim();
+    this.secretKey = (config.secretKey || requiredEnv("VEGAS_SECRET_KEY")).trim();
+    this.proxyUrl =
+      (config.proxyUrl || optionalEnv("VEGAS_PROXY_URL", "GAMEVAULT_PROXY_URL") || "").trim() || undefined;
   }
 
   private generateAuthParams(): { agent_id: string; timestamp: string; token: string } {

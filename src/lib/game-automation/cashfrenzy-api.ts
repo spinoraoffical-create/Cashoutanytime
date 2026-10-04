@@ -10,6 +10,9 @@
  * 6. Player withdrawal (POST /api/player/playerWithdraw)
  */
 
+import { generateGamePassword } from "./account-username";
+import { firstRequiredEnv } from "./env";
+
 export interface CashFrenzyLoginResponse {
   status_code: number;
   message: string;
@@ -112,16 +115,12 @@ export class CashFrenzyApiClient {
     ).replace(/\/+$/, "");
 
     this.agentUsername =
-      config.username ||
-      process.env.CASHFRENZY_AGENT_USERNAME ||
-      process.env.CASHFRENZY_USERNAME ||
-      "Funstorr111";
+      config.username?.trim() ||
+      firstRequiredEnv("CASHFRENZY_AGENT_USERNAME", "CASHFRENZY_USERNAME");
 
     this.agentPassword =
-      config.password ||
-      process.env.CASHFRENZY_AGENT_PASSWORD ||
-      process.env.CASHFRENZY_PASSWORD ||
-      "Fun@123@";
+      config.password?.trim() ||
+      firstRequiredEnv("CASHFRENZY_AGENT_PASSWORD", "CASHFRENZY_PASSWORD");
   }
 
   private async ensureAuthenticated(): Promise<string> {
@@ -233,7 +232,7 @@ export class CashFrenzyApiClient {
 
   async addPlayer(
     username: string,
-    password: string = "123456",
+    password: string = generateGamePassword(),
     nickname?: string,
     money: string | number = "0"
   ): Promise<CashFrenzyAddPlayerResponse> {

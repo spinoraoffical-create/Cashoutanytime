@@ -133,7 +133,7 @@ export function KYCVerificationCard({ initialStatus = "unverified" }: { initialS
 
           <div>
             <label className="block text-xs font-bold uppercase text-foreground mb-1">
-              Upload Photo of Government ID / Driver's License
+              Upload Photo of Government ID / Driver&apos;s License
             </label>
             <div className="rounded-xl border border-dashed border-border/80 bg-background/60 p-6 text-center hover:border-amber-500/50 transition-all">
               {filePreviewUrl ? (

@@ -62,7 +62,7 @@ export function StreakCalendarCard() {
           className="bg-amber-500 text-black hover:bg-amber-400 font-extrabold text-xs py-6 px-6 rounded-2xl shadow-xl shadow-amber-500/25 gap-2 shrink-0"
         >
           <Sparkles className="h-4 w-4" />
-          Claim Today's Day 3 Reward ($10)
+          Claim Today&apos;s Day 3 Reward ($10)
         </Button>
       </div>
 

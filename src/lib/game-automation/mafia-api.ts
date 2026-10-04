@@ -11,6 +11,7 @@
  */
 
 import { generateGamePassword } from "./account-username";
+import { hasAllEnv, requiredEnv } from "./env";
 
 export interface MafiaLoginResponse {
   status_code: number;
@@ -98,15 +99,8 @@ export class MafiaApiClient {
       "https://agentserver.mafia77777.com"
     ).replace(/\/admin\/login\/?$/, "").replace(/\/+$/, "");
 
-    this.username =
-      config.username ||
-      process.env.MAFIA_AGENT_USERNAME ||
-      "Romc12mf";
-
-    this.password =
-      config.password ||
-      process.env.MAFIA_AGENT_PASSWORD ||
-      "Reset123@";
+    this.username = config.username?.trim() || requiredEnv("MAFIA_AGENT_USERNAME");
+    this.password = config.password?.trim() || requiredEnv("MAFIA_AGENT_PASSWORD");
   }
 
   public async getValidToken(): Promise<string> {
@@ -294,7 +288,5 @@ export class MafiaApiClient {
 }
 
 export function isMafiaApiConfigured(): boolean {
-  const username = process.env.MAFIA_AGENT_USERNAME || "Romc12mf";
-  const password = process.env.MAFIA_AGENT_PASSWORD || "Reset123@";
-  return Boolean(username?.trim() && password?.trim());
+  return hasAllEnv("MAFIA_AGENT_USERNAME", "MAFIA_AGENT_PASSWORD");
 }

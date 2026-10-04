@@ -14,7 +14,7 @@ export default async function DashboardKYCPage() {
       <div>
         <h1 className="text-2xl font-black text-foreground">🛡️ KYC Account & Age Verification</h1>
         <p className="text-sm text-muted-foreground mt-1">
-          Upload your Government ID or Driver's License to verify your age (18+) and unlock fast 15-minute cashouts.
+          Upload your Government ID or Driver&apos;s License to verify your age (18+) and unlock fast 15-minute cashouts.
         </p>
       </div>
 

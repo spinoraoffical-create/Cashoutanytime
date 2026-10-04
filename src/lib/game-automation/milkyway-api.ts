@@ -1,4 +1,5 @@
 import crypto from "crypto";
+import { hasAllEnv, optionalEnv, requiredEnv } from "./env";
 import https from "https";
 import { HttpsProxyAgent } from "https-proxy-agent";
 
@@ -107,25 +108,10 @@ export class MilkyWayApiClient {
       "https://47.252.40.52:8033/ws/service.ashx"
     ).trim();
 
-    this.agentName = (
-      config.agentName ||
-      process.env.MILKYWAY_AGENT_USERNAME ||
-      "Darklord1121"
-    ).trim();
-
-    const rawPass =
-      config.agentPassword ||
-      process.env.MILKYWAY_AGENT_PASSWORD ||
-      "Darklord1121";
-
-    this.agentPasswdHash = md5(rawPass.trim());
-
-    this.proxyUrl = (
-      config.proxyUrl ||
-      process.env.MILKYWAY_PROXY_URL ||
-      process.env.GAMEVAULT_PROXY_URL ||
-      "http://sbhxwsxp:xn5frycnonl5@198.23.243.226:6361"
-    ).trim();
+    this.agentName = (config.agentName || requiredEnv("MILKYWAY_AGENT_USERNAME")).trim();
+    this.agentPasswdHash = md5((config.agentPassword || requiredEnv("MILKYWAY_AGENT_PASSWORD")).trim());
+    this.proxyUrl =
+      (config.proxyUrl || optionalEnv("MILKYWAY_PROXY_URL", "GAMEVAULT_PROXY_URL") || "").trim() || undefined;
   }
 
   private async request(url: string): Promise<any> {
@@ -278,7 +264,5 @@ export class MilkyWayApiClient {
 }
 
 export function isMilkyWayApiConfigured(): boolean {
-  const username = process.env.MILKYWAY_AGENT_USERNAME || "Darklord1121";
-  const password = process.env.MILKYWAY_AGENT_PASSWORD || "Darklord1121";
-  return Boolean(username?.trim() && password?.trim());
+  return hasAllEnv("MILKYWAY_AGENT_USERNAME", "MILKYWAY_AGENT_PASSWORD");
 }

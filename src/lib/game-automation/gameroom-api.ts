@@ -10,6 +10,9 @@
  * 6. Player withdrawal (POST /api/player/playerWithdraw)
  */
 
+import { generateGamePassword } from "./account-username";
+import { firstRequiredEnv } from "./env";
+
 export interface GameroomLoginResponse {
   status_code: number;
   message: string;
@@ -112,16 +115,12 @@ export class GameroomApiClient {
     ).replace(/\/+$/, "");
 
     this.agentUsername =
-      config.username ||
-      process.env.GAMEROOM_AGENT_USERNAME ||
-      process.env.GAMEROOM_USERNAME ||
-      "House0011";
+      config.username?.trim() ||
+      firstRequiredEnv("GAMEROOM_AGENT_USERNAME", "GAMEROOM_USERNAME");
 
     this.agentPassword =
-      config.password ||
-      process.env.GAMEROOM_AGENT_PASSWORD ||
-      process.env.GAMEROOM_PASSWORD ||
-      "David@123#";
+      config.password?.trim() ||
+      firstRequiredEnv("GAMEROOM_AGENT_PASSWORD", "GAMEROOM_PASSWORD");
   }
 
   private async ensureAuthenticated(): Promise<string> {
@@ -255,7 +254,7 @@ export class GameroomApiClient {
 
   async addPlayer(
     username: string,
-    password: string = "123456",
+    password: string = generateGamePassword(),
     nickname?: string,
     money: string | number = "0"
   ): Promise<GameroomAddPlayerResponse> {

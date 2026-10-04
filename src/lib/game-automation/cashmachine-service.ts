@@ -1,3 +1,4 @@
+import { hasAnyEnv } from "./env";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { formatGameAutomationError } from "./error-formatter";
 import { generateGamePassword } from "./account-username";
@@ -30,9 +31,10 @@ export interface WithdrawCashMachineAccountParams {
  * Check if CashMachine API credentials are configured in environment
  */
 export function isCashMachineApiConfigured(): boolean {
-  const username = process.env.CASHMACHINE_AGENT_USERNAME || process.env.CASHMACHINE_USERNAME || "Tupac12cm";
-  const password = process.env.CASHMACHINE_AGENT_PASSWORD || process.env.CASHMACHINE_PASSWORD || "Test@2023";
-  return Boolean(username?.trim() && password?.trim());
+  return (
+    hasAnyEnv("CASHMACHINE_AGENT_USERNAME", "CASHMACHINE_USERNAME") &&
+    hasAnyEnv("CASHMACHINE_AGENT_PASSWORD", "CASHMACHINE_PASSWORD")
+  );
 }
 
 /**
@@ -44,7 +46,7 @@ export async function createCashMachineAccount(
   client?: CashMachineApiClient
 ) {
   const api = client || getCashMachineApiClient();
-  const password = params.password || "123456";
+  const password = params.password || generateGamePassword();
   const nickname = (params.nickname && params.nickname !== "-")
     ? params.nickname
     : params.username;

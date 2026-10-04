@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useRef, useCallback, useMemo } from "react";
 import { usePathname } from "next/navigation";
+import Link from "next/link";
 import { motion, AnimatePresence } from "framer-motion";
 import { MessageCircle, X, Minimize2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -220,7 +221,7 @@ export function ChatWidget() {
                 <div className="text-center py-8">
                   <p className="text-sm text-muted-foreground mb-3">Please log in to start chatting</p>
                   <Button size="sm" asChild>
-                    <a href="/login">Login</a>
+                    <Link href="/login">Login</Link>
                   </Button>
                 </div>
               ) : messages.length === 0 ? (
