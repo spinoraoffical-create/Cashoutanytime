@@ -21,7 +21,7 @@ export default function ResetPasswordPage() {
 
     const supabase = createClient();
     if (!supabase) {
-      toast.error("Authentication is not configured");
+      toast.error("Sign-in is temporarily unavailable. Please try again later or contact support.");
       setLoading(false);
       return;
     }

@@ -18,9 +18,9 @@ export function LobbyTopBar() {
   const initial = (profile?.name || displayName || "P").slice(0, 1).toUpperCase();
 
   return (
-    <header className="flex h-14 shrink-0 items-center justify-between gap-2 border-b border-white/6 bg-[#0b0e14]/90 px-4 backdrop-blur-md">
+    <header className="flex h-14 shrink-0 items-center justify-between gap-2 border-b border-white/8 bg-[#07060c]/80 px-4 backdrop-blur-md">
       <Link href="/" className="flex min-w-0 items-center gap-2" aria-label={`${SITE_NAME} home`}>
-        <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-primary text-[10px] font-black text-white">
+        <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-primary text-[10px] font-black text-white shadow-[0_0_16px_rgba(255,45,85,0.45)]">
           SH
         </span>
         <span className="truncate text-sm font-extrabold tracking-tight">{SITE_NAME}</span>
@@ -29,7 +29,7 @@ export function LobbyTopBar() {
       <div className="flex shrink-0 items-center gap-2">
         <Link
           href="/dashboard/wallet"
-          className="rounded-full border border-white/10 bg-white/8 px-3 py-1.5 text-sm font-extrabold tabular-nums text-white"
+          className="rounded-full border border-primary/30 bg-white/8 px-3 py-1.5 text-sm font-extrabold tabular-nums text-white shadow-[0_0_16px_rgba(255,45,85,0.25)]"
         >
           ${fmt}
         </Link>

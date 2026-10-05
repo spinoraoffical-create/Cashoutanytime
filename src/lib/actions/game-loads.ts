@@ -31,6 +31,14 @@ import { autoFulfillJuwaRequest } from "@/lib/game-automation/juwa-service";
 import { isJuwaApiConfigured } from "@/lib/game-automation/juwa-api";
 import { autoFulfillVegasRequest } from "@/lib/game-automation/vegas-service";
 import { isVegasApiConfigured } from "@/lib/game-automation/vegas-api";
+import { userFacingGameLoadError } from "@/lib/game-automation/user-facing-errors";
+
+function safePlayerError(message: string | null | undefined, loadType?: string | null): string {
+  const raw = message?.trim() || "";
+  const safe = userFacingGameLoadError(raw, loadType);
+  if (raw && safe !== raw) console.error("[game-loads]", raw);
+  return safe || "Request failed. Please try again or contact support.";
+}
 
 const API_CONFIGURED_GAMES = ["cash-machine", "cash-frenzy", "gameroom", "game-vault", "mafia", "juwa", "vegas-sweeps", "mr-all-in-one", "orion-stars", "milky-way", "fire-kirin"];
 
@@ -133,7 +141,8 @@ async function autoFulfillGameRequest(
 }
 
 /** No non-atomic wallet writes. Loads debit only via request_game_load RPC. */
-const WALLET_RPC_UNAVAILABLE = "Wallet RPC unavailable — database setup incomplete";
+const WALLET_RPC_UNAVAILABLE =
+  "This request is temporarily unavailable. Please try again later or contact support.";
 
 function isMissingRpcError(message: string): boolean {
   return /could not find the function|schema cache|function.*does not exist/i.test(message);
@@ -277,7 +286,7 @@ export async function requestGameAccountCreate(input: {
       if (fulfillResult && !fulfillResult.success && fulfillResult.error) {
         revalidatePath(`/games/${input.gameSlug}`);
         revalidatePath("/admin/game-loads");
-        return { error: fulfillResult.error, requestId: requestId as string };
+        return { error: safePlayerError(fulfillResult.error, "create_account"), requestId: requestId as string };
       }
       revalidatePath(`/games/${input.gameSlug}`);
       revalidatePath("/dashboard");
@@ -287,11 +296,11 @@ export async function requestGameAccountCreate(input: {
       return { success: true, requestId: requestId as string };
     }
     if (error) {
-      return { error: error.message };
+      return { error: safePlayerError(error.message, "create_account") };
     }
   } catch (err) {
     const message = err instanceof Error ? err.message : "Could not queue account request";
-    return { error: message };
+    return { error: safePlayerError(message, "create_account") };
   }
 
   // Queue for bot worker — do not fake completed credentials
@@ -313,7 +322,7 @@ export async function requestGameAccountCreate(input: {
       .single();
 
     if (insertError) {
-      return { error: insertError.message };
+      return { error: safePlayerError(insertError.message, "create_account") };
     }
 
     const createdId = (directInsert?.id as string) || "";
@@ -326,7 +335,7 @@ export async function requestGameAccountCreate(input: {
       if (fulfillResult && !fulfillResult.success && fulfillResult.error) {
         revalidatePath(`/games/${input.gameSlug}`);
         revalidatePath("/admin/game-loads");
-        return { error: fulfillResult.error, requestId: createdId };
+        return { error: safePlayerError(fulfillResult.error, "create_account"), requestId: createdId };
       }
     }
 
@@ -338,7 +347,13 @@ export async function requestGameAccountCreate(input: {
     return { success: true, requestId: createdId };
   }
 
-  return { error: "Could not queue account creation. Run request_game_account_create migration in Supabase." };
+  console.error("[game-loads] account create queue unavailable");
+  return {
+    error: safePlayerError(
+      "Could not queue account creation. Run request_game_account_create migration in Supabase.",
+      "create_account"
+    ),
+  };
 }
 
 export async function requestGameCheckBalance(input: {
@@ -393,9 +408,9 @@ export async function requestGameCheckBalance(input: {
 
   if (error) {
     if (error.message.includes("request_game_check_balance")) {
-      return { error: "Run supabase/redeem-wallets-and-balance-check.sql in Supabase SQL Editor first." };
+      console.error("[game-loads] check balance rpc missing:", error.message);
     }
-    return { error: error.message };
+    return { error: safePlayerError(error.message, "check_balance") };
   }
 
   const fulfillResult = await autoFulfillGameRequest(input.gameSlug, requestId as string, "check_balance", {
@@ -405,7 +420,7 @@ export async function requestGameCheckBalance(input: {
   if (fulfillResult && !fulfillResult.success && fulfillResult.error) {
     revalidatePath(`/games/${input.gameSlug}`);
     revalidatePath("/admin/game-loads");
-    return { error: fulfillResult.error, requestId: requestId as string };
+    return { error: safePlayerError(fulfillResult.error, "check_balance"), requestId: requestId as string };
   }
 
   revalidatePath(`/games/${input.gameSlug}`);
@@ -497,7 +512,7 @@ export async function requestGameLoad(input: {
         return await failClosedMissingWalletRpc(`request_game_load: ${msg}`);
       }
       if (!requestId) {
-        return { error: msg };
+        return { error: safePlayerError(msg, "load") };
       }
     }
   } catch (err) {
@@ -505,7 +520,7 @@ export async function requestGameLoad(input: {
     if (isMissingRpcError(message)) {
       return await failClosedMissingWalletRpc(`request_game_load: ${message}`);
     }
-    return { error: message };
+    return { error: safePlayerError(message, "load") };
   }
 
   if (!requestId) {
@@ -520,7 +535,7 @@ export async function requestGameLoad(input: {
   if (fulfillLoad && !fulfillLoad.success && fulfillLoad.error) {
     revalidatePath(`/games/${input.gameSlug}`);
     revalidatePath("/admin/game-loads");
-    return { error: fulfillLoad.error, requestId };
+    return { error: safePlayerError(fulfillLoad.error, "load"), requestId };
   }
 
   revalidatePath(`/games/${input.gameSlug}`);
@@ -672,7 +687,7 @@ export async function requestGameRedeem(input: {
     });
 
     if (rpcError) {
-      return { error: rpcError.message || fallback.error };
+      return { error: safePlayerError(rpcError.message || fallback.error, "redeem") };
     }
     if (!rpcId) {
       return { error: fallback.error || "Could not queue redeem request." };
@@ -690,7 +705,7 @@ export async function requestGameRedeem(input: {
   if (fulfillRedeem && !fulfillRedeem.success && fulfillRedeem.error) {
     revalidatePath(`/games/${input.gameSlug}`);
     revalidatePath("/admin/game-loads");
-    return { error: fulfillRedeem.error, requestId };
+    return { error: safePlayerError(fulfillRedeem.error, "redeem"), requestId };
   }
 
   revalidatePath(`/games/${input.gameSlug}`);

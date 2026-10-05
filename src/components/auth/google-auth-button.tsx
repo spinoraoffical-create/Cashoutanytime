@@ -23,7 +23,7 @@ export function GoogleAuthButton({
     setLoading(true);
     const supabase = createClient();
     if (!supabase) {
-      toast.error("Authentication is not configured");
+      toast.error("Sign-in is temporarily unavailable. Please try again later or contact support.");
       setLoading(false);
       return;
     }
@@ -51,8 +51,8 @@ export function GoogleAuthButton({
       const raw = `${error.message} ${error.code ?? ""}`.toLowerCase();
       toast.error(
         raw.includes("provider is not enabled") || error.code === "validation_failed"
-          ? "Google is not enabled on this project. Sign in with email, or turn on Google in Supabase → Authentication → Providers."
-          : error.message
+          ? "Google sign-in is temporarily unavailable. Use email, or contact support."
+          : "Could not start Google sign-in. Please try again or use email."
       );
       setLoading(false);
       return;
@@ -63,7 +63,7 @@ export function GoogleAuthButton({
       return;
     }
 
-    toast.error("Could not start Google sign-in. Check Supabase Google provider settings.");
+    toast.error("Could not start Google sign-in. Please try again or use email.");
     setLoading(false);
   }
 

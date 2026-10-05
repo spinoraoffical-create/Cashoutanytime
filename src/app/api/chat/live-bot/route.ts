@@ -18,6 +18,7 @@ export async function POST(req: Request) {
   try {
     const body = await req.json();
     const message = String(body.message || "").slice(0, 2000);
+    const requestHuman = body.requestHuman === true;
     const hasMedia = Boolean(body.hasMedia);
     const mediaName = String(body.mediaName || "").slice(0, 200);
     const userId = body.userId ? String(body.userId) : undefined;
@@ -47,7 +48,10 @@ export async function POST(req: Request) {
         "Thank you for sending your receipt/media! I've alerted our support team on Telegram to review and credit your account.";
     }
 
-    const needsHuman = aiResult.shouldEscalateToHuman || hasMedia;
+    const needsHuman = requestHuman || aiResult.shouldEscalateToHuman || hasMedia;
+    if (requestHuman) {
+      reply = "A person from Sweepstakes Hub support will reply in this chat.";
+    }
 
     const admin = createAdminClient();
     const botSenderId = await getBotSenderProfileId();
@@ -122,7 +126,10 @@ export async function POST(req: Request) {
 
     return NextResponse.json({ success: true, reply, alertedTelegram: needsHuman });
   } catch (err) {
-    const msg = err instanceof Error ? err.message : String(err);
-    return NextResponse.json({ error: msg }, { status: 500 });
+    console.error("[live-bot]", err instanceof Error ? err.message : err);
+    return NextResponse.json(
+      { error: "Support is temporarily unavailable. Please try again later." },
+      { status: 500 }
+    );
   }
 }

@@ -6,9 +6,12 @@ import { useRouter } from "next/navigation";
 import {
   Download,
   Info,
+  MessageCircle,
   Sparkles,
   UserPlus,
 } from "lucide-react";
+import Link from "next/link";
+import { CreateGameAccountModal } from "@/components/games/create-game-account-modal";
 import { createClient } from "@/lib/supabase/client";
 import { getMyGameAccount } from "@/lib/actions/game-loads";
 import {
@@ -46,9 +49,11 @@ export function GameLandingClient({
   const autoCreateAttempted = useRef(false);
   const walletPanelRef = useRef<HTMLDivElement>(null);
   const [accountStatus, setAccountStatus] = useState<"loading" | "none" | "has">(
-    initialGameAccount?.game_username ? "has" : "loading"
+    initialGameAccount?.game_username ? "has" : "none"
   );
   const [resolvedAccount, setResolvedAccount] = useState(initialGameAccount ?? null);
+  const [createOpen, setCreateOpen] = useState(false);
+  const [reloadToken, setReloadToken] = useState(0);
   const otherGames = getOtherGames(game.slug);
 
   function openWalletPanel() {
@@ -72,7 +77,7 @@ export function GameLandingClient({
       return;
     }
 
-    openWalletPanel();
+    setCreateOpen(true);
   }
 
   function handleAccountChange(hasAccount: boolean) {
@@ -150,23 +155,17 @@ export function GameLandingClient({
 
   useEffect(() => {
     if (!autoCreate || autoCreateAttempted.current) return;
+    if (accountStatus === "loading") return;
     autoCreateAttempted.current = true;
 
-    if (walletLoadEnabled) {
-      void (async () => {
-        const { data: { user } } = (await supabase?.auth.getUser()) ?? { data: { user: null } };
-        if (user) openWalletPanel();
-        else
-          router.push(
-            `/login?redirect=${encodeURIComponent(`/games/${game.slug}?create=1`)}`
-          );
-      })();
+    if (walletLoadEnabled && accountStatus === "has") {
+      openWalletPanel();
       return;
     }
 
     void handleCreateAccount();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [autoCreate, walletLoadEnabled]);
+  }, [autoCreate, walletLoadEnabled, accountStatus]);
 
   function handleHowItWorks() {
     setShowHowItWorks(true);
@@ -186,9 +185,118 @@ export function GameLandingClient({
         game={game}
         initialAccount={resolvedAccount}
         onAccountChange={handleAccountChange}
+        mode={hasAccount ? "full" : "activity"}
+        reloadToken={reloadToken}
       />
     </div>
   ) : null;
+
+  const createModal = (
+    <CreateGameAccountModal
+      game={game}
+      open={createOpen}
+      onOpenChange={setCreateOpen}
+      onCreated={() => setReloadToken((n) => n + 1)}
+    />
+  );
+
+  if (showWalletPanel && !hasAccount) {
+    return (
+      <div className="max-w-2xl mx-auto space-y-5 pb-8">
+        <section className="relative overflow-hidden rounded-2xl border border-white/10">
+          <div className={cn("absolute inset-0 bg-gradient-to-br opacity-90", game.gradient)} />
+          <div className="absolute inset-0 bg-gradient-to-t from-[#121212] via-[#121212]/50 to-transparent" />
+          <div className="relative p-5 sm:p-6 min-h-[140px] flex flex-col justify-end">
+            <h1 className="text-2xl sm:text-3xl font-bold text-white">{game.name}</h1>
+            <p className="mt-1 text-sm text-white/80">
+              Create your game sign-in, then load funds when you&apos;re ready.
+            </p>
+          </div>
+        </section>
+
+        {accountStatus === "loading" ? (
+          <p className="text-sm text-muted-foreground">Checking your game sign-in…</p>
+        ) : (
+          <>
+            <button
+              type="button"
+              onClick={() => void handleCreateAccount()}
+              className="flex w-full items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-yellow-400 via-orange-400 to-red-500 px-6 py-4 text-base font-bold text-black shadow-lg shadow-orange-500/20"
+            >
+              <UserPlus className="h-5 w-5" />
+              Create game account
+            </button>
+
+            <section className="rounded-2xl border border-white/10 bg-[#1a1a1a] p-4 sm:p-5 space-y-3">
+              <h2 className="font-bold text-white">Before you start</h2>
+              <ol className="space-y-2 text-sm text-muted-foreground">
+                <li>1. Create your game sign-in. It is free.</li>
+                <li>2. Download the app and sign in with the username and password shown here.</li>
+                <li>3. Load funds from your wallet when you are ready.</li>
+              </ol>
+              <a
+                href={game.downloadUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-flex items-center gap-2 text-sm font-semibold text-white underline"
+              >
+                <Download className="h-4 w-4" />
+                Download {game.name}
+              </a>
+            </section>
+
+            <section className="rounded-2xl border border-white/10 bg-[#1a1a1a] p-4 sm:p-5 space-y-4">
+              <div className="flex items-center gap-2">
+                <Sparkles className="h-5 w-5 text-violet-400" />
+                <h2 className="font-bold text-white">Rules &amp; game details</h2>
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <div className="rounded-xl bg-[#242424] border border-white/5 p-4 text-center">
+                  <p className="text-xs text-muted-foreground mb-1">First time bonus</p>
+                  <p className="text-3xl font-bold text-emerald-400">{rules.firstTimeBonus}%</p>
+                </div>
+                <div className="rounded-xl bg-[#242424] border border-white/5 p-4 text-center">
+                  <p className="text-xs text-muted-foreground mb-1">Regular bonus</p>
+                  <p className="text-3xl font-bold text-teal-400">{rules.regularBonus}%</p>
+                </div>
+              </div>
+              <div className="flex flex-wrap gap-2">
+                <span className="inline-flex items-center rounded-full border border-white/10 bg-white/5 px-3 py-1.5 text-xs font-medium text-white">
+                  Load: ${rules.minDeposit} – ${rules.maxDeposit}
+                </span>
+                <span className="inline-flex items-center rounded-full border border-violet-500/30 bg-violet-500/10 px-3 py-1.5 text-xs font-medium text-violet-200">
+                  Redeem: {rules.redeemMin}x – {rules.redeemMax}x
+                </span>
+              </div>
+              <p className="text-sm text-muted-foreground leading-relaxed">{game.bio}</p>
+            </section>
+
+            <section className="rounded-2xl border border-white/10 bg-[#161616] p-4 sm:p-5 space-y-3">
+              <h2 className="font-bold text-white">Activity</h2>
+              {walletSection}
+            </section>
+
+            <section className="rounded-2xl border border-white/10 bg-[#1a1a1a] p-4 sm:p-5">
+              <h2 className="font-bold text-white">Get help</h2>
+              <p className="mt-1 text-sm text-muted-foreground">
+                Questions about {game.name}, payments, or your sign-in.
+              </p>
+              <Link
+                href="/support"
+                className="mt-3 inline-flex items-center gap-2 text-sm font-semibold text-white underline"
+              >
+                <MessageCircle className="h-4 w-4" />
+                Sweepstakes Hub support
+              </Link>
+            </section>
+          </>
+        )}
+
+        {createModal}
+        <GameOtherGames games={otherGames} />
+      </div>
+    );
+  }
 
   return (
     <div className="max-w-2xl mx-auto space-y-5 pb-8">
@@ -372,6 +480,7 @@ export function GameLandingClient({
       )}
 
       <GameOtherGames games={otherGames} />
+      {createModal}
     </div>
   );
 }

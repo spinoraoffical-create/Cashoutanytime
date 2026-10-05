@@ -3,6 +3,7 @@ import { getPaydoraDeposit, isPaidDepositStatus } from "@/lib/payments/paydora";
 import { hasPaydoraPaymentBeenCredited } from "@/lib/payments/paydora-wallet";
 import { createClient } from "@/lib/supabase/server";
 import { rateLimit } from "@/lib/rate-limit";
+import { DEPOSITS_UNAVAILABLE, playerPaymentError } from "@/lib/player-safe-error";
 
 export async function GET(req: Request) {
   try {
@@ -36,7 +37,6 @@ export async function GET(req: Request) {
       credited,
     });
   } catch (err) {
-    const msg = err instanceof Error ? err.message : String(err);
-    return NextResponse.json({ error: msg }, { status: 500 });
+    return NextResponse.json({ error: playerPaymentError(err, DEPOSITS_UNAVAILABLE) }, { status: 500 });
   }
 }

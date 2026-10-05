@@ -112,7 +112,7 @@ export function OtpAuthForm({ mode, redirect = "/", referralCodeFromUrl }: OtpAu
 
     const supabase = createClient();
     if (!supabase) {
-      toast.error("Authentication is not configured");
+      toast.error("Sign-in is temporarily unavailable. Please try again later or contact support.");
       setLoading(false);
       return;
     }
@@ -175,7 +175,7 @@ export function OtpAuthForm({ mode, redirect = "/", referralCodeFromUrl }: OtpAu
 
     const supabase = createClient();
     if (!supabase) {
-      toast.error("Authentication is not configured");
+      toast.error("Sign-in is temporarily unavailable. Please try again later or contact support.");
       setLoading(false);
       return;
     }

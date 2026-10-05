@@ -3,7 +3,9 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { Home, Gamepad2, Wallet, History } from "lucide-react";
+import { motion } from "framer-motion";
 import { cn } from "@/lib/utils";
+import { usePlayerMotion } from "@/lib/player-motion";
 
 const TABS = [
   { label: "Home", href: "/", icon: Home, match: (p: string) => p === "/" || p === "/home" },
@@ -33,9 +35,10 @@ const TABS = [
 
 export function LobbyBottomNav() {
   const pathname = usePathname();
+  const { reduced } = usePlayerMotion();
 
   return (
-    <nav className="lobby-bottom-nav shrink-0 z-50" aria-label="Player navigation">
+    <nav className="lobby-bottom-nav z-50 shrink-0" aria-label="Player navigation">
       <div className="mx-auto flex max-w-[480px] items-center justify-around px-2 pb-[max(0.4rem,env(safe-area-inset-bottom))] pt-2">
         {TABS.map(({ label, href, icon: Icon, match }) => {
           const active = match(pathname);
@@ -44,14 +47,19 @@ export function LobbyBottomNav() {
               key={label}
               href={href}
               className={cn(
-                "flex min-w-[64px] flex-col items-center gap-0.5 rounded-full px-4 py-2 text-[11px] font-semibold transition-all",
-                active
-                  ? "bg-primary text-primary-foreground shadow-md shadow-rose-500/30"
-                  : "text-muted-foreground hover:text-foreground"
+                "relative flex min-w-[64px] flex-col items-center gap-0.5 rounded-full px-4 py-2 text-[11px] font-semibold",
+                active ? "text-white" : "text-zinc-400 hover:text-foreground"
               )}
             >
-              <Icon className="h-5 w-5" strokeWidth={active ? 2.4 : 1.85} />
-              {label}
+              {active ? (
+                <motion.span
+                  layoutId={reduced ? undefined : "player-nav-pill"}
+                  className="hub-neon-pill absolute inset-0 rounded-full bg-primary"
+                  transition={{ type: "spring", stiffness: 380, damping: 32 }}
+                />
+              ) : null}
+              <Icon className="relative z-10 h-5 w-5" strokeWidth={active ? 2.4 : 1.85} />
+              <span className="relative z-10">{label}</span>
             </Link>
           );
         })}

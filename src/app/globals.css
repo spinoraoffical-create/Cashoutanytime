@@ -1,25 +1,27 @@
 @import "tailwindcss";
 
 @theme {
-  --color-background: #0b0e14;
-  --color-foreground: #f1f5f9;
-  --color-card: #12161f;
-  --color-card-foreground: #f1f5f9;
-  --color-primary: #f43f5e;
+  --color-background: #07060c;
+  --color-foreground: #f8fafc;
+  --color-card: #141020;
+  --color-card-foreground: #f8fafc;
+  --color-primary: #ff2d55;
   --color-primary-foreground: #fff7f9;
-  --color-secondary: #161b26;
+  --color-secondary: #16101f;
   --color-secondary-foreground: #e2e8f0;
-  --color-muted: #161b26;
-  --color-muted-foreground: #94a3b8;
-  --color-accent: #f43f5e;
+  --color-muted: #141020;
+  --color-muted-foreground: #a1a1aa;
+  --color-accent: #ff3b6b;
   --color-accent-foreground: #fff7f9;
   --color-destructive: #ef4444;
-  --color-border: rgba(244, 63, 94, 0.16);
-  --color-ring: #f43f5e;
-  --color-hub-emerald: #10b981;
-  --color-hub-gold: #f59e0b;
-  --color-hub-pink: #f43f5e;
-  --color-hub-obsidian: #0b0e14;
+  --color-border: rgba(255, 45, 85, 0.18);
+  --color-ring: #ff2d55;
+  --color-hub-emerald: #34d399;
+  --color-hub-gold: #f5c542;
+  --color-hub-gold-bright: #ffd666;
+  --color-hub-pink: #ff2d55;
+  --color-hub-cyan: #22d3ee;
+  --color-hub-obsidian: #07060c;
   --radius-sm: 0.5rem;
   --radius-md: 0.75rem;
   --radius-lg: 1rem;
@@ -36,40 +38,76 @@ body {
   font-family: "Inter", system-ui, -apple-system, sans-serif;
   -webkit-font-smoothing: antialiased;
   background-image:
-    radial-gradient(ellipse 80% 50% at 50% -20%, rgba(244, 63, 94, 0.1), transparent),
-    radial-gradient(ellipse 60% 40% at 100% 0%, rgba(124, 58, 237, 0.06), transparent);
+    radial-gradient(ellipse 90% 55% at 50% -18%, rgba(255, 45, 85, 0.18), transparent 55%),
+    radial-gradient(ellipse 50% 40% at 100% 0%, rgba(91, 33, 182, 0.22), transparent 50%),
+    radial-gradient(ellipse 40% 30% at 0% 80%, rgba(34, 211, 238, 0.06), transparent 45%),
+    linear-gradient(180deg, #07060c 0%, #0b0e14 100%);
 }
 
-/* Enterprise hub — frosted glass + neon emerald accents */
 .hub-glass {
-  background: rgba(18, 22, 31, 0.72);
-  backdrop-filter: blur(16px);
-  -webkit-backdrop-filter: blur(16px);
-  border: 1px solid rgba(244, 63, 94, 0.12);
+  background: rgba(20, 16, 32, 0.85);
+  backdrop-filter: blur(18px);
+  -webkit-backdrop-filter: blur(18px);
+  border: 1px solid rgba(255, 255, 255, 0.08);
 }
 
 .hub-card {
-  background: linear-gradient(145deg, rgba(18, 22, 31, 0.95) 0%, rgba(11, 14, 20, 0.98) 100%);
-  border: 1px solid rgba(255, 255, 255, 0.06);
-  box-shadow: 0 4px 24px rgba(0, 0, 0, 0.35);
+  background: rgba(20, 16, 32, 0.85);
+  backdrop-filter: blur(18px);
+  -webkit-backdrop-filter: blur(18px);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.45);
 }
 
 .hub-card-glow {
-  border-color: rgba(244, 63, 94, 0.28);
+  border-color: rgba(255, 45, 85, 0.35);
   box-shadow:
-    0 4px 24px rgba(0, 0, 0, 0.35),
-    inset 0 1px 0 rgba(244, 63, 94, 0.08);
+    0 0 24px rgba(255, 45, 85, 0.22),
+    0 8px 32px rgba(0, 0, 0, 0.45),
+    inset 0 1px 0 rgba(255, 214, 102, 0.08);
+}
+
+.hub-gold-edge {
+  box-shadow:
+    0 0 20px rgba(245, 197, 66, 0.18),
+    0 8px 32px rgba(0, 0, 0, 0.45),
+    inset 0 0 0 1px rgba(245, 197, 66, 0.28);
+}
+
+.hub-cta-glow {
+  box-shadow: 0 0 24px rgba(255, 45, 85, 0.35);
+  animation: hub-pulse-glow 2.8s ease-in-out infinite;
+}
+
+.hub-neon-pill {
+  box-shadow: 0 0 20px rgba(255, 45, 85, 0.4);
 }
 
 .hub-gradient-text {
-  background: linear-gradient(135deg, #fb7185, #f43f5e, #e11d48);
+  background: linear-gradient(135deg, #ffd666, #ff3b6b, #ff2d55);
   -webkit-background-clip: text;
   background-clip: text;
   -webkit-text-fill-color: transparent;
 }
 
+@keyframes hub-pulse-glow {
+  0%,
+  100% {
+    box-shadow: 0 0 16px rgba(255, 45, 85, 0.28);
+  }
+  50% {
+    box-shadow: 0 0 28px rgba(255, 45, 85, 0.5);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .hub-cta-glow {
+    animation: none;
+  }
+}
+
 body.lobby-mode {
-  background-color: #0b0e14;
+  background-color: #07060c;
 }
 
 /* VIP page content — shared inner pages styling */
@@ -1073,10 +1111,10 @@ body.lobby-mode .fixed.bottom-20 {
 }
 
 .lobby-bottom-nav {
-  background: rgba(11, 14, 20, 0.94);
+  background: rgba(7, 6, 12, 0.94);
   backdrop-filter: blur(18px);
   border-top: 1px solid rgba(255, 255, 255, 0.08);
-  box-shadow: 0 -8px 24px rgba(0, 0, 0, 0.35);
+  box-shadow: 0 -8px 28px rgba(0, 0, 0, 0.5);
   min-height: 64px;
   padding-bottom: env(safe-area-inset-bottom, 0px);
 }

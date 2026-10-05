@@ -19,7 +19,8 @@ export function WalletSnapshot({
   const freeplay = wallet?.bonusWallet ?? initial.freeplay;
 
   return (
-    <section className="hub-card space-y-3 rounded-[24px] p-5">
+    <section className="hub-gold-edge hub-card relative space-y-3 overflow-hidden rounded-[24px] p-5">
+      <div className="pointer-events-none absolute -right-8 -top-10 h-32 w-32 rounded-full bg-[#f5c542]/15 blur-2xl" />
       <div className="flex items-center justify-between">
         <p className="text-sm font-bold">
           Wallet{" "}
@@ -27,18 +28,18 @@ export function WalletSnapshot({
             <span className="h-1.5 w-1.5 rounded-full bg-emerald-400" /> live
           </span>
         </p>
-        <Eye className="h-4 w-4 text-muted-foreground" aria-hidden />
+        <Eye className="h-4 w-4 text-zinc-500" aria-hidden />
       </div>
       <p className="text-4xl font-extrabold tabular-nums">
         ${walletHidden ? "••••" : money(balance)}
       </p>
       <div className="grid grid-cols-2 gap-3 text-sm">
         <div>
-          <p className="text-muted-foreground">Cash out ready</p>
+          <p className="text-zinc-400">Cash out ready</p>
           <p className="font-bold tabular-nums">${walletHidden ? "••••" : money(cashout)}</p>
         </div>
         <div>
-          <p className="text-muted-foreground">Freeplay</p>
+          <p className="text-zinc-400">Freeplay</p>
           <p className="font-bold tabular-nums">${walletHidden ? "••••" : money(freeplay)}</p>
         </div>
       </div>

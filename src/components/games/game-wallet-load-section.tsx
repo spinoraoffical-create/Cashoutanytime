@@ -44,6 +44,14 @@ import { cn, formatRelativeTime } from "@/lib/utils";
 import { toast } from "sonner";
 import type { DepositRolloverBounds } from "@/lib/wallet/deposit-redeem-rollover";
 import { WALLET_REFRESH_EVENT } from "@/lib/wallet/use-live-wallet";
+import { userFacingGameLoadError } from "@/lib/game-automation/user-facing-errors";
+
+function notifyGameError(message: string | null | undefined, loadType?: string | null) {
+  toast.error(
+    userFacingGameLoadError(message, loadType) ||
+      "Request failed. Please try again or contact support."
+  );
+}
 
 interface GameWalletLoadSectionProps {
   game: Game;
@@ -52,12 +60,17 @@ interface GameWalletLoadSectionProps {
     game_password: string | null;
   } | null;
   onAccountChange?: (hasAccount: boolean) => void;
+  /** activity = no create form and no load/redeem until a sign-in exists */
+  mode?: "full" | "activity";
+  reloadToken?: number;
 }
 
 export function GameWalletLoadSection({
   game,
   initialAccount,
   onAccountChange,
+  mode = "full",
+  reloadToken = 0,
 }: GameWalletLoadSectionProps) {
   const supabase = useMemo(() => createClient(), []);
 
@@ -203,7 +216,7 @@ export function GameWalletLoadSection({
       failedToastShownRef.current.add(justFailed.id);
       pendingJobIdsRef.current.delete(justFailed.id);
       failedToastRef.current = justFailed.id;
-      toast.error(justFailed.error_message ?? "Request failed");
+      notifyGameError(justFailed.error_message, justFailed.load_type);
       void refreshWallet();
     }
 
@@ -283,6 +296,12 @@ export function GameWalletLoadSection({
       document.removeEventListener("visibilitychange", onVisibilityChange);
     };
   }, [refreshWallet, refreshAccount, refreshLoads, game.slug, onAccountChange]);
+
+  useEffect(() => {
+    if (!reloadToken) return;
+    void refreshLoads();
+    void refreshAccount();
+  }, [reloadToken, refreshLoads, refreshAccount]);
 
   useEffect(() => {
     if (!accountReadyRef.current) return;
@@ -471,7 +490,7 @@ export function GameWalletLoadSection({
   async function handleCancelLoad(loadId: string) {
     setCancellingId(loadId);
     const result = await cancelMyGameLoad(loadId, game.slug);
-    if (result.error) toast.error(result.error);
+    if (result.error) notifyGameError(result.error);
     else toast.success("Cancelled — click Replace Account again.");
     void refreshLoads();
     setCancellingId(null);
@@ -494,7 +513,7 @@ export function GameWalletLoadSection({
       replaceAccount: hasSavedAccount,
     });
     if (result.error) {
-      toast.error(result.error);
+      notifyGameError(result.error, "create_account");
     } else {
       if ("requestId" in result && result.requestId) pendingJobIdsRef.current.add(result.requestId);
       toast.success(
@@ -537,7 +556,7 @@ export function GameWalletLoadSection({
       gameName: game.name,
       gameUsername: savedAccount.game_username,
     });
-    if (result.error) toast.error(result.error);
+    if (result.error) notifyGameError(result.error, "check_balance");
     else {
       if ("requestId" in result && result.requestId) pendingJobIdsRef.current.add(result.requestId);
       toast.success("Checking your live game balance…");
@@ -569,7 +588,7 @@ export function GameWalletLoadSection({
       gameUsername: savedAccount.game_username,
     });
 
-    if (result.error) toast.error(result.error);
+    if (result.error) notifyGameError(result.error, "load");
     else {
       if ("requestId" in result && result.requestId) pendingJobIdsRef.current.add(result.requestId);
       toast.success(`Load queued! $${parsedAmount.toFixed(2)} — bot will credit ${game.name} shortly.`);
@@ -628,7 +647,7 @@ export function GameWalletLoadSection({
     });
 
     const destLabel = "Deposit Redeem";
-    if (result.error) toast.error(result.error);
+    if (result.error) notifyGameError(result.error, "redeem");
     else {
       if ("requestId" in result && result.requestId) pendingJobIdsRef.current.add(result.requestId);
       toast.success(
@@ -659,6 +678,31 @@ export function GameWalletLoadSection({
       return `$${Number(load.amount).toFixed(2)} redeem`;
     }
     return `$${Number(load.amount).toFixed(2)} load`;
+  }
+
+  if (mode === "activity" && !hasSavedAccount) {
+    return (
+      <div className="space-y-2">
+        {pendingCreate ? (
+          <p className="text-sm text-amber-200/90">Creating your game sign-in…</p>
+        ) : null}
+        {recentLoads.length === 0 ? (
+          <p className="text-sm text-muted-foreground">No activity yet.</p>
+        ) : (
+          recentLoads.slice(0, 5).map((load) => (
+            <div
+              key={load.id}
+              className="flex items-center justify-between gap-2 rounded-lg bg-black/20 px-3 py-2 text-xs"
+            >
+              <span>
+                {activityLabel(load)} · {load.status}
+              </span>
+              <span className="shrink-0 text-muted-foreground">{formatRelativeTime(load.created_at)}</span>
+            </div>
+          ))
+        )}
+      </div>
+    );
   }
 
   return (
@@ -922,7 +966,7 @@ export function GameWalletLoadSection({
         )}
       </div>
 
-      {/* Load / Redeem */}
+      {hasSavedAccount ? (
       <div className="rounded-xl border border-orange-500/20 bg-black/20 p-4 sm:p-5 space-y-4">
         <div className="grid grid-cols-2 gap-2 sm:gap-3">
           <button
@@ -1156,6 +1200,11 @@ export function GameWalletLoadSection({
           </>
         )}
       </div>
+      ) : (
+        <p className="text-sm text-muted-foreground">
+          Load and redeem unlock after your game sign-in is ready.
+        </p>
+      )}
 
       {recentLoads.length > 0 && (
         <div className="space-y-2 pt-2 border-t border-white/10">

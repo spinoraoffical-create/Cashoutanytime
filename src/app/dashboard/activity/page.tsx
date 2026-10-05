@@ -10,6 +10,7 @@ import {
   transactionSummary,
   type WalletTransactionRow,
 } from "@/lib/wallet/transaction-display";
+import { MotionPage } from "@/components/player/motion-page";
 
 export const metadata: Metadata = { title: "Activity | Sweepstakes Hub" };
 
@@ -56,7 +57,7 @@ export default async function ActivityPage({
   const items = filter === "all" ? rows : rows.filter((tx) => bucket(tx) === filter);
 
   return (
-    <div className="space-y-5">
+    <MotionPage className="space-y-5">
       <div>
         <h1 className="text-3xl font-extrabold">Activity</h1>
         <p className="mt-1 text-sm text-muted-foreground">
@@ -71,7 +72,7 @@ export default async function ActivityPage({
             href={f.id === "all" ? "/dashboard/activity" : `/dashboard/activity?filter=${f.id}`}
             className={cn(
               "rounded-full px-4 py-1.5 text-sm font-semibold whitespace-nowrap",
-              filter === f.id ? "bg-primary text-white" : "bg-white/8 text-muted-foreground"
+              filter === f.id ? "hub-neon-pill bg-primary text-white" : "bg-white/8 text-zinc-400"
             )}
           >
             {f.label}
@@ -115,6 +116,6 @@ export default async function ActivityPage({
           })}
         </ul>
       )}
-    </div>
+    </MotionPage>
   );
 }

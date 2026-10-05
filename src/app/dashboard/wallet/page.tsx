@@ -11,6 +11,7 @@ import {
 } from "@/lib/wallet/transaction-display";
 import { Button } from "@/components/ui/button";
 import { ClaimVerifyBanner } from "@/components/player/claim-verify-banner";
+import { MotionPage } from "@/components/player/motion-page";
 
 export const metadata: Metadata = { title: "Wallet | Sweepstakes Hub" };
 
@@ -52,7 +53,7 @@ export default async function WalletPage() {
   const freeplay = wallet.freeplay;
 
   return (
-    <div className="space-y-5">
+    <MotionPage className="space-y-5">
       {showBanner ? (
         <ClaimVerifyBanner
           href="/dashboard/kyc"
@@ -68,7 +69,8 @@ export default async function WalletPage() {
         </span>
       </div>
 
-      <section className="hub-card hub-card-glow overflow-hidden rounded-[24px]">
+      <section className="hub-gold-edge hub-card relative overflow-hidden rounded-[24px]">
+        <div className="pointer-events-none absolute -right-10 -top-12 h-40 w-40 rounded-full bg-primary/20 blur-3xl" />
         <div className="flex items-start justify-between p-5 pb-2">
           <div>
             <p className="text-lg font-extrabold">Main Wallet</p>
@@ -133,6 +135,6 @@ export default async function WalletPage() {
           </ul>
         )}
       </div>
-    </div>
+    </MotionPage>
   );
 }

@@ -33,6 +33,7 @@ import { appendMessage, mergeMessagesById } from "@/lib/chat/merge-messages";
 import { subscribeToConversationInserts, subscribeToMessageInserts } from "@/lib/chat/subscribe-messages";
 import { toast } from "sonner";
 import { ArrowLeft, Headphones, MessageCircle } from "lucide-react";
+import { SupportAiStarter } from "@/components/chat/support-ai-starter";
 import type { Message } from "@/types/database";
 
 interface UserChatPanelProps {
@@ -482,6 +483,14 @@ export function UserMessagesInbox({
         <MessageCircle className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
         <h3 className="font-semibold mb-2">Please log in</h3>
         <p className="text-sm text-muted-foreground">Sign in to message our support team.</p>
+      </Card>
+    );
+  }
+
+  if (conversations.length === 0) {
+    return (
+      <Card className={`${CHAT_INBOX_CARD_CLASS} min-h-[28rem]`}>
+        <SupportAiStarter userId={userId} onConversationStarted={() => void init()} />
       </Card>
     );
   }

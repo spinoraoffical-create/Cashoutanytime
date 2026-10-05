@@ -7,6 +7,7 @@ import {
 } from "@/lib/payments/paydora-wallet";
 import { createClient } from "@/lib/supabase/server";
 import { checkRateLimit, rateLimitUserMessage } from "@/lib/rate-limit";
+import { playerPaymentError } from "@/lib/player-safe-error";
 
 export async function POST(req: Request) {
   try {
@@ -106,8 +107,15 @@ export async function POST(req: Request) {
       throw err;
     }
   } catch (err) {
-    const msg = err instanceof Error ? err.message : String(err);
     const status = (err as { status?: number }).status || 500;
-    return NextResponse.json({ error: msg }, { status: status >= 400 && status < 600 ? status : 500 });
+    return NextResponse.json(
+      {
+        error: playerPaymentError(
+          err,
+          "Cash outs are temporarily unavailable. Please try again later or contact support."
+        ),
+      },
+      { status: status >= 400 && status < 600 ? status : 500 }
+    );
   }
 }

@@ -15,6 +15,8 @@ import {
 import { getDashboardCore } from "@/lib/data/dashboard";
 import { ClaimVerifyBanner } from "@/components/player/claim-verify-banner";
 import { SignOutButton } from "@/components/player/sign-out-button";
+import { PlayerVideoGuides } from "@/components/player/player-video-guides";
+import { MotionPage } from "@/components/player/motion-page";
 import { SITE_NAME } from "@/lib/constants";
 
 const GRID = [
@@ -54,7 +56,11 @@ export default async function AccountHubPage() {
     display_name?: string | null;
     username?: string | null;
   };
-  const name = row.display_name ?? row.username ?? row.full_name ?? row.email?.split("@")[0] ?? "Player";
+  const name =
+    row.display_name?.trim() ||
+    row.username?.trim() ||
+    row.email?.split("@")[0] ||
+    "Player";
   const kyc = row.kyc_status === "verified" ? 1 : 0;
   const phone = row.phone ? 1 : 0;
   const emailOk = row.email ? 1 : 0;
@@ -62,7 +68,7 @@ export default async function AccountHubPage() {
   const needsVerify = verified < 3;
 
   return (
-    <div className="space-y-6">
+    <MotionPage className="space-y-6">
       {needsVerify ? (
         <ClaimVerifyBanner
           href="/dashboard/kyc"
@@ -160,7 +166,9 @@ export default async function AccountHubPage() {
         ))}
       </div>
 
+      <PlayerVideoGuides />
+
       <SignOutButton />
-    </div>
+    </MotionPage>
   );
 }

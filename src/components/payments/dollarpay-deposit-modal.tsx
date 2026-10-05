@@ -13,6 +13,7 @@ import {
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
+import { DEPOSITS_UNAVAILABLE, friendlyPlayerError } from "@/lib/player-safe-error";
 
 interface PayMethod {
   id: string;
@@ -52,7 +53,7 @@ export function DollarPayDepositSection({
           setMethodId(list[0].id);
           setSelectedAmount(list[0].amounts.includes("19.99") ? "19.99" : list[0].amounts[0]);
         }
-        if (data.error) toast.error(data.error);
+        if (data.error) toast.error(friendlyPlayerError(data.error, DEPOSITS_UNAVAILABLE));
       })
       .catch(() => {
         if (!cancelled) toast.error("Could not load instant payment methods.");
@@ -92,7 +93,7 @@ export function DollarPayDepositSection({
       });
       const data = await res.json();
       if (!res.ok || data.error) {
-        toast.error(data.error || "Failed to initiate payment");
+        toast.error(friendlyPlayerError(data.error, DEPOSITS_UNAVAILABLE));
         return;
       }
       if (!data.payUrl) {
@@ -128,7 +129,9 @@ export function DollarPayDepositSection({
         }, 8000);
       }
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : "Payment error occurred");
+      toast.error(
+        friendlyPlayerError(err instanceof Error ? err.message : "", DEPOSITS_UNAVAILABLE)
+      );
     } finally {
       setLoading(false);
     }

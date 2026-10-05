@@ -15,11 +15,11 @@ export function ClaimVerifyBanner({
   return (
     <Link
       href={href}
-      className="flex items-center gap-3 rounded-2xl bg-emerald-500 px-4 py-3 text-white shadow-lg shadow-emerald-500/20"
+      className="hub-glass flex items-center gap-3 rounded-2xl border border-emerald-400/30 px-4 py-3 text-white shadow-[0_0_20px_rgba(52,211,153,0.18)]"
     >
       <div className="min-w-0 flex-1">
         <p className="text-sm font-extrabold leading-tight">{title}</p>
-        {body ? <p className="mt-0.5 text-xs text-white/85">{body}</p> : null}
+        {body ? <p className="mt-0.5 text-xs text-zinc-300">{body}</p> : null}
       </div>
       <span className="shrink-0 rounded-full bg-white px-3 py-1.5 text-xs font-bold text-zinc-900">
         {cta}

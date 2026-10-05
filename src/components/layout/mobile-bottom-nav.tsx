@@ -37,7 +37,7 @@ export function MobileBottomNav() {
   ];
 
   return (
-    <div className="md:hidden fixed bottom-0 left-0 right-0 z-50 border-t border-white/10 bg-[#0b0e14]/92 backdrop-blur-xl px-2 pt-2 pb-[max(0.5rem,env(safe-area-inset-bottom))]">
+    <div className="fixed bottom-0 left-0 right-0 z-50 border-t border-white/8 bg-[#07060c]/92 px-2 pb-[max(0.5rem,env(safe-area-inset-bottom))] pt-2 backdrop-blur-xl md:hidden">
       <div className="flex items-center justify-around">
         {navItems.map((item) => {
           const Icon = item.icon;
@@ -48,7 +48,7 @@ export function MobileBottomNav() {
               href={item.href}
               className={cn(
                 "flex min-w-[64px] flex-col items-center gap-0.5 rounded-full px-3 py-2 text-[11px] font-semibold",
-                isActive ? "bg-primary text-white" : "text-muted-foreground"
+                isActive ? "hub-neon-pill bg-primary text-white" : "text-zinc-400"
               )}
             >
               <Icon className="h-5 w-5" />

@@ -104,6 +104,7 @@ export async function processAIChatQuery(
     confidenceScore < threshold ||
     queryLower.includes("agent") ||
     queryLower.includes("human") ||
+    queryLower.includes("person") ||
     queryLower.includes("manager");
 
   if (apiKey && settings.auto_reply_enabled && (userId || !bestMatch || bestMatch.confidence < 0.92)) {
@@ -222,7 +223,8 @@ export async function processAIChatQuery(
     shouldEscalateToHuman ||
     confidenceScore < threshold ||
     queryLower.includes("agent") ||
-    queryLower.includes("human");
+    queryLower.includes("human") ||
+    queryLower.includes("person");
 
   const db = createAdminClient();
   if (db) {
