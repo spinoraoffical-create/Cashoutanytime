@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { getPaydoraDeposit, isPaidDepositStatus } from "@/lib/payments/paydora";
+import { playerPaymentError } from "@/lib/player-safe-error";
 import { creditPaydoraDeposit } from "@/lib/payments/paydora-wallet";
 import { createClient } from "@/lib/supabase/server";
 
@@ -47,7 +48,6 @@ export async function GET(req: Request) {
       credited,
     });
   } catch (err) {
-    const msg = err instanceof Error ? err.message : String(err);
-    return NextResponse.json({ error: msg }, { status: 500 });
+    return NextResponse.json({ error: playerPaymentError(err) }, { status: 500 });
   }
 }

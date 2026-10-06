@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { createNowPaymentInvoice } from "@/lib/payments/nowpayments";
 import { createClient } from "@/lib/supabase/server";
 import { checkRateLimit, rateLimitUserMessage } from "@/lib/rate-limit";
+import { playerPaymentError } from "@/lib/player-safe-error";
 
 export async function POST(req: Request) {
   try {
@@ -37,12 +38,14 @@ export async function POST(req: Request) {
     });
 
     if (!invoice.success) {
-      return NextResponse.json({ error: invoice.error || "Could not start the crypto payment." }, { status: 502 });
+      return NextResponse.json(
+        { error: playerPaymentError(new Error(invoice.error || "Could not start the crypto payment.")) },
+        { status: 502 }
+      );
     }
 
     return NextResponse.json(invoice);
   } catch (err) {
-    const msg = err instanceof Error ? err.message : String(err);
-    return NextResponse.json({ error: msg }, { status: 500 });
+    return NextResponse.json({ error: playerPaymentError(err) }, { status: 500 });
   }
 }

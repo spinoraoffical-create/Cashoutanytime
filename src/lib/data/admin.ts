@@ -41,9 +41,8 @@ async function legacyAdminContext(
     .eq("id", userId)
     .maybeSingle();
 
-  // Allow admin access if profile role is admin, or if profile is missing/unseeded in dev mode
-  const isDev = process.env.NODE_ENV === "development";
-  const isAdminRole = profile?.role === "admin" || !profile || isDev;
+  // Legacy profiles.role only. A missing row must not grant staff access.
+  const isAdminRole = profile?.role === "admin" || profile?.role === "super_admin";
 
   if (!isAdminRole) return null;
 

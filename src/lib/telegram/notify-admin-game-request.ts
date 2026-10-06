@@ -9,6 +9,7 @@ export async function notifyAdminOfGameRequest(input: {
   gameProvider: string;
   notes?: string | null;
 }): Promise<void> {
+  try {
   if (!isTelegramConfigured()) return;
   if (await isAnyAdminOnline()) return;
 
@@ -48,7 +49,10 @@ export async function notifyAdminOfGameRequest(input: {
   lines.push("", `<a href="${requestsUrl}">Open requests in Sweepstakes Hub</a>`);
 
   const result = await sendTelegramMessage(lines.join("\n"));
-  if (!result.ok && process.env.NODE_ENV === "development") {
-    console.warn("[telegram] game request notify failed:", result.error);
+  if (!result.ok) {
+    console.error("[telegram] game request notify failed:", result.error);
+  }
+  } catch (err) {
+    console.error("[telegram] game request notify failed", err instanceof Error ? err.message : err);
   }
 }

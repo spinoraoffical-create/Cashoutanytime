@@ -12,7 +12,7 @@ import {
   startOfUtcDayIso,
   type GlobalSpinStats,
 } from "@/lib/spin/prize-engine";
-import { creditUserWallet } from "@/lib/actions/wallet";
+import { creditCurrentWallet } from "@/lib/wallet/service-mutate";
 import { assertFreeplayAllowed } from "@/lib/actions/security";
 import { DAILY_SPIN_ENABLED } from "@/lib/constants";
 
@@ -182,34 +182,7 @@ export async function spinWheel(): Promise<SpinResult> {
     const msg = error.message ?? String(error);
     console.error("[spinWheel] wheel_spins insert failed:", msg, error.code, error.details);
 
-    if (/relation .*wheel_spins.* does not exist/i.test(msg) || error.code === "42P01") {
-      return {
-        error:
-          "Wheel table missing. In Supabase SQL Editor run the full file: supabase/wheel-spins-patch.sql (not spin_history migration).",
-      };
-    }
-    if (/wheel_spins_prize_type_check|check constraint/i.test(msg)) {
-      return {
-        error:
-          "Wheel schema outdated (missing points prize type). Run supabase/wheel-spins-patch.sql in Supabase SQL Editor.",
-      };
-    }
-    if (/permission denied|42501|row-level security/i.test(msg)) {
-      return {
-        error:
-          "Wheel permission denied. Run supabase/wheel-spins-patch.sql to fix RLS grants, then hard-refresh and spin again.",
-      };
-    }
-    if (/foreign key|profiles/i.test(msg)) {
-      return {
-        error:
-          "Your profile row is missing in Supabase. Log out and back in, or ask support to sync your profile.",
-      };
-    }
-    if (msg.includes("wheel_spins")) {
-      return { error: `Wheel error: ${msg}. Run supabase/wheel-spins-patch.sql if you have not yet.` };
-    }
-    return { error: msg };
+    return { error: "The wheel is unavailable right now. Try again later." };
   }
 
   if (prize.type === "cash" && prize.value > 0) {
@@ -227,13 +200,17 @@ export async function spinWheel(): Promise<SpinResult> {
         .eq("id", user.id);
     }
 
-    await creditUserWallet(
+    const credited = await creditCurrentWallet(
       user.id,
       prize.value,
-      "current",
-      "spin",
+      "adjustment",
       `Wheel prize: ${prize.label}`
     );
+    if (credited.error) {
+      return {
+        error: "Your spin was saved, but the prize could not be added. Contact support.",
+      };
+    }
 
     await createNotification(
       user.id,

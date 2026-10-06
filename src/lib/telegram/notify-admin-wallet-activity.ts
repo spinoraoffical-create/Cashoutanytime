@@ -23,6 +23,7 @@ export async function notifyAdminOfWalletActivity(input: {
   redeemAll?: boolean;
   requestId: string;
 }): Promise<void> {
+  try {
   if (!isTelegramConfigured()) {
     console.error("[telegram] wallet activity skipped: TELEGRAM_BOT_TOKEN or TELEGRAM_ADMIN_CHAT_ID not set");
     return;
@@ -82,5 +83,8 @@ export async function notifyAdminOfWalletActivity(input: {
   const result = await sendTelegramMessage(lines.join("\n"), { disableNotification });
   if (!result.ok) {
     console.error("[telegram] wallet activity notify failed:", result.error);
+  }
+  } catch (err) {
+    console.error("[telegram] wallet activity notify failed", err instanceof Error ? err.message : err);
   }
 }

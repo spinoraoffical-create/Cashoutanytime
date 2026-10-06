@@ -19,6 +19,7 @@ export async function notifyAdminOfDeposit(input: {
   proofPath: string;
   depositId: string;
 }): Promise<void> {
+  try {
   if (!isTelegramConfigured()) return;
 
   const admin = createAdminClient();
@@ -78,7 +79,10 @@ export async function notifyAdminOfDeposit(input: {
   ];
 
   const result = await sendTelegramMessage(textLines.join("\n"), { disableNotification });
-  if (!result.ok && process.env.NODE_ENV === "development") {
-    console.warn("[telegram] deposit notify failed:", result.error);
+  if (!result.ok) {
+    console.error("[telegram] deposit notify failed:", result.error);
+  }
+  } catch (err) {
+    console.error("[telegram] deposit notify failed", err instanceof Error ? err.message : err);
   }
 }

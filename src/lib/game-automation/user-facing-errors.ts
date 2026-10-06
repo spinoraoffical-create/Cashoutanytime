@@ -39,7 +39,10 @@ const PLAYER_SAFE_ERROR_PATTERNS = [
   /^redeems go to/i,
   /^username must/i,
   /^password must/i,
-  /^run supabase\//i,
+  /^this game is not connected/i,
+  /^kyc /i,
+  /^not authenticated/i,
+  /^request not found/i,
 ];
 
 function isTechnicalError(message: string): boolean {

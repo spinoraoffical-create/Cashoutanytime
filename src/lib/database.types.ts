@@ -1001,6 +1001,7 @@ export type Database = {
           p_game_slug: string;
           p_game_name: string;
           p_amount: number;
+          p_wallet_type: string;
           p_load_type: string;
           p_game_username?: string | null;
         };

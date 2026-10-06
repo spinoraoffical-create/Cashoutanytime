@@ -38,6 +38,7 @@ import {
   validateCustomGameAccountCredentials,
 } from "@/lib/game-automation/account-username";
 import { previewJuwaUsername } from "@/lib/game-automation/juwa-credentials";
+import { userFacingGameLoadError } from "@/lib/game-automation/user-facing-errors";
 import { cn, formatRelativeTime } from "@/lib/utils";
 import { toast } from "sonner";
 import type { DepositRolloverBounds } from "@/lib/wallet/deposit-redeem-rollover";
@@ -400,7 +401,10 @@ export function GameWalletLoadSection({
         setCustomPassword("");
       }
     } catch (err: any) {
-      toast.error(err.message || "Account creation failed");
+      toast.error(
+        userFacingGameLoadError(err instanceof Error ? err.message : "", "create_account") ||
+          "Account creation failed. Please try again or contact support."
+      );
     } finally {
       void refreshLoads();
       setCreating(false);
@@ -429,15 +433,18 @@ export function GameWalletLoadSection({
       return;
     }
     setCheckingBalance(true);
-    const result = await requestGameCheckBalance({
-      gameSlug: game.slug,
-      gameName: game.name,
-      gameUsername: savedAccount.game_username,
-    });
-    if (result.error) toast.error(result.error);
-    else toast.success("Checking your live game balance…");
-    void refreshLoads();
-    setCheckingBalance(false);
+    try {
+      const result = await requestGameCheckBalance({
+        gameSlug: game.slug,
+        gameName: game.name,
+        gameUsername: savedAccount.game_username,
+      });
+      if (result.error) toast.error(result.error);
+      else toast.success("Checking your live game balance…");
+      void refreshLoads();
+    } finally {
+      setCheckingBalance(false);
+    }
   }
 
   async function handleLoad() {
@@ -455,21 +462,24 @@ export function GameWalletLoadSection({
     }
 
     setLoading(true);
-    const result = await requestGameLoad({
-      gameSlug: game.slug,
-      gameName: game.name,
-      amount: parsedAmount,
-      walletType: "current",
-      gameUsername: savedAccount.game_username,
-    });
+    try {
+      const result = await requestGameLoad({
+        gameSlug: game.slug,
+        gameName: game.name,
+        amount: parsedAmount,
+        walletType: "current",
+        gameUsername: savedAccount.game_username,
+      });
 
-    if (result.error) toast.error(result.error);
-    else {
-      toast.success(`Load queued! $${parsedAmount.toFixed(2)} — bot will credit ${game.name} shortly.`);
-      void refreshWallet();
-      void refreshLoads();
+      if (result.error) toast.error(result.error);
+      else {
+        toast.success(`Load queued! $${parsedAmount.toFixed(2)} will be added to ${game.name} shortly.`);
+        void refreshWallet();
+        void refreshLoads();
+      }
+    } finally {
+      setLoading(false);
     }
-    setLoading(false);
   }
 
   async function handleRedeem() {
@@ -511,27 +521,30 @@ export function GameWalletLoadSection({
     }
 
     setRedeeming(true);
-    const result = await requestGameRedeem({
-      gameSlug: game.slug,
-      gameName: game.name,
-      amount: redeemAll ? undefined : parsedRedeemAmount,
-      redeemAll,
-      gameUsername: savedAccount.game_username,
-      walletType: "current",
-    });
+    try {
+      const result = await requestGameRedeem({
+        gameSlug: game.slug,
+        gameName: game.name,
+        amount: redeemAll ? undefined : parsedRedeemAmount,
+        redeemAll,
+        gameUsername: savedAccount.game_username,
+        walletType: "current",
+      });
 
-    const destLabel = "Deposit Redeem";
-    if (result.error) toast.error(result.error);
-    else {
-      toast.success(
-        redeemAll
-          ? `Redeem queued — bot will cash out your full game balance to your ${destLabel} wallet.`
-          : `Redeem queued! $${parsedRedeemAmount.toFixed(2)} will move to your ${destLabel} wallet.`
-      );
-      void refreshWallet();
-      void refreshLoads();
+      const destLabel = "Deposit Redeem";
+      if (result.error) toast.error(result.error);
+      else {
+        toast.success(
+          redeemAll
+            ? `Redeem queued — your full game balance will move to your ${destLabel} wallet.`
+            : `Redeem queued! $${parsedRedeemAmount.toFixed(2)} will move to your ${destLabel} wallet.`
+        );
+        void refreshWallet();
+        void refreshLoads();
+      }
+    } finally {
+      setRedeeming(false);
     }
-    setRedeeming(false);
   }
 
   function activityLabel(load: GameLoadRequest) {

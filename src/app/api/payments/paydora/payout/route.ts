@@ -4,6 +4,7 @@ import { creditPaydoraDeposit } from "@/lib/payments/paydora-wallet";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { checkRateLimit, rateLimitUserMessage } from "@/lib/rate-limit";
+import { playerPaymentError } from "@/lib/player-safe-error";
 
 export async function POST(req: Request) {
   try {
@@ -31,9 +32,22 @@ export async function POST(req: Request) {
 
     const { data: profile } = await supabase
       .from("profiles")
-      .select("wallet_balance")
+      .select("wallet_balance, kyc_status")
       .eq("id", user.id)
       .single();
+
+    const kyc = (profile as { kyc_status?: string | null } | null)?.kyc_status;
+    if (kyc !== "verified" && kyc !== "approved") {
+      return NextResponse.json(
+        {
+          error:
+            kyc === "pending"
+              ? "KYC is under review. Cash out opens after your ID is approved."
+              : "Verify your ID before cashing out.",
+        },
+        { status: 403 }
+      );
+    }
 
     const currentBalance = Number(profile?.wallet_balance || 0);
     if (currentBalance < amount) {
@@ -99,8 +113,10 @@ export async function POST(req: Request) {
       amount: withdrawal.amount,
     });
   } catch (err) {
-    const msg = err instanceof Error ? err.message : String(err);
     const status = (err as { status?: number }).status || 500;
-    return NextResponse.json({ error: msg }, { status: status >= 400 && status < 600 ? status : 500 });
+    return NextResponse.json(
+      { error: playerPaymentError(err) },
+      { status: status >= 400 && status < 600 ? status : 500 }
+    );
   }
 }

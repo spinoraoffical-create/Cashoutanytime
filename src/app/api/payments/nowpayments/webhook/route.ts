@@ -41,7 +41,7 @@ export async function POST(req: Request) {
 
     return NextResponse.json({ success: true, payment_status: payload.payment_status });
   } catch (err) {
-    const msg = err instanceof Error ? err.message : String(err);
-    return NextResponse.json({ error: msg }, { status: 500 });
+    console.error("[nowpayments/webhook]", err);
+    return NextResponse.json({ error: "Retry" }, { status: 500 });
   }
 }

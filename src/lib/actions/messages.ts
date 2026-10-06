@@ -191,10 +191,8 @@ export async function sendUserMessage(
     .single();
 
   if (error) {
-    const hint = error.message.includes("attachment_")
-      ? " Run supabase/chat-attachments.sql in Supabase SQL Editor first."
-      : "";
-    return { error: `${error.message}${hint}` };
+    console.error("[messages] send:", error.message);
+    return { error: "Could not send that message. Try again." };
   }
 
   void notifyAdminOfCustomerMessage({
@@ -235,7 +233,10 @@ export async function ensureUserConversation() {
       .select("id, updated_at")
       .single();
 
-    if (error) return { error: error.message };
+    if (error) {
+      console.error("[messages] conversation:", error.message);
+      return { error: "Could not open chat. Try again." };
+    }
     conversation = created;
   }
 
@@ -270,7 +271,10 @@ export async function initUserMessagesInbox(): Promise<{
       .select("id, updated_at")
       .single();
 
-    if (error) return { error: error.message };
+    if (error) {
+      console.error("[messages] conversation:", error.message);
+      return { error: "Could not open chat. Try again." };
+    }
     conversation = created;
   }
 

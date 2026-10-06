@@ -82,14 +82,8 @@ export async function submitKYCDocument(formData: FormData): Promise<{ ok: boole
     .upsert(payload, { onConflict: "user_id" });
 
   if (upsertError) {
-    if (/kyc_submissions|schema cache|does not exist/i.test(upsertError.message)) {
-      return {
-        ok: false,
-        error:
-          "KYC database not set up. Admin: run supabase/migrations/20260720000300_kyc_and_ai_system.sql in Supabase SQL Editor.",
-      };
-    }
-    return { ok: false, error: upsertError.message };
+    console.error("[KYC] submit:", upsertError.message);
+    return { ok: false, error: "Could not submit that ID. Try again or contact support." };
   }
 
   const { error: profileError } = await admin
@@ -115,7 +109,7 @@ export async function submitKYCDocument(formData: FormData): Promise<{ ok: boole
 export async function getKYCSystemStatus(): Promise<{ ready: boolean; error?: string }> {
   const admin = createAdminClient();
   if (!admin) {
-    return { ready: false, error: "SUPABASE_SERVICE_ROLE_KEY is missing on the server." };
+    return { ready: false, error: "KYC review is not configured on the server." };
   }
 
   const { error } = await admin.from("kyc_submissions").select("id").limit(1);

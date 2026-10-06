@@ -7,6 +7,7 @@ import { processAIChatQuery, getBotSenderProfileId } from "@/lib/ai/chatbot";
 import { getChatbotSettings } from "@/lib/ai/settings";
 import { isTelegramConfigured, sendTelegramMessage, escapeTelegramHtml } from "@/lib/telegram/client";
 import { SITE_URL } from "@/lib/constants";
+import { getStaffContext } from "@/lib/data/admin";
 
 export async function POST(request: Request) {
   const supabase = await createClient();
@@ -36,16 +37,10 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Missing fields" }, { status: 400 });
   }
 
-  const { data: profile } = await supabase
-    .from("profiles")
-    .select("role")
-    .eq("id", user.id)
-    .single();
-
-  const isAdmin = profile?.role === "admin";
+  const staff = await getStaffContext();
 
   if (kind === "admin") {
-    if (!isAdmin) {
+    if (!staff) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 403 });
     }
 
@@ -112,11 +107,11 @@ export async function POST(request: Request) {
           if (aiResult.shouldEscalateToHuman && chatSettings.telegram_escalation_enabled && isTelegramConfigured()) {
             const { data: profile } = await db
               .from("profiles")
-              .select("display_name, username, email")
+              .select("full_name, email")
               .eq("id", user.id)
               .maybeSingle();
 
-            const displayName = profile?.display_name || profile?.username || "Player";
+            const displayName = profile?.full_name || "Player";
             const email = profile?.email || "No Email";
 
             await sendTelegramMessage(

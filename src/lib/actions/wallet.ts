@@ -6,6 +6,13 @@ import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import { createNotification } from "@/lib/actions/notifications";
 import { walletTypeLabel, type WalletType } from "@/lib/wallet/types";
+import { getStaffContext } from "@/lib/data/admin";
+import { createAdminClient } from "@/lib/supabase/admin";
+import {
+  creditCurrentWallet,
+  debitCashoutWallet,
+  debitCurrentWallet,
+} from "@/lib/wallet/service-mutate";
 
 export interface WalletBalance {
   walletBalance: number;
@@ -37,7 +44,9 @@ export async function getWalletForUser(userId: string): Promise<WalletBalance | 
       .select("role")
       .eq("id", user.id)
       .single();
-    if (adminProfile?.role !== "admin") return { error: "Unauthorized" };
+    if (adminProfile?.role !== "admin" && adminProfile?.role !== "super_admin") {
+      return { error: "Unauthorized" };
+    }
   }
 
   const { data: profile, error } = await supabase
@@ -47,15 +56,8 @@ export async function getWalletForUser(userId: string): Promise<WalletBalance | 
     .single();
 
   if (error) {
-    if (
-      error.message.includes("wallet_balance") ||
-      error.message.includes("bonus_wallet") ||
-      error.message.includes("cashout_wallet") ||
-      error.message.includes("bonus_redeem_wallet")
-    ) {
-      return { error: "Wallet not set up. Run supabase/redeem-wallets-and-balance-check.sql in Supabase." };
-    }
-    return { error: error.message };
+    console.error("[wallet] balance:", error.message);
+    return { error: "Could not load your wallet. Try again." };
   }
 
   return {
@@ -73,23 +75,14 @@ export async function creditUserWallet(
   source: string,
   description?: string
 ): Promise<{ success?: boolean; error?: string }> {
-  if (amount <= 0) return { error: "Invalid amount" };
-
-  const supabase = await createClient();
-  const { error } = await supabase.rpc("credit_wallet", {
-    p_user_id: userId,
-    p_amount: amount,
-    p_wallet_type: walletType,
-    p_source: source,
-    p_description: description ?? null,
-  });
-
-  if (error) {
-    if (error.message.includes("credit_wallet") || error.message.includes("wallet_balance")) {
-      return { error: "Wallet RPC unavailable — database setup incomplete" };
-    }
-    return { error: error.message };
+  const auth = await requireAdmin();
+  if (auth.error) return { error: auth.error };
+  if (walletType !== "current") {
+    return { error: "Only the deposit wallet can be adjusted here." };
   }
+
+  const result = await creditCurrentWallet(userId, amount, source, description);
+  if (result.error) return result;
 
   revalidatePath("/dashboard");
   revalidatePath("/spin");
@@ -114,7 +107,7 @@ export async function getWalletTransactions(userId?: string, limit = 10) {
       .select("role")
       .eq("id", user.id)
       .single();
-    if (adminProfile?.role !== "admin") return [];
+    if (adminProfile?.role !== "admin" && adminProfile?.role !== "super_admin") return [];
     targetId = userId;
   }
 
@@ -191,10 +184,8 @@ export async function getAdminAllTransactions(): Promise<
       .range(from, from + BATCH - 1);
 
     if (error) {
-      if (error.message.includes("wallet_transactions")) {
-        return { error: "Run supabase/wallets.sql in Supabase." };
-      }
-      return { error: error.message };
+      console.error("[wallet] admin transactions:", error.message);
+      return { error: "Could not load transactions." };
     }
     if (!data?.length) break;
     rows.push(...(data as Array<Record<string, unknown>>));
@@ -231,7 +222,10 @@ export async function searchAdminTransactionUsers(
   }
 
   const { data, error } = await dbQuery;
-  if (error) return { error: error.message };
+  if (error) {
+    console.error("[wallet] user search:", error.message);
+    return { error: "Could not search players." };
+  }
   return { users: (data ?? []) as AdminTransactionUser[] };
 }
 
@@ -249,10 +243,8 @@ export async function getAdminUserTransactions(
     .limit(300);
 
   if (error) {
-    if (error.message.includes("wallet_transactions")) {
-      return { error: "Run supabase/wallets.sql in Supabase." };
-    }
-    return { error: error.message };
+    console.error("[wallet] user transactions:", error.message);
+    return { error: "Could not load that player's transactions." };
   }
 
   const transactions = await attachProfilesToTransactions(
@@ -307,10 +299,10 @@ export async function getAdminUserBonusActivity(
       .order("created_at", { ascending: false })
       .range(from, from + BATCH - 1);
 
-    if (error?.message.includes("wallet_transactions")) {
-      return { error: "Run supabase/wallets.sql in Supabase." };
+    if (error) {
+      console.error("[wallet] bonus activity:", error.message);
+      return { error: "Could not load bonus activity." };
     }
-    if (error) return { error: error.message };
     if (!data?.length) break;
     txRows.push(...data);
     if (data.length < BATCH) break;
@@ -330,10 +322,10 @@ export async function getAdminUserBonusActivity(
       .order("created_at", { ascending: false })
       .range(from, from + BATCH - 1);
 
-    if (error?.message.includes("game_load_requests")) {
-      return { error: "Run supabase/game-load-requests.sql in Supabase." };
+    if (error) {
+      console.error("[wallet] bonus loads:", error.message);
+      return { error: "Could not load bonus activity." };
     }
-    if (error) return { error: error.message };
     if (!data?.length) break;
     loadRows.push(...data);
     if (data.length < BATCH) break;
@@ -363,7 +355,14 @@ export async function adminGrantWallet(
     .select("role")
     .eq("id", user.id)
     .single();
-  if (adminProfile?.role !== "admin") return { error: "Admin only" };
+  const staff = await getStaffContext();
+  const staffWallet =
+    staff?.isSuperAdmin ||
+    staff?.roles.includes("admin") ||
+    staff?.roles.includes("super_admin");
+  if (adminProfile?.role !== "admin" && adminProfile?.role !== "super_admin" && !staffWallet) {
+    return { error: "Admin only" };
+  }
 
   const result = await creditUserWallet(
     userId,
@@ -397,7 +396,14 @@ async function requireAdmin() {
     .select("role")
     .eq("id", user.id)
     .single();
-  if (adminProfile?.role !== "admin") return { error: "Admin only" as const, supabase: null };
+  const staff = await getStaffContext();
+  const staffWallet =
+    staff?.isSuperAdmin ||
+    staff?.roles.includes("admin") ||
+    staff?.roles.includes("super_admin");
+  if (adminProfile?.role !== "admin" && adminProfile?.role !== "super_admin" && !staffWallet) {
+    return { error: "Admin only" as const, supabase: null };
+  }
 
   return { supabase, error: null };
 }
@@ -421,20 +427,14 @@ export async function adminDeductWallet(
   const auth = await requireAdmin();
   if (auth.error) return { error: auth.error };
 
-  const { error } = await auth.supabase!.rpc("debit_wallet", {
-    p_user_id: userId,
-    p_amount: amount,
-    p_wallet_type: walletType,
-    p_source: "admin",
-    p_description: note || `Admin removed $${amount} from ${walletType} wallet`,
-  });
-
-  if (error) {
-    if (error.message.includes("debit_wallet")) {
-      return { error: "Wallet RPC unavailable — database setup incomplete" };
-    }
-    return { error: error.message };
-  }
+  const noteText = note || `Admin removed $${amount} from ${walletTypeLabel(walletType)}`;
+  const result =
+    walletType === "cashout"
+      ? await debitCashoutWallet(userId, amount, noteText)
+      : walletType === "current"
+        ? await debitCurrentWallet(userId, amount, "adjustment", noteText)
+        : { error: "Only the deposit and cash-out wallets can be adjusted here." };
+  if (result.error) return result;
 
   revalidateWalletPaths();
   return { success: true };
@@ -447,19 +447,30 @@ export async function adminResetWallet(
 ) {
   const auth = await requireAdmin();
   if (auth.error) return { error: auth.error };
-
-  const { error } = await auth.supabase!.rpc("reset_wallet", {
-    p_user_id: userId,
-    p_wallet_type: walletType,
-    p_description: note || `${walletType} wallet reset to zero after play`,
-  });
-
-  if (error) {
-    if (error.message.includes("reset_wallet")) {
-      return { error: "Wallet RPC unavailable — database setup incomplete" };
-    }
-    return { error: error.message };
+  if (walletType !== "current" && walletType !== "cashout") {
+    return { error: "Only the deposit and cash-out wallets can be adjusted here." };
   }
+
+  const admin = createAdminClient();
+  if (!admin) return { error: "Could not update that wallet." };
+  const column = walletType === "cashout" ? "cashout_wallet" : "wallet_balance";
+  const { data, error } = await admin.from("profiles").select(column).eq("id", userId).maybeSingle();
+  if (error || !data) {
+    console.error("[wallet] reset read:", error?.message);
+    return { error: "Could not update that wallet." };
+  }
+  const balance = Number((data as Record<string, unknown>)[column] ?? 0);
+  if (balance <= 0) {
+    revalidateWalletPaths();
+    return { success: true };
+  }
+
+  const noteText = note || `${walletTypeLabel(walletType)} reset to zero`;
+  const result =
+    walletType === "cashout"
+      ? await debitCashoutWallet(userId, balance, noteText)
+      : await debitCurrentWallet(userId, balance, "adjustment", noteText);
+  if (result.error) return result;
 
   revalidateWalletPaths();
   return { success: true };

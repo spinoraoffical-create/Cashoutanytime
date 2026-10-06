@@ -17,6 +17,7 @@ export async function notifyAdminOfCustomerMessage(input: {
   content: string;
   attachmentType?: "image" | "file" | null;
 }): Promise<void> {
+  try {
   if (!isTelegramConfigured()) return;
 
   if (await isAnyAdminOnline()) return;
@@ -60,7 +61,10 @@ export async function notifyAdminOfCustomerMessage(input: {
   ].join("\n");
 
   const result = await sendTelegramMessage(text);
-  if (!result.ok && process.env.NODE_ENV === "development") {
-    console.warn("[telegram] notify failed:", result.error);
+  if (!result.ok) {
+    console.error("[telegram] notify failed:", result.error);
+  }
+  } catch (err) {
+    console.error("[telegram] notify failed", err instanceof Error ? err.message : err);
   }
 }

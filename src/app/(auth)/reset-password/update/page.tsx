@@ -151,7 +151,7 @@ export default function UpdatePasswordPage() {
     setLoading(false);
 
     if (error) {
-      toast.error(error.message);
+      toast.error("Could not update that password. Try again.");
       return;
     }
 

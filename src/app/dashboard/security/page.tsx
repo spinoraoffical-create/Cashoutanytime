@@ -26,7 +26,7 @@ export default function SecurityPage() {
     const { error } = await supabase.auth.updateUser({ password });
     setSaving(false);
     if (error) {
-      toast.error(error.message);
+      toast.error("Could not update that password. Try again.");
       return;
     }
     setPassword("");

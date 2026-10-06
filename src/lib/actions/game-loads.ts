@@ -29,6 +29,52 @@ import { autoFulfillJuwaRequest } from "@/lib/game-automation/juwa-service";
 import { isJuwaApiConfigured } from "@/lib/game-automation/juwa-api";
 import { autoFulfillVegasRequest } from "@/lib/game-automation/vegas-service";
 import { isVegasApiConfigured } from "@/lib/game-automation/vegas-api";
+import { userFacingGameLoadError } from "@/lib/game-automation/user-facing-errors";
+
+function playerGameError(message: string | null | undefined, loadType?: string | null): string {
+  if (message?.trim()) console.error("[game-loads]", message);
+  return (
+    userFacingGameLoadError(message, loadType) ||
+    "Request failed. Please try again or contact support."
+  );
+}
+
+async function fulfillOrFail(
+  gameSlug: string,
+  requestId: string,
+  loadType: "create_account" | "new_account" | "check_balance" | "load" | "reload" | "redeem",
+  input: {
+    userId: string;
+    gameUsername?: string | null;
+    amount?: number | null;
+    requestedUsername?: string | null;
+    requestedPassword?: string | null;
+  }
+) {
+  try {
+    return await autoFulfillGameRequest(gameSlug, requestId, loadType, input);
+  } catch (err) {
+    const message = err instanceof Error ? err.message : "Game request failed";
+    console.error("[game-loads] fulfill threw", message);
+    const admin = createAdminClient();
+    if (admin) {
+      const { data } = await admin
+        .from("game_load_requests")
+        .update({
+          status: "failed",
+          error_message: message.slice(0, 400),
+          updated_at: new Date().toISOString(),
+        })
+        .eq("id", requestId)
+        .in("status", ["pending", "processing"])
+        .select("id");
+      if (data?.length && (loadType === "load" || loadType === "reload")) {
+        await admin.rpc("refund_game_load_wallet", { p_request_id: requestId });
+      }
+    }
+    return { success: false as const, error: message };
+  }
+}
 
 const API_CONFIGURED_GAMES = ["cash-machine", "cash-frenzy", "gameroom", "game-vault", "mafia", "juwa", "vegas-sweeps", "mr-all-in-one", "orion-stars", "milky-way", "fire-kirin"];
 
@@ -236,17 +282,9 @@ export async function requestGameAccountCreate(input: {
     p_replace: shouldReplace,
   });
 
-  if (error) {
-    if (error.message.includes("request_game_account_create")) {
-      return { error: "Run supabase/redeem-wallets-and-balance-check.sql in Supabase SQL Editor first." };
-    }
-    if (error.message.includes("already have a game account")) {
-      return { error: error.message };
-    }
-    return { error: error.message };
-  }
+  if (error) return { error: playerGameError(error.message, "create_account") };
 
-  const fulfillResult = await autoFulfillGameRequest(input.gameSlug, requestId as string, "create_account", {
+  const fulfillResult = await fulfillOrFail(input.gameSlug, requestId as string, "create_account", {
     userId: user.id,
     requestedUsername: username,
     requestedPassword: finalPassword,
@@ -254,7 +292,10 @@ export async function requestGameAccountCreate(input: {
   if (!fulfillResult?.success) {
     revalidatePath(`/games/${input.gameSlug}`);
     revalidatePath("/admin/game-loads");
-    return { error: fulfillResult?.error || GAME_API_UNAVAILABLE, requestId: requestId as string };
+    return {
+      error: playerGameError(fulfillResult?.error || GAME_API_UNAVAILABLE, "create_account"),
+      requestId: requestId as string,
+    };
   }
 
   revalidatePath(`/games/${input.gameSlug}`);
@@ -324,21 +365,19 @@ export async function requestGameCheckBalance(input: {
     p_game_username: input.gameUsername.trim(),
   });
 
-  if (error) {
-    if (error.message.includes("request_game_check_balance")) {
-      return { error: "Run supabase/redeem-wallets-and-balance-check.sql in Supabase SQL Editor first." };
-    }
-    return { error: error.message };
-  }
+  if (error) return { error: playerGameError(error.message, "check_balance") };
 
-  const fulfillResult = await autoFulfillGameRequest(input.gameSlug, requestId as string, "check_balance", {
+  const fulfillResult = await fulfillOrFail(input.gameSlug, requestId as string, "check_balance", {
     userId: user.id,
     gameUsername: input.gameUsername.trim(),
   });
   if (!fulfillResult?.success) {
     revalidatePath(`/games/${input.gameSlug}`);
     revalidatePath("/admin/game-loads");
-    return { error: fulfillResult?.error || GAME_API_UNAVAILABLE, requestId: requestId as string };
+    return {
+      error: playerGameError(fulfillResult?.error || GAME_API_UNAVAILABLE, "check_balance"),
+      requestId: requestId as string,
+    };
   }
 
   revalidatePath(`/games/${input.gameSlug}`);
@@ -402,14 +441,9 @@ export async function requestGameLoad(input: {
     p_game_username: input.gameUsername.trim(),
   });
 
-  if (error) {
-    if (error.message.includes("request_game_load")) {
-      return { error: "Run supabase/game-load-requests.sql in Supabase SQL Editor first." };
-    }
-    return { error: error.message };
-  }
+  if (error) return { error: playerGameError(error.message, "load") };
 
-  const fulfillResult = await autoFulfillGameRequest(input.gameSlug, requestId as string, "load", {
+  const fulfillResult = await fulfillOrFail(input.gameSlug, requestId as string, "load", {
     userId: user.id,
     gameUsername: input.gameUsername.trim(),
     amount,
@@ -417,7 +451,10 @@ export async function requestGameLoad(input: {
   if (!fulfillResult?.success) {
     revalidatePath(`/games/${input.gameSlug}`);
     revalidatePath("/admin/game-loads");
-    return { error: fulfillResult?.error || GAME_API_UNAVAILABLE, requestId: requestId as string };
+    return {
+      error: playerGameError(fulfillResult?.error || GAME_API_UNAVAILABLE, "load"),
+      requestId: requestId as string,
+    };
   }
 
   revalidatePath(`/games/${input.gameSlug}`);
@@ -531,19 +568,11 @@ export async function requestGameRedeem(input: {
     p_amount: redeemAll ? 0 : input.amount,
     p_game_username: input.gameUsername.trim(),
     p_redeem_all: redeemAll,
-    p_wallet_type: walletType,
   });
 
-  if (error) {
-    if (error.message.includes("request_game_redeem")) {
-      return {
-        error: "Run supabase/deposit-redeem-rollover.sql in Supabase SQL Editor first.",
-      };
-    }
-    return { error: error.message };
-  }
+  if (error) return { error: playerGameError(error.message, "redeem") };
 
-  const fulfillResult = await autoFulfillGameRequest(input.gameSlug, requestId as string, "redeem", {
+  const fulfillResult = await fulfillOrFail(input.gameSlug, requestId as string, "redeem", {
     userId: user.id,
     gameUsername: input.gameUsername.trim(),
     amount: redeemAll ? null : input.amount,
@@ -551,7 +580,10 @@ export async function requestGameRedeem(input: {
   if (!fulfillResult?.success) {
     revalidatePath(`/games/${input.gameSlug}`);
     revalidatePath("/admin/game-loads");
-    return { error: fulfillResult?.error || GAME_API_UNAVAILABLE, requestId: requestId as string };
+    return {
+      error: playerGameError(fulfillResult?.error || GAME_API_UNAVAILABLE, "redeem"),
+      requestId: requestId as string,
+    };
   }
 
   revalidatePath(`/games/${input.gameSlug}`);
@@ -757,8 +789,7 @@ export async function healStaleGameLoads(gameSlug: string, staleMinutes = 15) {
     .from("game_load_requests")
     .update({
       status: "failed",
-      error_message:
-        "This request got stuck (bot did not finish). Refresh, then click Replace Account again.",
+      error_message: "This request timed out before it finished. Try again.",
       updated_at: new Date().toISOString(),
     })
     .eq("user_id", user.id)
@@ -771,8 +802,7 @@ export async function healStaleGameLoads(gameSlug: string, staleMinutes = 15) {
     .from("game_load_requests")
     .update({
       status: "failed",
-      error_message:
-        "Timed out waiting for the game bot. Restart the bot on your PC, then try Replace again.",
+      error_message: "This request timed out. Try again in a few minutes.",
       updated_at: new Date().toISOString(),
     })
     .eq("user_id", user.id)
@@ -803,12 +833,7 @@ export async function cancelMyGameLoad(requestId: string, gameSlug: string) {
 
   const admin = createAdminClient();
   if (!admin) {
-    return {
-      error:
-        error.message.includes("cancel_my_game_load")
-          ? "Run supabase/stale-game-load-recovery.sql in Supabase, or ask admin to cancel the stuck job."
-          : error.message,
-    };
+    return { error: playerGameError(error.message, "load") };
   }
 
   const { data: rows, error: updErr } = await admin
@@ -824,7 +849,7 @@ export async function cancelMyGameLoad(requestId: string, gameSlug: string) {
     .select("id");
 
   if (updErr || !rows?.length) {
-    return { error: updErr?.message ?? "Request not found or already finished" };
+    return { error: playerGameError(updErr?.message ?? "Request not found or already finished", "load") };
   }
 
   revalidatePath(`/games/${gameSlug}`);
@@ -917,7 +942,7 @@ export async function adminUpdateGameLoadStatus(
     })
     .eq("id", requestId);
 
-  if (error) return { error: error.message };
+  if (error) return { error: "Could not update that request." };
 
   if (status === "completed") {
     const isRedeem = existing.load_type === "redeem";
@@ -925,7 +950,7 @@ export async function adminUpdateGameLoadStatus(
       existing.user_id,
       isRedeem ? `${existing.game_name} redeem complete` : `${existing.game_name} load complete`,
       isRedeem
-        ? `$${Number(existing.amount).toFixed(2)} was redeemed to your Spinora wallet.`
+        ? `$${Number(existing.amount).toFixed(2)} was redeemed to your wallet.`
         : `$${Number(existing.amount).toFixed(2)} was loaded to your ${existing.game_name} account.`,
       "success"
     );
