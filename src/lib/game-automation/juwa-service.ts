@@ -1,6 +1,5 @@
 import { createAdminClient } from "@/lib/supabase/admin";
 import { JuwaApiClient } from "./juwa-api";
-import { generateGamePassword } from "./account-username";
 
 export interface AutoFulfillJuwaOptions {
   requestId?: string;
@@ -36,7 +35,7 @@ export async function autoFulfillJuwaRequest(
   try {
     if (loadType === "create_account") {
       console.log(`[Juwa Service] Processing create_account for account: "${cleanAccount}"`);
-      const passToUse = password?.trim() || generateGamePassword();
+      const passToUse = password?.trim() || `Pass_${Math.floor(1000 + Math.random() * 9000)}`;
 
       // 1. Call addUser on Juwa External API
       const created = await client.addUser(cleanAccount, passToUse);
@@ -108,7 +107,7 @@ export async function autoFulfillJuwaRequest(
       try {
         userId = await client.getUserID(cleanAccount);
       } catch (err) {
-        const passToUse = password?.trim() || generateGamePassword();
+        const passToUse = password?.trim() || `Pass_${Math.floor(1000 + Math.random() * 9000)}`;
         const newUser = await client.addUser(cleanAccount, passToUse);
         userId = newUser.userId;
       }

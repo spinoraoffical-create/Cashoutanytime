@@ -28,7 +28,7 @@ export interface GameLoadRequest {
   completed_at: string | null;
 }
 
-/** Games with agent API automation (no local workers). */
+/** Games fulfilled by a platform API, not a desktop bot. */
 export const AUTOMATED_GAME_SLUGS = [
   "juwa",
   "vegas-sweeps",
@@ -38,6 +38,9 @@ export const AUTOMATED_GAME_SLUGS = [
   "mr-all-in-one",
   "mafia",
   "cash-frenzy",
+  "orion-stars",
+  "milky-way",
+  "fire-kirin",
 ] as const;
 export type AutomatedGameSlug = (typeof AUTOMATED_GAME_SLUGS)[number];
 

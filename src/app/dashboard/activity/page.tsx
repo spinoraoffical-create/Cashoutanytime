@@ -10,13 +10,17 @@ import {
   transactionSummary,
   type WalletTransactionRow,
 } from "@/lib/wallet/transaction-display";
+import { ActivityCsvButton, ActivityRangeSelect } from "@/components/player/activity-tools";
+import { ClaimVerifyBanner } from "@/components/player/claim-verify-banner";
 import { MotionPage } from "@/components/player/motion-page";
+import { getProfile } from "@/lib/supabase/session";
 
 export const metadata: Metadata = { title: "Activity | Sweepstakes Hub" };
 
-type Filter = "all" | "deposits" | "cashouts" | "bonuses";
+type Filter = "all" | "deposits" | "cashouts" | "bonuses" | "games";
 
 function bucket(tx: WalletTransactionRow): Filter {
+  if (tx.source === "game_load" || tx.source === "game_load_refund") return "games";
   if (tx.source === "deposit") return "deposits";
   if (tx.source === "game_redeem" || tx.wallet_type === "cashout") return "cashouts";
   if (
@@ -31,20 +35,28 @@ function bucket(tx: WalletTransactionRow): Filter {
 }
 
 const FILTERS: { id: Filter; label: string }[] = [
-  { id: "all", label: "ALL" },
-  { id: "deposits", label: "DEPOSITS" },
-  { id: "cashouts", label: "CASHOUTS" },
-  { id: "bonuses", label: "BONUSES" },
+  { id: "all", label: "All" },
+  { id: "deposits", label: "Deposits" },
+  { id: "cashouts", label: "Cashouts" },
+  { id: "bonuses", label: "Bonuses" },
+  { id: "games", label: "Games" },
 ];
+
+const RANGES = new Set(["7", "30", "90"]);
 
 export default async function ActivityPage({
   searchParams,
 }: {
-  searchParams: Promise<{ filter?: string }>;
+  searchParams: Promise<{ filter?: string; range?: string }>;
 }) {
   const { supabase, user } = await requireUser();
   const params = await searchParams;
   const filter = (FILTERS.some((f) => f.id === params.filter) ? params.filter : "all") as Filter;
+  const range = RANGES.has(params.range ?? "") ? params.range! : "all";
+  const profile = await getProfile();
+  const row = profile as (typeof profile & { kyc_status?: string | null }) | null;
+  const kyc = row?.kyc_status;
+  const needsVerify = Boolean(row && (!row.phone || (kyc && kyc !== "verified" && kyc !== "approved")));
 
   const { data } = await supabase
     .from("wallet_transactions")
@@ -54,10 +66,28 @@ export default async function ActivityPage({
     .limit(80);
 
   const rows = (data ?? []) as WalletTransactionRow[];
-  const items = filter === "all" ? rows : rows.filter((tx) => bucket(tx) === filter);
+  const cutoff =
+    range === "all" ? 0 : Date.now() - Number(range) * 24 * 60 * 60 * 1000;
+  const ranged = cutoff ? rows.filter((tx) => new Date(tx.created_at).getTime() >= cutoff) : rows;
+  const items = filter === "all" ? ranged : ranged.filter((tx) => bucket(tx) === filter);
+  const filterHref = (id: Filter) => {
+    const params = new URLSearchParams();
+    if (id !== "all") params.set("filter", id);
+    if (range !== "all") params.set("range", range);
+    const query = params.toString();
+    return query ? `/dashboard/activity?${query}` : "/dashboard/activity";
+  };
 
   return (
     <MotionPage className="space-y-5">
+      {needsVerify ? (
+        <ClaimVerifyBanner
+          href="/dashboard/kyc"
+          title="Get $5 free play — just verify your email & phone"
+          body="No deposit needed. Verify your email and phone number to unlock free play. New players — tap to see the details and claim."
+        />
+      ) : null}
+
       <div>
         <h1 className="text-3xl font-extrabold">Activity</h1>
         <p className="mt-1 text-sm text-muted-foreground">
@@ -65,14 +95,29 @@ export default async function ActivityPage({
         </p>
       </div>
 
+      <section className="overflow-hidden rounded-[24px] bg-gradient-to-r from-[#241433] to-[#4a2048] p-5">
+        <h2 className="max-w-[220px] text-2xl font-extrabold leading-tight">Every move, easy to follow.</h2>
+        <p className="mt-2 max-w-[240px] text-sm text-zinc-300">
+          The live record below remains the source of truth.
+        </p>
+      </section>
+
+      <div className="flex items-center justify-between gap-3">
+        <p className="text-xs font-bold uppercase tracking-[0.16em] text-zinc-500">History</p>
+        <div className="flex items-center gap-2">
+          <ActivityCsvButton rows={items} />
+          <ActivityRangeSelect range={range} filter={filter} />
+        </div>
+      </div>
+
       <div className="flex gap-2 overflow-x-auto scrollbar-hide">
         {FILTERS.map((f) => (
           <Link
             key={f.id}
-            href={f.id === "all" ? "/dashboard/activity" : `/dashboard/activity?filter=${f.id}`}
+            href={filterHref(f.id)}
             className={cn(
-              "rounded-full px-4 py-1.5 text-sm font-semibold whitespace-nowrap",
-              filter === f.id ? "hub-neon-pill bg-primary text-white" : "bg-white/8 text-zinc-400"
+              "rounded-full px-4 py-1.5 text-sm font-semibold whitespace-nowrap uppercase",
+              filter === f.id ? "bg-white text-zinc-950" : "bg-white/8 text-zinc-300"
             )}
           >
             {f.label}

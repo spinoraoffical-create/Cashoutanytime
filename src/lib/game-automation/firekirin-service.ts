@@ -1,6 +1,5 @@
 import { createAdminClient } from "@/lib/supabase/admin";
 import { FireKirinApiClient, parseFireKirinUserBalance } from "./firekirin-api";
-import { generateGamePassword } from "./account-username";
 
 export interface AutoFulfillFireKirinOptions {
   requestId?: string;
@@ -34,7 +33,7 @@ export async function autoFulfillFireKirinRequest(
 
   try {
     if (loadType === "create_account") {
-      const passToUse = password?.trim() || generateGamePassword();
+      const passToUse = password?.trim() || `Pass_${Math.floor(1000 + Math.random() * 9000)}`;
       const created = await client.createAccount(cleanAccount, passToUse);
       const verifiedInfo = await client.queryInfo(created.account, created.session);
 

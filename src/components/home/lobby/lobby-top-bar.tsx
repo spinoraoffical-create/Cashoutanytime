@@ -1,17 +1,16 @@
 "use client";
 
 import Link from "next/link";
-import Image from "next/image";
-import { Bell } from "lucide-react";
+import { Bell, Wallet } from "lucide-react";
 import { useLobbyProfile } from "@/components/home/lobby/use-lobby-profile";
 import { useUnreadMessages } from "@/hooks/use-unread-messages";
 import { SITE_NAME } from "@/lib/constants";
 
 export function LobbyTopBar() {
-  const { balance, walletHidden, profile, displayName } = useLobbyProfile();
+  const { balance, balancesHidden, profile, displayName } = useLobbyProfile();
   const { count: unreadMessages } = useUnreadMessages();
 
-  const fmt = walletHidden
+  const fmt = balancesHidden
     ? "••••"
     : balance.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 
@@ -29,8 +28,10 @@ export function LobbyTopBar() {
       <div className="flex shrink-0 items-center gap-2">
         <Link
           href="/dashboard/wallet"
-          className="rounded-full border border-primary/30 bg-white/8 px-3 py-1.5 text-sm font-extrabold tabular-nums text-white shadow-[0_0_16px_rgba(255,45,85,0.25)]"
+          className="flex items-center gap-1.5 rounded-full border border-white/10 bg-white/8 px-3 py-1.5 text-sm font-extrabold tabular-nums text-white"
+          aria-label="Wallet balances"
         >
+          <Wallet className="h-3.5 w-3.5 text-primary" />
           ${fmt}
         </Link>
         <Link
@@ -47,11 +48,12 @@ export function LobbyTopBar() {
         </Link>
         <Link
           href="/dashboard"
-          className="relative flex h-9 w-9 items-center justify-center overflow-hidden rounded-full border border-primary/40 bg-primary/20 text-xs font-bold"
+          className="relative flex h-9 w-9 items-center justify-center overflow-hidden rounded-full bg-primary text-xs font-bold text-white"
           aria-label="Profile"
         >
           {profile?.avatarUrl ? (
-            <Image src={profile.avatarUrl} alt="" fill className="object-cover" />
+            // eslint-disable-next-line @next/next/no-img-element
+            <img src={profile.avatarUrl} alt="" className="h-full w-full object-cover" />
           ) : (
             initial
           )}

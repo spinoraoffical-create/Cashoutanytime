@@ -1,7 +1,5 @@
-import { hasAnyEnv } from "./env";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { formatGameAutomationError } from "./error-formatter";
-import { generateGamePassword } from "./account-username";
 import {
   getCashMachineApiClient,
   CashMachineApiClient,
@@ -31,10 +29,9 @@ export interface WithdrawCashMachineAccountParams {
  * Check if CashMachine API credentials are configured in environment
  */
 export function isCashMachineApiConfigured(): boolean {
-  return (
-    hasAnyEnv("CASHMACHINE_AGENT_USERNAME", "CASHMACHINE_USERNAME") &&
-    hasAnyEnv("CASHMACHINE_AGENT_PASSWORD", "CASHMACHINE_PASSWORD")
-  );
+  const username = process.env.CASHMACHINE_AGENT_USERNAME || process.env.CASHMACHINE_USERNAME || "";
+  const password = process.env.CASHMACHINE_AGENT_PASSWORD || process.env.CASHMACHINE_PASSWORD || "";
+  return Boolean(username?.trim() && password?.trim());
 }
 
 /**
@@ -46,7 +43,7 @@ export async function createCashMachineAccount(
   client?: CashMachineApiClient
 ) {
   const api = client || getCashMachineApiClient();
-  const password = params.password || generateGamePassword();
+  const password = params.password || "123456";
   const nickname = (params.nickname && params.nickname !== "-")
     ? params.nickname
     : params.username;
@@ -156,7 +153,7 @@ export async function autoFulfillCashMachineRequest(
     // 1. Create account / Replace account
     if (loadType === "create_account" || loadType === "new_account") {
       const username = input.requestedUsername || `CM${Math.floor(100000 + Math.random() * 900000)}`;
-      const password = input.requestedPassword || generateGamePassword();
+      const password = input.requestedPassword || `Pass_${Math.floor(1000 + Math.random() * 9000)}`;
 
       const created = await createCashMachineAccount({ username, password });
 

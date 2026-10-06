@@ -1,15 +1,15 @@
-/** Production email links always use SITE_URL so Supabase redirect allow-list matches. */
+/** Email and Google links return to the site the player is actually using. */
 export function getEmailAuthOrigin(requestOrigin: string): string {
   try {
-    const host = new URL(requestOrigin).hostname;
-    if (host === "localhost" || host === "127.0.0.1") {
-      return requestOrigin.replace(/\/$/, "");
+    const url = new URL(requestOrigin);
+    if (url.protocol === "https:" || url.hostname === "localhost" || url.hostname === "127.0.0.1") {
+      return url.origin;
     }
   } catch {
     // fall through to SITE_URL
   }
 
-  const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || "https://spinoracasinos.com";
+  const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || "https://cashoutanytime.vercel.app";
   return siteUrl.replace(/\/$/, "");
 }
 

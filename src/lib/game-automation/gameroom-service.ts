@@ -1,17 +1,14 @@
-import { hasAnyEnv } from "./env";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { formatGameAutomationError } from "./error-formatter";
-import { generateGamePassword } from "./account-username";
 import {
   getGameroomApiClient,
   GameroomApiClient,
 } from "./gameroom-api";
 
 export function isGameroomApiConfigured(): boolean {
-  return (
-    hasAnyEnv("GAMEROOM_AGENT_USERNAME", "GAMEROOM_USERNAME") &&
-    hasAnyEnv("GAMEROOM_AGENT_PASSWORD", "GAMEROOM_PASSWORD")
-  );
+  const username = process.env.GAMEROOM_AGENT_USERNAME || process.env.GAMEROOM_USERNAME || "";
+  const password = process.env.GAMEROOM_AGENT_PASSWORD || process.env.GAMEROOM_PASSWORD || "";
+  return Boolean(username?.trim() && password?.trim());
 }
 
 export async function createGameroomAccount(
@@ -19,7 +16,7 @@ export async function createGameroomAccount(
   client?: GameroomApiClient
 ) {
   const api = client || getGameroomApiClient();
-  const password = params.password || generateGamePassword();
+  const password = params.password || "123456";
   const nickname = (params.nickname && params.nickname !== "-") ? params.nickname : params.username;
   const res = await api.addPlayer(params.username, password, nickname, "0");
   return { success: true, account: res.data.account, password: res.data.password };
@@ -73,7 +70,7 @@ export async function autoFulfillGameroomRequest(
   try {
     if (loadType === "create_account" || loadType === "new_account") {
       const username = input.requestedUsername || `GR${Math.floor(100000 + Math.random() * 900000)}`;
-      const password = input.requestedPassword || generateGamePassword();
+      const password = input.requestedPassword || `Pass_${Math.floor(1000 + Math.random() * 9000)}`;
       const created = await createGameroomAccount({ username, password });
 
       await admin

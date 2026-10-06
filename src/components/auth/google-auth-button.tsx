@@ -40,6 +40,7 @@ export function GoogleAuthButton({
       provider: "google",
       options: {
         redirectTo: callbackUrl.toString(),
+        skipBrowserRedirect: true,
         queryParams: {
           access_type: "online",
           prompt: "select_account",
@@ -47,24 +48,34 @@ export function GoogleAuthButton({
       },
     });
 
-    if (error) {
-      const raw = `${error.message} ${error.code ?? ""}`.toLowerCase();
+    if (error || !data?.url) {
+      const raw = `${error?.message ?? ""} ${error?.code ?? ""}`.toLowerCase();
       toast.error(
-        raw.includes("provider is not enabled") || error.code === "validation_failed"
-          ? "Google sign-in is temporarily unavailable. Use email, or contact support."
+        raw.includes("provider is not enabled") || raw.includes("validation_failed")
+          ? "Google sign-in is not turned on yet. Use email and password."
           : "Could not start Google sign-in. Please try again or use email."
       );
       setLoading(false);
       return;
     }
 
-    if (data?.url) {
-      window.location.href = data.url;
+    const probe = await fetch("/api/auth/google", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ url: data.url }),
+    });
+    const probeBody = await probe.json().catch(() => ({}));
+    if (!probe.ok) {
+      toast.error(
+        typeof probeBody.error === "string"
+          ? probeBody.error
+          : "Google sign-in is not turned on yet. Use email and password."
+      );
+      setLoading(false);
       return;
     }
 
-    toast.error("Could not start Google sign-in. Please try again or use email.");
-    setLoading(false);
+    window.location.href = data.url;
   }
 
   return (

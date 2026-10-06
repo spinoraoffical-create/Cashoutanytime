@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { ChevronRight } from "lucide-react";
+import { Check } from "lucide-react";
 
 export function ClaimVerifyBanner({
   href,
@@ -15,16 +15,18 @@ export function ClaimVerifyBanner({
   return (
     <Link
       href={href}
-      className="hub-glass flex items-center gap-3 rounded-2xl border border-emerald-400/30 px-4 py-3 text-white shadow-[0_0_20px_rgba(52,211,153,0.18)]"
+      className="hub-card flex items-center gap-3 rounded-[22px] px-4 py-3.5 text-white"
     >
-      <div className="min-w-0 flex-1">
-        <p className="text-sm font-extrabold leading-tight">{title}</p>
-        {body ? <p className="mt-0.5 text-xs text-zinc-300">{body}</p> : null}
-      </div>
-      <span className="shrink-0 rounded-full bg-white px-3 py-1.5 text-xs font-bold text-zinc-900">
-        {cta}
+      <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-emerald-500/15 text-emerald-400">
+        <Check className="h-4 w-4" strokeWidth={2.6} />
       </span>
-      <ChevronRight className="h-4 w-4 shrink-0 opacity-80" />
+      <div className="min-w-0 flex-1">
+        <p className="text-sm font-extrabold leading-snug">{title}</p>
+        {body ? <p className="mt-0.5 text-xs leading-snug text-zinc-400">{body}</p> : null}
+      </div>
+      <span className="shrink-0 rounded-full bg-white px-4 py-2 text-xs font-bold text-zinc-950">
+        {cta} →
+      </span>
     </Link>
   );
 }

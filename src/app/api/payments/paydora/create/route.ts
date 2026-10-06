@@ -1,8 +1,8 @@
 import { NextResponse } from "next/server";
 import { createPaydoraDeposit } from "@/lib/payments/paydora";
 import { createClient } from "@/lib/supabase/server";
-import { checkRateLimit, rateLimitUserMessage } from "@/lib/rate-limit";
-import { DEPOSITS_UNAVAILABLE, playerPaymentError } from "@/lib/player-safe-error";
+import { checkRateLimit, clientIp, rateLimitUserMessage } from "@/lib/rate-limit";
+import { playerPaymentError } from "@/lib/player-safe-error";
 
 export async function POST(req: Request) {
   try {
@@ -17,17 +17,13 @@ export async function POST(req: Request) {
 
     const limited = await checkRateLimit("paydoraCreate", user.id);
     if (!limited.allowed) {
-      const unavailable = limited.reason === "unavailable";
-      return NextResponse.json(
-        { error: rateLimitUserMessage(limited) },
-        { status: unavailable ? 503 : 429 }
-      );
+      return NextResponse.json({ error: rateLimitUserMessage(limited) }, { status: 429 });
     }
 
     const body = await req.json();
     const paymentMethodId = String(body.paymentMethodId || "").trim();
     const amount = Number(body.amount);
-    const gameSlug = body.gameSlug ? String(body.gameSlug).trim() : "";
+    const fingerprint = String(body.deviceFingerprint || "").trim();
 
     if (!paymentMethodId) {
       return NextResponse.json({ error: "Choose a payment method." }, { status: 400 });
@@ -36,11 +32,13 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: "Choose a deposit amount." }, { status: 400 });
     }
 
+    const ip = clientIp(req);
     const deposit = await createPaydoraDeposit({
       paymentMethodId,
       amount,
       userName: user.id,
-      gameId: gameSlug || undefined,
+      customerIp: ip === "unknown" ? "127.0.0.1" : ip,
+      deviceFingerprint: fingerprint || `player_${user.id}`,
       idempotencyKey: `dep_${user.id}_${Date.now()}`,
     });
 
@@ -55,7 +53,7 @@ export async function POST(req: Request) {
   } catch (err) {
     const status = (err as { status?: number }).status || 500;
     return NextResponse.json(
-      { error: playerPaymentError(err, DEPOSITS_UNAVAILABLE) },
+      { error: playerPaymentError(err) },
       { status: status >= 400 && status < 600 ? status : 500 }
     );
   }

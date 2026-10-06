@@ -15,6 +15,19 @@ import { cn } from "@/lib/utils";
 import { toast } from "sonner";
 import { DEPOSITS_UNAVAILABLE, friendlyPlayerError } from "@/lib/player-safe-error";
 
+function deviceFingerprint() {
+  const key = "hub-device-id";
+  try {
+    const existing = localStorage.getItem(key);
+    if (existing) return existing;
+    const id = crypto.randomUUID();
+    localStorage.setItem(key, id);
+    return id;
+  } catch {
+    return "browser";
+  }
+}
+
 interface PayMethod {
   id: string;
   value: string;
@@ -75,8 +88,18 @@ export function DollarPayDepositSection({
   }
 
   async function handlePayNow() {
-    if (!selected || !selectedAmount) {
+      if (!selected || !selectedAmount) {
       toast.error("Please choose a deposit amount.");
+      return;
+    }
+    const limit = Number(localStorage.getItem("hub-deposit-limit") || 0);
+    if (limit > 0 && Number(selectedAmount) > limit) {
+      toast.error(`Your deposit limit is $${limit.toFixed(2)}. Change it in Responsible play.`);
+      return;
+    }
+    const pausedUntil = localStorage.getItem("hub-play-timeout");
+    if (pausedUntil && new Date(pausedUntil).getTime() > Date.now()) {
+      toast.error("Play is paused from your responsible play settings.");
       return;
     }
 
@@ -89,6 +112,7 @@ export function DollarPayDepositSection({
           paymentMethodId: selected.id,
           amount: Number(selectedAmount),
           gameSlug,
+          deviceFingerprint: deviceFingerprint(),
         }),
       });
       const data = await res.json();

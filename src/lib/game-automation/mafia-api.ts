@@ -10,9 +10,6 @@
  * 6. Player withdrawal (POST /api/player/playerWithdraw)
  */
 
-import { generateGamePassword } from "./account-username";
-import { hasAllEnv, requiredEnv } from "./env";
-
 export interface MafiaLoginResponse {
   status_code: number;
   message: string;
@@ -99,8 +96,15 @@ export class MafiaApiClient {
       "https://agentserver.mafia77777.com"
     ).replace(/\/admin\/login\/?$/, "").replace(/\/+$/, "");
 
-    this.username = config.username?.trim() || requiredEnv("MAFIA_AGENT_USERNAME");
-    this.password = config.password?.trim() || requiredEnv("MAFIA_AGENT_PASSWORD");
+    this.username =
+      config.username ||
+      process.env.MAFIA_AGENT_USERNAME ||
+      "";
+
+    this.password =
+      config.password ||
+      process.env.MAFIA_AGENT_PASSWORD ||
+      "";
   }
 
   public async getValidToken(): Promise<string> {
@@ -216,7 +220,7 @@ export class MafiaApiClient {
     let player = await this.findPlayerByAccount(account);
     if (!player) {
       // If player doesn't exist, create it!
-      const created = await this.createAccount(account, generateGamePassword());
+      const created = await this.createAccount(account, "123123");
       player = { id: created.id, Account: created.account } as MafiaPlayer;
     }
 
@@ -288,5 +292,7 @@ export class MafiaApiClient {
 }
 
 export function isMafiaApiConfigured(): boolean {
-  return hasAllEnv("MAFIA_AGENT_USERNAME", "MAFIA_AGENT_PASSWORD");
+  const username = process.env.MAFIA_AGENT_USERNAME || "";
+  const password = process.env.MAFIA_AGENT_PASSWORD || "";
+  return Boolean(username?.trim() && password?.trim());
 }

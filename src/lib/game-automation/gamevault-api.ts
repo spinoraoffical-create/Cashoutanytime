@@ -1,5 +1,4 @@
 import { createHash } from "crypto";
-import { optionalEnv, requiredEnv } from "./env";
 import https from "https";
 import tls from "tls";
 import net from "net";
@@ -262,9 +261,23 @@ export class GameVaultApiClient {
       "https://apius.gamevault999.com"
     ).replace(/\/+$/, "");
 
-    this.agentId = (config.agentId || requiredEnv("GAMEVAULT_AGENT_ID")).trim();
-    this.secretKey = (config.secretKey || requiredEnv("GAMEVAULT_SECRET_KEY")).trim();
-    this.proxyUrl = (config.proxyUrl || optionalEnv("GAMEVAULT_PROXY_URL") || "").trim() || undefined;
+    this.agentId = (
+      config.agentId ||
+      process.env.GAMEVAULT_AGENT_ID ||
+      ""
+    ).trim();
+
+    this.secretKey = (
+      config.secretKey ||
+      process.env.GAMEVAULT_SECRET_KEY ||
+      ""
+    ).trim();
+
+    this.proxyUrl = (
+      config.proxyUrl ||
+      process.env.GAMEVAULT_PROXY_URL ||
+      ""
+    ).trim();
   }
 
   /**

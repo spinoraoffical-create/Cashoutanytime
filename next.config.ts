@@ -31,6 +31,17 @@ const nextConfig: NextConfig = {
       { source: "/activity", destination: "/dashboard/activity", permanent: false },
       { source: "/me", destination: "/dashboard", permanent: false },
       { source: "/account", destination: "/dashboard", permanent: false },
+      { source: "/welcome-bonus", destination: "/dashboard/welcome", permanent: false },
+      { source: "/account/verification", destination: "/dashboard/verification", permanent: false },
+      { source: "/account/security", destination: "/dashboard/security", permanent: false },
+      { source: "/account/notifications", destination: "/dashboard/notifications", permanent: false },
+      { source: "/responsible", destination: "/dashboard/responsible", permanent: false },
+      { source: "/missions", destination: "/dashboard/missions", permanent: false },
+      { source: "/loyalty", destination: "/dashboard/vip", permanent: false },
+      { source: "/inbox", destination: "/dashboard/messages", permanent: false },
+      { source: "/affiliate", destination: "/dashboard/referrals", permanent: false },
+      { source: "/rewards", destination: "/dashboard/rewards", permanent: false },
+      { source: "/help", destination: "/support", permanent: false },
     ];
   },
   experimental: {

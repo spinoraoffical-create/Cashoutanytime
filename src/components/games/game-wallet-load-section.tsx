@@ -1,7 +1,6 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import Link from "next/link";
 import {
   Copy,
   Eye,
@@ -15,7 +14,6 @@ import {
   RefreshCw,
   Pencil,
   X,
-  ShieldCheck,
 } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import {
@@ -44,14 +42,6 @@ import { cn, formatRelativeTime } from "@/lib/utils";
 import { toast } from "sonner";
 import type { DepositRolloverBounds } from "@/lib/wallet/deposit-redeem-rollover";
 import { WALLET_REFRESH_EVENT } from "@/lib/wallet/use-live-wallet";
-import { userFacingGameLoadError } from "@/lib/game-automation/user-facing-errors";
-
-function notifyGameError(message: string | null | undefined, loadType?: string | null) {
-  toast.error(
-    userFacingGameLoadError(message, loadType) ||
-      "Request failed. Please try again or contact support."
-  );
-}
 
 interface GameWalletLoadSectionProps {
   game: Game;
@@ -60,7 +50,6 @@ interface GameWalletLoadSectionProps {
     game_password: string | null;
   } | null;
   onAccountChange?: (hasAccount: boolean) => void;
-  /** activity = no create form and no load/redeem until a sign-in exists */
   mode?: "full" | "activity";
   reloadToken?: number;
 }
@@ -75,8 +64,6 @@ export function GameWalletLoadSection({
   const supabase = useMemo(() => createClient(), []);
 
   const [walletBalance, setWalletBalance] = useState(0);
-  const [cashoutWallet, setCashoutWallet] = useState(0);
-  const [kycStatus, setKycStatus] = useState<string>("unverified");
   const [amount, setAmount] = useState(String(WALLET_LOAD_LIMITS.min));
   const [redeemAmount, setRedeemAmount] = useState(String(WALLET_LOAD_LIMITS.min));
   const [redeemAll, setRedeemAll] = useState(false);
@@ -89,7 +76,6 @@ export function GameWalletLoadSection({
   const [customUsername, setCustomUsername] = useState("");
   const [customPassword, setCustomPassword] = useState("");
   const [recentLoads, setRecentLoads] = useState<GameLoadRequest[]>([]);
-  const [lastVerifiedBalance, setLastVerifiedBalance] = useState<number | null>(null);
   const [requesterName, setRequesterName] = useState<string | null>(null);
   const [requesterEmail, setRequesterEmail] = useState<string | null>(null);
   const [savedAccount, setSavedAccount] = useState<{
@@ -122,14 +108,12 @@ export function GameWalletLoadSection({
 
     const { data } = await supabase
       .from("profiles")
-      .select("wallet_balance, cashout_wallet, kyc_status, full_name, email")
+      .select("wallet_balance, full_name, email")
       .eq("id", user.id)
       .single();
 
     if (data) {
       setWalletBalance(Number(data.wallet_balance ?? 0));
-      setCashoutWallet(Number(data.cashout_wallet ?? 0));
-      setKycStatus(String(data.kyc_status ?? "unverified"));
       setRequesterName(data.full_name ?? null);
       setRequesterEmail(data.email ?? null);
     }
@@ -149,25 +133,6 @@ export function GameWalletLoadSection({
     const loads = (await getMyGameLoads(game.slug)) as GameLoadRequest[];
     setRecentLoads(loads);
 
-    // Fetch last completed balance check to prevent pagination truncation bug
-    if (supabase) {
-      const { data: lastCheck } = await supabase
-        .from("game_load_requests")
-        .select("amount")
-        .eq("game_slug", game.slug)
-        .eq("load_type", "check_balance")
-        .eq("status", "completed")
-        .order("completed_at", { ascending: false })
-        .limit(1)
-        .maybeSingle();
-
-      if (lastCheck) {
-        setLastVerifiedBalance(Number(lastCheck.amount));
-      } else {
-        setLastVerifiedBalance(null);
-      }
-    }
-
     const pendingLoads = loads.filter(
       (l) =>
         (l.load_type === "load" || l.load_type === "reload") &&
@@ -181,15 +146,9 @@ export function GameWalletLoadSection({
         (l.status === "completed" || l.status === "failed" || l.status === "cancelled") &&
         pendingLoadIdsRef.current.has(l.id)
     );
-    const finishedRedeem = loads.some(
-      (l) =>
-        l.load_type === "redeem" &&
-        (l.status === "completed" || l.status === "failed" || l.status === "cancelled") &&
-        pendingJobIdsRef.current.has(l.id)
-    );
     pendingLoadIdsRef.current = pendingIds;
 
-    if (finishedLoad || finishedRedeem || (hadPending && pendingIds.size === 0)) {
+    if (finishedLoad || (hadPending && pendingIds.size === 0)) {
       void refreshWallet();
     }
 
@@ -204,6 +163,9 @@ export function GameWalletLoadSection({
       if (load.status === "pending" || load.status === "processing") {
         pendingJobIdsRef.current.add(load.id);
       }
+      if (load.status === "completed" || load.status === "cancelled") {
+        pendingJobIdsRef.current.delete(load.id);
+      }
     }
 
     const justFailed = loads.find(
@@ -216,36 +178,7 @@ export function GameWalletLoadSection({
       failedToastShownRef.current.add(justFailed.id);
       pendingJobIdsRef.current.delete(justFailed.id);
       failedToastRef.current = justFailed.id;
-      notifyGameError(justFailed.error_message, justFailed.load_type);
       void refreshWallet();
-    }
-
-    const justCompleted = loads.find(
-      (load) =>
-        load.status === "completed" &&
-        pendingJobIdsRef.current.has(load.id)
-    );
-    if (justCompleted) {
-      pendingJobIdsRef.current.delete(justCompleted.id);
-      if (justCompleted.load_type === "check_balance") {
-        toast.success(`Balance: $${Number(justCompleted.amount).toFixed(2)}`);
-      } else if (justCompleted.load_type === "load" || justCompleted.load_type === "reload") {
-        toast.success(`$${Number(justCompleted.amount).toFixed(2)} loaded to ${game.name}`);
-      } else if (justCompleted.load_type === "redeem") {
-        toast.success(
-          `$${Number(justCompleted.amount).toFixed(2)} redeemed to your Deposit Redeem wallet`
-        );
-        void refreshWallet();
-      } else if (isGameAccountCreateLoadType(justCompleted.load_type) && justCompleted.game_username) {
-        toast.success(`${game.name} account ready: ${justCompleted.game_username}`);
-        void refreshAccount();
-      }
-    }
-
-    for (const load of loads) {
-      if (load.status === "cancelled") {
-        pendingJobIdsRef.current.delete(load.id);
-      }
     }
 
     const completedCreate = loads.find(
@@ -259,12 +192,10 @@ export function GameWalletLoadSection({
         game_username: completedCreate.game_username,
         game_password: completedCreate.game_password,
       });
-    } else {
-      void refreshAccount();
     }
 
     return loads;
-  }, [game.slug, refreshWallet, refreshAccount, supabase]);
+  }, [game.slug, refreshWallet]);
 
   useEffect(() => {
     let cancelled = false;
@@ -272,7 +203,7 @@ export function GameWalletLoadSection({
     async function init() {
       void refreshWallet();
       await refreshAccount();
-      await healStaleGameLoads(game.slug, 20);
+      await healStaleGameLoads(game.slug, 5);
       await refreshLoads();
       if (cancelled) return;
       accountReadyRef.current = true;
@@ -314,65 +245,6 @@ export function GameWalletLoadSection({
     return () => window.removeEventListener(WALLET_REFRESH_EVENT, onWalletRefresh);
   }, [refreshWallet]);
 
-  useEffect(() => {
-    if (!supabase) return;
-    let channel: ReturnType<typeof supabase.channel> | null = null;
-    let cancelled = false;
-
-    void supabase.auth.getUser().then(({ data: { user } }) => {
-      if (!user || cancelled) return;
-      channel = supabase
-        .channel(`game-wallet-profile-${user.id}`)
-        .on(
-          "postgres_changes",
-          { event: "UPDATE", schema: "public", table: "profiles", filter: `id=eq.${user.id}` },
-          (payload) => {
-            const row = payload.new as Record<string, unknown>;
-            setWalletBalance(Number(row.wallet_balance ?? 0));
-            setCashoutWallet(Number(row.cashout_wallet ?? 0));
-            setKycStatus(String(row.kyc_status ?? "unverified"));
-          }
-        )
-        .subscribe();
-    });
-
-    return () => {
-      cancelled = true;
-      if (channel) void supabase.removeChannel(channel);
-    };
-  }, [supabase]);
-
-  useEffect(() => {
-    if (!supabase) return;
-    let channel: ReturnType<typeof supabase.channel> | null = null;
-    let cancelled = false;
-
-    void supabase.auth.getUser().then(({ data: { user } }) => {
-      if (!user || cancelled) return;
-      channel = supabase
-        .channel(`game-load-requests-${user.id}-${game.slug}`)
-        .on(
-          "postgres_changes",
-          { event: "*", schema: "public", table: "game_load_requests", filter: `user_id=eq.${user.id}` },
-          () => {
-            void refreshAccount();
-            void refreshLoads();
-            void refreshWallet();
-          }
-        )
-        .subscribe();
-    });
-
-    return () => {
-      cancelled = true;
-      if (channel) void supabase.removeChannel(channel);
-    };
-  }, [supabase, game.slug, refreshAccount, refreshLoads, refreshWallet]);
-
-  useEffect(() => {
-    if (fundsTab === "redeem") void refreshWallet();
-  }, [fundsTab, refreshWallet]);
-
   const pendingCreate = recentLoads.some(
     (l) =>
       isGameAccountCreateLoadType(l.load_type) &&
@@ -394,19 +266,19 @@ export function GameWalletLoadSection({
   useEffect(() => {
     if (!anyPending) return;
 
-    void healStaleGameLoads(game.slug, 20).then((result) => {
+    void healStaleGameLoads(game.slug, 5).then((result) => {
       if (result.healed > 0) void refreshLoads();
     });
 
     void refreshLoads();
     const interval = setInterval(() => {
       if (document.visibilityState === "visible") {
-        void healStaleGameLoads(game.slug, 20).then((result) => {
+        void healStaleGameLoads(game.slug, 5).then((result) => {
           if (result.healed > 0) void refreshLoads();
         });
         void refreshLoads();
       }
-    }, 1500);
+    }, 3000);
 
     return () => clearInterval(interval);
   }, [anyPending, refreshLoads, game.slug]);
@@ -438,7 +310,10 @@ export function GameWalletLoadSection({
       })()
     : previewStem;
 
-  const lastKnownBalance = lastVerifiedBalance;
+  const lastBalanceCheck = recentLoads.find(
+    (l) => l.load_type === "check_balance" && l.status === "completed"
+  );
+  const lastKnownBalance = lastBalanceCheck ? Number(lastBalanceCheck.amount) : null;
   const parsedRedeemAmount = parseFloat(redeemAmount) || 0;
 
   const activeRedeemRollover = depositRollover;
@@ -450,7 +325,6 @@ export function GameWalletLoadSection({
   const redeemRulesActive =
     activeRedeemRollover !== null && activeRedeemRollover.activeDepositAmount > 0;
   const canRedeem = redeemRulesActive;
-  const kycVerified = kycStatus === "verified";
 
   const redeemMaxAllowed = redeemRulesActive
     ? Math.min(WALLET_LOAD_LIMITS.max, activeRedeemRollover!.maxRedeemRemaining)
@@ -490,7 +364,7 @@ export function GameWalletLoadSection({
   async function handleCancelLoad(loadId: string) {
     setCancellingId(loadId);
     const result = await cancelMyGameLoad(loadId, game.slug);
-    if (result.error) notifyGameError(result.error);
+    if (result.error) toast.error(result.error);
     else toast.success("Cancelled — click Replace Account again.");
     void refreshLoads();
     setCancellingId(null);
@@ -504,29 +378,33 @@ export function GameWalletLoadSection({
       if (!ok) return;
     }
 
-    setCreating(true);
-    const result = await requestGameAccountCreate({
-      gameSlug: game.slug,
-      gameName: game.name,
-      username: custom?.username,
-      password: custom?.password,
-      replaceAccount: hasSavedAccount,
-    });
-    if (result.error) {
-      notifyGameError(result.error, "create_account");
-    } else {
-      if ("requestId" in result && result.requestId) pendingJobIdsRef.current.add(result.requestId);
-      toast.success(
-        hasSavedAccount
-          ? `Replacing your ${game.name} account…`
-          : `Creating your ${game.name} account…`
-      );
-      setCustomMode(false);
-      setCustomUsername("");
-      setCustomPassword("");
+    try {
+      setCreating(true);
+      const result = await requestGameAccountCreate({
+        gameSlug: game.slug,
+        gameName: game.name,
+        username: custom?.username,
+        password: custom?.password,
+        replaceAccount: hasSavedAccount,
+      });
+      if (result.error) {
+        toast.error(result.error);
+      } else {
+        toast.success(
+          hasSavedAccount
+            ? `Replacing your ${game.name} account…`
+            : `Account request submitted successfully!`
+        );
+        setCustomMode(false);
+        setCustomUsername("");
+        setCustomPassword("");
+      }
+    } catch (err: any) {
+      toast.error(err.message || "Account creation failed");
+    } finally {
+      void refreshLoads();
+      setCreating(false);
     }
-    void refreshLoads();
-    setCreating(false);
   }
 
   async function handleCreateCustom() {
@@ -556,11 +434,8 @@ export function GameWalletLoadSection({
       gameName: game.name,
       gameUsername: savedAccount.game_username,
     });
-    if (result.error) notifyGameError(result.error, "check_balance");
-    else {
-      if ("requestId" in result && result.requestId) pendingJobIdsRef.current.add(result.requestId);
-      toast.success("Checking your live game balance…");
-    }
+    if (result.error) toast.error(result.error);
+    else toast.success("Checking your live game balance…");
     void refreshLoads();
     setCheckingBalance(false);
   }
@@ -588,9 +463,8 @@ export function GameWalletLoadSection({
       gameUsername: savedAccount.game_username,
     });
 
-    if (result.error) notifyGameError(result.error, "load");
+    if (result.error) toast.error(result.error);
     else {
-      if ("requestId" in result && result.requestId) pendingJobIdsRef.current.add(result.requestId);
       toast.success(`Load queued! $${parsedAmount.toFixed(2)} — bot will credit ${game.name} shortly.`);
       void refreshWallet();
       void refreshLoads();
@@ -647,9 +521,8 @@ export function GameWalletLoadSection({
     });
 
     const destLabel = "Deposit Redeem";
-    if (result.error) notifyGameError(result.error, "redeem");
+    if (result.error) toast.error(result.error);
     else {
-      if ("requestId" in result && result.requestId) pendingJobIdsRef.current.add(result.requestId);
       toast.success(
         redeemAll
           ? `Redeem queued — bot will cash out your full game balance to your ${destLabel} wallet.`
@@ -683,9 +556,7 @@ export function GameWalletLoadSection({
   if (mode === "activity" && !hasSavedAccount) {
     return (
       <div className="space-y-2">
-        {pendingCreate ? (
-          <p className="text-sm text-amber-200/90">Creating your game sign-in…</p>
-        ) : null}
+        {pendingCreate ? <p className="text-sm text-amber-200/90">Creating your game sign-in…</p> : null}
         {recentLoads.length === 0 ? (
           <p className="text-sm text-muted-foreground">No activity yet.</p>
         ) : (
@@ -706,15 +577,52 @@ export function GameWalletLoadSection({
   }
 
   return (
-    <section className="rounded-2xl border border-emerald-500/25 bg-gradient-to-br from-emerald-950/40 to-[#161616] p-5 space-y-5">
-      <div className="flex items-center gap-2">
-        <Zap className="h-5 w-5 text-emerald-400" />
-        <h2 className="font-bold text-white">{game.name} Account</h2>
+    <section
+      className="relative overflow-hidden rounded-2xl p-5 space-y-5"
+      style={{
+        background: "linear-gradient(160deg, rgba(0,229,255,0.08) 0%, rgba(8,8,24,0.98) 35%, rgba(255,45,120,0.06) 100%)",
+        border: "1px solid rgba(0,229,255,0.28)",
+        boxShadow: "0 0 40px rgba(0,229,255,0.08), inset 0 1px 0 rgba(0,229,255,0.1)",
+      }}
+    >
+      <div
+        className="pointer-events-none absolute inset-0 opacity-[0.04]"
+        style={{
+          backgroundImage:
+            "linear-gradient(rgba(0,229,255,1) 1px, transparent 1px), linear-gradient(90deg, rgba(0,229,255,1) 1px, transparent 1px)",
+          backgroundSize: "22px 22px",
+        }}
+      />
+
+      <div className="relative z-10 flex items-center gap-2">
+        <div
+          className="flex h-9 w-9 items-center justify-center rounded-lg"
+          style={{
+            background: "rgba(0,229,255,0.12)",
+            border: "1px solid rgba(0,229,255,0.35)",
+            boxShadow: "0 0 16px rgba(0,229,255,0.25)",
+          }}
+        >
+          <Zap className="h-4 w-4 text-[#00E5FF]" />
+        </div>
+        <h2 className="font-black tracking-wide text-white">
+          {game.name}{" "}
+          <span className="bg-gradient-to-r from-[#7af5ff] to-[#ff2d78] bg-clip-text text-transparent">
+            Account
+          </span>
+        </h2>
       </div>
 
       {/* Your Account — like Game Vault */}
-      <div className="rounded-xl border border-white/10 bg-black/30 p-4 space-y-3">
-        <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+      <div
+        className="relative z-10 rounded-xl p-4 space-y-3"
+        style={{
+          background: "rgba(5,5,16,0.65)",
+          border: "1px solid rgba(0,229,255,0.18)",
+          boxShadow: "inset 0 0 24px rgba(0,229,255,0.04)",
+        }}
+      >
+        <p className="text-[10px] font-black uppercase tracking-[0.2em] text-[#00E5FF]">
           Your Account
         </p>
 
@@ -727,13 +635,13 @@ export function GameWalletLoadSection({
             </div>
             <div className="space-y-2 text-sm">
               <div className="flex items-center justify-between gap-2">
-                <span className="text-muted-foreground">Username</span>
+                <span className="text-[#6b6d8f]">Username</span>
                 <div className="flex items-center gap-2">
                   <span className="font-mono text-white">{savedAccount.game_username}</span>
                   <button
                     type="button"
                     onClick={() => copyText(savedAccount.game_username, "Username")}
-                    className="text-muted-foreground hover:text-white"
+                    className="text-[#6b6d8f] hover:text-white"
                   >
                     <Copy className="h-3.5 w-3.5" />
                   </button>
@@ -741,7 +649,7 @@ export function GameWalletLoadSection({
               </div>
               {savedAccount.game_password && (
                 <div className="flex items-center justify-between gap-2">
-                  <span className="text-muted-foreground">Password</span>
+                  <span className="text-[#6b6d8f]">Password</span>
                   <div className="flex items-center gap-2">
                     <span className="font-mono text-white">
                       {showPassword ? savedAccount.game_password : "••••••••"}
@@ -749,22 +657,22 @@ export function GameWalletLoadSection({
                     <button
                       type="button"
                       onClick={() => setShowPassword((v) => !v)}
-                      className="text-muted-foreground hover:text-white"
+                      className="text-[#6b6d8f] hover:text-white"
                     >
                       {showPassword ? <EyeOff className="h-3.5 w-3.5" /> : <Eye className="h-3.5 w-3.5" />}
                     </button>
                     <button
                       type="button"
                       onClick={() => copyText(savedAccount.game_password!, "Password")}
-                      className="text-muted-foreground hover:text-white"
+                      className="text-[#6b6d8f] hover:text-white"
                     >
                       <Copy className="h-3.5 w-3.5" />
                     </button>
                   </div>
                 </div>
               )}
-              <div className="flex items-center justify-between gap-2 pt-1 border-t border-white/5 mt-1">
-                <span className="text-muted-foreground">Last known balance</span>
+              <div className="flex items-center justify-between gap-2 pt-1 border-t border-[rgba(0, 229, 255,0.07)] mt-1">
+                <span className="text-[#6b6d8f]">Last known balance</span>
                 <span className="font-semibold text-white">
                   {lastKnownBalance !== null ? `$${lastKnownBalance.toFixed(2)}` : "—"}
                 </span>
@@ -774,8 +682,12 @@ export function GameWalletLoadSection({
             <button
               type="button"
               onClick={handleCheckBalance}
-              disabled={checkingBalance || pendingCheck || pendingCreate || !savedAccount?.game_username}
-              className="w-full flex items-center justify-center gap-2 rounded-xl border border-white/15 bg-white/5 px-4 py-2.5 text-sm font-semibold text-white hover:bg-white/10 disabled:opacity-50"
+              disabled={checkingBalance || pendingCheck}
+              className="w-full flex items-center justify-center gap-2 rounded-xl px-4 py-2.5 text-sm font-bold text-[#7af5ff] transition-all hover:shadow-[0_0_20px_rgba(0,229,255,0.25)] disabled:opacity-50"
+              style={{
+                border: "1px solid rgba(0,229,255,0.35)",
+                background: "rgba(0,229,255,0.08)",
+              }}
             >
               {checkingBalance || pendingCheck ? (
                 <Loader2 className="h-4 w-4 animate-spin" />
@@ -787,7 +699,7 @@ export function GameWalletLoadSection({
           </>
         ) : (
           <>
-            <p className="text-sm text-muted-foreground">
+            <p className="text-sm text-[#6b6d8f]">
               No account yet. Use <strong className="text-white">Create Account</strong> below or
               the button in this panel — free, no wallet charge.
             </p>
@@ -811,7 +723,7 @@ export function GameWalletLoadSection({
               minLength={7}
               maxLength={maxUsernameLenForGame(game.slug)}
               autoComplete="off"
-              className="w-full rounded-lg border border-white/10 bg-black/30 px-3 py-2 text-sm text-white placeholder:text-muted-foreground"
+              className="w-full rounded-lg border border-[rgba(0, 229, 255,0.1)] bg-black/30 px-3 py-2 text-sm text-white placeholder:text-[#6b6d8f]"
             />
             <input
               type="text"
@@ -823,9 +735,9 @@ export function GameWalletLoadSection({
               minLength={7}
               maxLength={13}
               autoComplete="off"
-              className="w-full rounded-lg border border-white/10 bg-black/30 px-3 py-2 text-sm text-white placeholder:text-muted-foreground"
+              className="w-full rounded-lg border border-[rgba(0, 229, 255,0.1)] bg-black/30 px-3 py-2 text-sm text-white placeholder:text-[#6b6d8f]"
             />
-            <p className="text-[11px] text-muted-foreground">
+            <p className="text-[11px] text-[#6b6d8f]">
               7–13 characters each, letters and numbers only (no symbols). If the name is taken, we&apos;ll
               adjust it to stay unique.
             </p>
@@ -834,7 +746,7 @@ export function GameWalletLoadSection({
                 type="button"
                 onClick={handleCreateCustom}
                 disabled={creating || pendingCreate}
-                className="flex-1 flex items-center justify-center gap-2 rounded-xl border border-emerald-500/40 bg-emerald-500/10 px-4 py-2.5 text-sm font-semibold text-emerald-200 hover:bg-emerald-500/20 disabled:opacity-50"
+                className="cyber-btn-primary flex-1 flex items-center justify-center gap-2 rounded-xl px-4 py-2.5 text-sm font-black uppercase tracking-wide disabled:opacity-50"
               >
                 {creating || pendingCreate ? (
                   <Loader2 className="h-4 w-4 animate-spin" />
@@ -847,7 +759,7 @@ export function GameWalletLoadSection({
                 type="button"
                 onClick={() => setCustomMode(false)}
                 disabled={creating || pendingCreate}
-                className="flex items-center justify-center gap-1.5 rounded-xl border border-white/15 bg-white/5 px-3 py-2.5 text-sm font-medium text-white hover:bg-white/10 disabled:opacity-50"
+                className="cyber-btn-ghost flex items-center justify-center gap-1.5 rounded-xl px-3 py-2.5 text-sm font-bold disabled:opacity-50"
               >
                 <X className="h-4 w-4" />
                 Cancel
@@ -860,7 +772,7 @@ export function GameWalletLoadSection({
               type="button"
               onClick={() => handleCreateAccount()}
               disabled={creating || pendingCreate}
-              className="flex-1 flex items-center justify-center gap-2 rounded-xl border border-emerald-500/40 bg-emerald-500/10 px-4 py-3 text-sm font-semibold text-emerald-200 hover:bg-emerald-500/20 disabled:opacity-50"
+              className="cyber-btn-primary flex-1 flex items-center justify-center gap-2 rounded-xl px-4 py-3 text-sm font-black uppercase tracking-wide disabled:opacity-50"
             >
               {creating || pendingCreate ? (
                 <Loader2 className="h-4 w-4 animate-spin" />
@@ -874,7 +786,7 @@ export function GameWalletLoadSection({
               onClick={() => setCustomMode(true)}
               disabled={creating || pendingCreate}
               title="Choose your own username & password"
-              className="flex items-center justify-center gap-1.5 rounded-xl border border-white/15 bg-white/5 px-3 py-3 text-sm font-medium text-white hover:bg-white/10 disabled:opacity-50"
+              className="cyber-btn-ghost flex items-center justify-center gap-1.5 rounded-xl px-3 py-3 text-sm font-bold disabled:opacity-50"
             >
               <Pencil className="h-4 w-4" />
               <span className="hidden sm:inline">Own login</span>
@@ -886,7 +798,7 @@ export function GameWalletLoadSection({
               type="button"
               onClick={() => handleCreateAccount()}
               disabled={creating || pendingCreate}
-              className="flex-1 flex items-center justify-center gap-2 rounded-xl border border-emerald-500/40 bg-emerald-500/10 px-4 py-3 text-sm font-semibold text-emerald-200 hover:bg-emerald-500/20 disabled:opacity-50"
+              className="cyber-btn-primary flex-1 flex items-center justify-center gap-2 rounded-xl px-4 py-3 text-sm font-black uppercase tracking-wide disabled:opacity-50"
             >
               {creating || pendingCreate ? (
                 <Loader2 className="h-4 w-4 animate-spin" />
@@ -900,7 +812,7 @@ export function GameWalletLoadSection({
               onClick={() => setCustomMode(true)}
               disabled={creating || pendingCreate}
               title="Choose your own username & password"
-              className="flex items-center justify-center gap-1.5 rounded-xl border border-white/15 bg-white/5 px-3 py-3 text-sm font-medium text-white hover:bg-white/10 disabled:opacity-50"
+              className="cyber-btn-ghost flex items-center justify-center gap-1.5 rounded-xl px-3 py-3 text-sm font-bold disabled:opacity-50"
             >
               <Pencil className="h-4 w-4" />
               <span className="hidden sm:inline">Own login</span>
@@ -909,14 +821,14 @@ export function GameWalletLoadSection({
         )}
 
         {hasSavedAccount && !customMode && (
-          <p className="text-[11px] text-muted-foreground text-center">
+          <p className="text-[11px] text-[#6b6d8f] text-center">
             One account per game — Replace creates a new login on the game panel.
           </p>
         )}
 
         {pendingCreate && activeCreateLoad && (
           <p className="text-[11px] text-amber-200/80 text-center leading-relaxed">
-            An older bot request is still open ({activityLabel(activeCreateLoad)} ·{" "}
+            An older request is still open ({activityLabel(activeCreateLoad)} ·{" "}
             {activeCreateLoad.status}) — you do not need to click again.{" "}
             <button
               type="button"
@@ -951,32 +863,39 @@ export function GameWalletLoadSection({
         )}
 
         {!hasSavedAccount && !customMode && previewAccount && (
-          <p className="text-xs text-muted-foreground text-center">
-            Will be created as <span className="font-mono text-emerald-300">{previewAccount}</span>{" "}
+          <p className="text-xs text-[#6b6d8f] text-center">
+            Will be created as <span className="font-mono text-[#7af5ff]">{previewAccount}</span>{" "}
             (same password)
           </p>
         )}
 
         {hasSavedAccount && !customMode && previewAccount && usesNumberedAccounts && (
-          <p className="text-xs text-muted-foreground text-center">
+          <p className="text-xs text-[#6b6d8f] text-center">
             Replace will create{" "}
-            <span className="font-mono text-emerald-300">{previewAccount}</span> (or the next free
+            <span className="font-mono text-[#7af5ff]">{previewAccount}</span> (or the next free
             number if that is taken)
           </p>
         )}
       </div>
 
-      {hasSavedAccount ? (
-      <div className="rounded-xl border border-orange-500/20 bg-black/20 p-4 sm:p-5 space-y-4">
+      {/* Load / Redeem */}
+      <div
+        className="relative z-10 rounded-xl p-4 sm:p-5 space-y-4"
+        style={{
+          background: "rgba(5,5,16,0.7)",
+          border: "1px solid rgba(0,229,255,0.2)",
+          boxShadow: "inset 0 0 30px rgba(0,229,255,0.03)",
+        }}
+      >
         <div className="grid grid-cols-2 gap-2 sm:gap-3">
           <button
             type="button"
             onClick={() => setFundsTab("load")}
             className={cn(
-              "flex items-center justify-center gap-2 rounded-xl py-3.5 sm:py-4 px-4 text-sm sm:text-base font-semibold border transition-colors",
+              "flex items-center justify-center gap-2 rounded-xl py-3.5 sm:py-4 px-4 text-sm sm:text-base font-black uppercase tracking-wide border transition-all",
               fundsTab === "load"
-                ? "border-orange-500/60 bg-gradient-to-r from-orange-500/25 to-red-500/15 text-orange-100 shadow-sm shadow-orange-500/10"
-                : "border-white/10 bg-[#2a2a2a] text-muted-foreground hover:border-white/20 hover:text-white"
+                ? "cyber-tab-load-active"
+                : "cyber-tab-inactive"
             )}
           >
             <ArrowDownCircle className="h-4 w-4 sm:h-5 sm:w-5 shrink-0" />
@@ -986,10 +905,10 @@ export function GameWalletLoadSection({
             type="button"
             onClick={() => setFundsTab("redeem")}
             className={cn(
-              "flex items-center justify-center gap-2 rounded-xl py-3.5 sm:py-4 px-4 text-sm sm:text-base font-semibold border transition-colors",
+              "flex items-center justify-center gap-2 rounded-xl py-3.5 sm:py-4 px-4 text-sm sm:text-base font-black uppercase tracking-wide border transition-all",
               fundsTab === "redeem"
-                ? "border-amber-500/60 bg-gradient-to-r from-amber-500/25 to-orange-500/15 text-amber-100 shadow-sm shadow-amber-500/10"
-                : "border-white/10 bg-[#2a2a2a] text-muted-foreground hover:border-white/20 hover:text-white"
+                ? "cyber-tab-redeem-active"
+                : "cyber-tab-inactive"
             )}
           >
             <ArrowUpCircle className="h-4 w-4 sm:h-5 sm:w-5 shrink-0" />
@@ -997,32 +916,37 @@ export function GameWalletLoadSection({
           </button>
         </div>
 
-        <div className="rounded-xl border border-white/10 bg-[#242424]/80 px-4 py-3.5 sm:px-5 sm:py-4">
-          <span className="text-xs sm:text-sm text-muted-foreground">
-            {fundsTab === "redeem" ? "Deposit Redeem (cashout wallet)" : "Total Deposit"}
+        <div
+          className="rounded-xl px-4 py-3.5 sm:px-5 sm:py-4"
+          style={{
+            background: "linear-gradient(135deg, rgba(0,229,255,0.1), rgba(123,47,247,0.08))",
+            border: "1px solid rgba(0,229,255,0.28)",
+            boxShadow: "0 0 24px rgba(0,229,255,0.08)",
+          }}
+        >
+          <span className="text-[10px] font-black uppercase tracking-[0.18em] text-[#00E5FF]">
+            Total Deposit
           </span>
-          <p className="mt-1 text-xl sm:text-2xl font-bold text-white tabular-nums">
-            ${(fundsTab === "redeem" ? cashoutWallet : walletBalance).toFixed(2)}
+          <p
+            className="mt-1 text-xl sm:text-2xl font-black text-white tabular-nums"
+            style={{ textShadow: "0 0 20px rgba(0,229,255,0.35)" }}
+          >
+            ${walletBalance.toFixed(2)}
           </p>
-          {fundsTab === "redeem" && (
-            <p className="mt-1 text-[11px] text-muted-foreground">
-              Total Deposit stays ${walletBalance.toFixed(2)} — redeem adds to Deposit Redeem, not Total Deposit.
-            </p>
-          )}
         </div>
 
         {fundsTab === "load" ? (
           <>
-            <p className="text-xs sm:text-sm font-semibold uppercase tracking-wider text-muted-foreground">
+            <p className="text-[10px] font-black uppercase tracking-[0.18em] text-[#00E5FF]">
               Load Credits
             </p>
-            <p className="text-sm text-muted-foreground">
+            <p className="text-sm text-[#6b6d8f]">
               Load from your Total Deposit balance into {game.name}.
             </p>
 
             <div className="flex flex-col sm:flex-row gap-3">
               <div className="relative flex-1">
-                <span className="absolute left-4 top-1/2 -translate-y-1/2 text-base text-muted-foreground">$</span>
+                <span className="absolute left-4 top-1/2 -translate-y-1/2 text-base text-[#00E5FF]">$</span>
                 <input
                   type="number"
                   min={WALLET_LOAD_LIMITS.min}
@@ -1031,14 +955,14 @@ export function GameWalletLoadSection({
                   value={amount}
                   onChange={(e) => setAmount(e.target.value)}
                   disabled={!savedAccount}
-                  className="w-full rounded-xl border border-white/10 bg-black/30 pl-8 pr-4 py-3.5 sm:py-4 text-base text-white disabled:opacity-50"
+                  className="cyber-input w-full rounded-xl pl-8 pr-4 py-3.5 sm:py-4 text-base text-white disabled:opacity-50"
                 />
               </div>
               <button
                 type="button"
                 onClick={handleLoad}
                 disabled={loading || pendingLoad || !savedAccount || available < WALLET_LOAD_LIMITS.min}
-                className="flex w-full sm:w-auto sm:min-w-[132px] items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-orange-500 to-red-500 px-6 py-3.5 sm:py-4 text-base font-bold text-black disabled:opacity-50 shrink-0"
+                className="cyber-btn-load flex w-full sm:w-auto sm:min-w-[132px] items-center justify-center gap-2 rounded-xl px-6 py-3.5 sm:py-4 text-sm font-black uppercase tracking-wide disabled:opacity-50 shrink-0"
               >
                 {loading || pendingLoad ? (
                   <Loader2 className="h-5 w-5 animate-spin" />
@@ -1050,38 +974,19 @@ export function GameWalletLoadSection({
             </div>
 
             {!savedAccount && (
-              <p className="text-sm text-amber-400/90">Create your account first, then load credits.</p>
+              <p className="text-sm text-[#ff2d78]">Create your account first, then load credits.</p>
             )}
           </>
         ) : (
           <>
-            <p className="text-xs sm:text-sm font-semibold uppercase tracking-wider text-muted-foreground">
+            <p className="text-[10px] font-black uppercase tracking-[0.18em] text-[#ff2d78]">
               Redeem Credits
             </p>
-            <p className="text-sm text-muted-foreground">
-              Pull credits from your {game.name} account to your Deposit Redeem wallet. Verified KYC required.
+            <p className="text-sm text-[#6b6d8f]">
+              Pull credits from your {game.name} account to your Deposit Redeem wallet.
             </p>
 
-            {!kycVerified && savedAccount && (
-              <div className="rounded-lg border border-amber-500/40 bg-amber-500/10 px-3 py-3 text-xs text-amber-100/95 space-y-2">
-                <p className="font-semibold text-amber-200 flex items-center gap-1.5">
-                  <ShieldCheck className="h-4 w-4" />
-                  {kycStatus === "pending"
-                    ? "KYC under review — redeem unlocks after admin approval"
-                    : "KYC verification required to redeem"}
-                </p>
-                {kycStatus !== "pending" && (
-                  <Link
-                    href="/dashboard/kyc"
-                    className="inline-flex items-center gap-1 text-amber-300 underline font-semibold hover:text-amber-200"
-                  >
-                    Complete KYC verification →
-                  </Link>
-                )}
-              </div>
-            )}
-
-            {!canRedeem && savedAccount && kycVerified && (
+            {!canRedeem && savedAccount && (
               <p className="text-xs text-amber-400/90">
                 Load credits from Total Deposit into this game first, then redeem at {redeemMinMult}x–{redeemMaxMult}x.
               </p>
@@ -1126,7 +1031,7 @@ export function GameWalletLoadSection({
                 checked={redeemAll}
                 onChange={(e) => setRedeemAll(e.target.checked)}
                 disabled={!savedAccount}
-                className="h-4 w-4 rounded border-white/20"
+                className="h-4 w-4 rounded border-white/20 accent-[#ff2d78]"
               />
               Redeem all (zero out game account)
             </label>
@@ -1134,7 +1039,7 @@ export function GameWalletLoadSection({
             {!redeemAll && (
               <div className="flex flex-col sm:flex-row gap-3">
                 <div className="relative flex-1">
-                  <span className="absolute left-4 top-1/2 -translate-y-1/2 text-base text-muted-foreground">$</span>
+                  <span className="absolute left-4 top-1/2 -translate-y-1/2 text-base text-[#ff2d78]">$</span>
                   <input
                     type="number"
                     min={WALLET_LOAD_LIMITS.min}
@@ -1143,7 +1048,7 @@ export function GameWalletLoadSection({
                     value={redeemAmount}
                     onChange={(e) => setRedeemAmount(e.target.value)}
                     disabled={!savedAccount}
-                    className="w-full rounded-xl border border-white/10 bg-black/30 pl-8 pr-4 py-3.5 sm:py-4 text-base text-white disabled:opacity-50"
+                    className="cyber-input w-full rounded-xl pl-8 pr-4 py-3.5 sm:py-4 text-base text-white disabled:opacity-50"
                   />
                 </div>
                 <button
@@ -1153,12 +1058,11 @@ export function GameWalletLoadSection({
                     redeeming ||
                     pendingRedeem ||
                     !savedAccount ||
-                    !kycVerified ||
                     !canRedeem ||
                     redeemBlocked ||
                     (redeemRulesActive && activeRedeemRollover!.maxRedeemRemaining <= 0)
                   }
-                  className="flex w-full sm:w-auto sm:min-w-[132px] items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-amber-400 to-orange-500 px-6 py-3.5 sm:py-4 text-base font-bold text-black disabled:opacity-50 shrink-0"
+                  className="cyber-btn-redeem flex w-full sm:w-auto sm:min-w-[132px] items-center justify-center gap-2 rounded-xl px-6 py-3.5 sm:py-4 text-sm font-black uppercase tracking-wide disabled:opacity-50 shrink-0"
                 >
                   {redeeming || pendingRedeem ? (
                     <Loader2 className="h-5 w-5 animate-spin" />
@@ -1178,12 +1082,11 @@ export function GameWalletLoadSection({
                   redeeming ||
                   pendingRedeem ||
                   !savedAccount ||
-                  !kycVerified ||
                   !canRedeem ||
                   redeemBlocked ||
                   (redeemRulesActive && activeRedeemRollover!.maxRedeemRemaining <= 0)
                 }
-                className="w-full flex items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-amber-400 to-orange-500 px-6 py-3.5 sm:py-4 text-base font-bold text-black disabled:opacity-50"
+                className="cyber-btn-redeem w-full flex items-center justify-center gap-2 rounded-xl px-6 py-3.5 sm:py-4 text-sm font-black uppercase tracking-wide disabled:opacity-50"
               >
                 {redeeming || pendingRedeem ? (
                   <Loader2 className="h-5 w-5 animate-spin" />
@@ -1195,20 +1098,15 @@ export function GameWalletLoadSection({
             )}
 
             {!savedAccount && (
-              <p className="text-sm text-amber-400/90">Create your account first, then redeem credits.</p>
+              <p className="text-sm text-[#ff2d78]">Create your account first, then redeem credits.</p>
             )}
           </>
         )}
       </div>
-      ) : (
-        <p className="text-sm text-muted-foreground">
-          Load and redeem unlock after your game sign-in is ready.
-        </p>
-      )}
 
       {recentLoads.length > 0 && (
-        <div className="space-y-2 pt-2 border-t border-white/10">
-          <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+        <div className="space-y-2 pt-2 border-t border-[rgba(0, 229, 255,0.1)]">
+          <p className="text-xs font-semibold uppercase tracking-wider text-[#6b6d8f]">
             Recent activity
           </p>
           {recentLoads.slice(0, 5).map((load) => (
@@ -1227,7 +1125,7 @@ export function GameWalletLoadSection({
                   {" · "}
                   {load.status}
                 </span>
-                <span className="text-muted-foreground shrink-0">
+                <span className="text-[#6b6d8f] shrink-0">
                   {formatRelativeTime(load.created_at)}
                 </span>
               </div>

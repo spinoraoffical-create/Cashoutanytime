@@ -1,5 +1,4 @@
 import crypto from "crypto";
-import { optionalEnv, requiredEnv } from "./env";
 import https from "https";
 import http from "http";
 import tls from "tls";
@@ -274,10 +273,24 @@ export class JuwaApiClient {
       .trim()
       .replace(/\/+$/, "");
 
-    this.agentId = (config.agentId || requiredEnv("JUWA_AGENT_ID")).trim();
-    this.secretKey = (config.secretKey || requiredEnv("JUWA_SECRET_KEY")).trim();
-    this.proxyUrl =
-      (config.proxyUrl || optionalEnv("JUWA_PROXY_URL", "GAMEVAULT_PROXY_URL") || "").trim() || undefined;
+    this.agentId = (
+      config.agentId ||
+      process.env.JUWA_AGENT_ID ||
+      ""
+    ).trim();
+
+    this.secretKey = (
+      config.secretKey ||
+      process.env.JUWA_SECRET_KEY ||
+      ""
+    ).trim();
+
+    this.proxyUrl = (
+      config.proxyUrl ||
+      process.env.JUWA_PROXY_URL ||
+      process.env.GAMEVAULT_PROXY_URL ||
+      ""
+    ).trim() || undefined;
   }
 
   private getAuthParams(): { agent_id: string; timestamp: string; token: string } {

@@ -56,9 +56,8 @@ export function getAutomationSecret(): string | null {
 }
 
 /**
- * Wallet create / load / redeem UI + API — enabled for every game in the catalog
- * except upcoming (coming soon) titles. Individual bot workers claim jobs by slug;
- * games without a worker yet can still queue requests until a bot is added.
+ * Wallet create / load / redeem UI — enabled for every game in the catalog
+ * except upcoming (coming soon) titles. Fulfillment runs through each game's API.
  */
 export function isWalletLoadEnabledForGame(slug: string): boolean {
   const game = getGameBySlug(slug);

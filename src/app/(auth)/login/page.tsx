@@ -4,7 +4,6 @@ import { Suspense, useEffect } from "react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { toast } from "sonner";
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { EmailAuthForm } from "@/components/auth/email-auth-form";
 import { GoogleAuthButton } from "@/components/auth/google-auth-button";
 
@@ -27,28 +26,25 @@ function LoginForm() {
   }, [searchParams]);
 
   return (
-    <Card className="border-0 bg-transparent shadow-none text-zinc-900">
-      <CardHeader className="px-0">
-        <CardTitle className="text-zinc-900">Sign in</CardTitle>
-        <CardDescription className="text-zinc-500">Email and password, or Google</CardDescription>
-      </CardHeader>
-      <CardContent className="space-y-6 px-0">
-        <GoogleAuthButton redirect={redirect} />
-        <EmailAuthForm mode="login" redirect={redirect} />
-
-        <p className="text-sm text-muted-foreground text-center">
-          Don&apos;t have an account?{" "}
-          <Link href="/register" className="text-primary hover:underline">
-            Register
-          </Link>
-        </p>
-        <p className="text-sm text-center">
-          <Link href="/reset-password" className="text-primary hover:underline font-medium">
-            Forgot your password?
-          </Link>
-        </p>
-      </CardContent>
-    </Card>
+    <div className="space-y-6">
+      <div>
+        <h2 className="text-2xl font-extrabold text-zinc-950">Sign in</h2>
+        <p className="mt-1 text-sm text-zinc-500">Enter your details to continue.</p>
+      </div>
+      <GoogleAuthButton redirect={redirect} />
+      <div className="flex items-center gap-3 text-[11px] font-semibold uppercase tracking-wider text-zinc-400">
+        <span className="h-px flex-1 bg-zinc-200" />
+        or
+        <span className="h-px flex-1 bg-zinc-200" />
+      </div>
+      <EmailAuthForm mode="login" redirect={redirect} />
+      <p className="text-center text-sm text-zinc-500">
+        New here?{" "}
+        <Link href="/register" className="font-semibold text-rose-600 hover:underline">
+          Create an account
+        </Link>
+      </p>
+    </div>
   );
 }
 

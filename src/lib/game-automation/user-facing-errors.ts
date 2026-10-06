@@ -1,5 +1,3 @@
-import { isSensitivePlayerError } from "@/lib/player-safe-error";
-
 const TECHNICAL_ERROR_PATTERNS = [
   /^locator\./i,
   /playwright/i,
@@ -41,6 +39,7 @@ const PLAYER_SAFE_ERROR_PATTERNS = [
   /^redeems go to/i,
   /^username must/i,
   /^password must/i,
+  /^run supabase\//i,
 ];
 
 function isTechnicalError(message: string): boolean {
@@ -75,7 +74,6 @@ export function userFacingGameLoadError(
   if (!errorMessage?.trim()) return null;
 
   const msg = errorMessage.trim();
-  if (isSensitivePlayerError(msg)) return genericGameLoadError(loadType);
   if (isPlayerSafeError(msg) && !isTechnicalError(msg)) return msg;
 
   return genericGameLoadError(loadType);

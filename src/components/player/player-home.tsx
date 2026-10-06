@@ -3,7 +3,7 @@
 import { useMemo, useState } from "react";
 import Image from "next/image";
 import Link from "next/link";
-import { ChevronRight, Search } from "lucide-react";
+import { ChevronRight, Search, Shield, X } from "lucide-react";
 import { motion } from "framer-motion";
 import type { Game } from "@/lib/games";
 import type { PublicPromotion } from "@/lib/data/promotions-public";
@@ -16,25 +16,22 @@ import { MotionPage } from "@/components/player/motion-page";
 
 function RoomCard({ game, tap }: { game: Game; tap?: { scale: number } }) {
   return (
-    <motion.div whileTap={tap} whileHover={{ y: -2 }} className="shrink-0">
-      <Link
-        href={`/games/${game.slug}`}
-        className="hub-card block w-[148px] overflow-hidden rounded-2xl transition-shadow hover:shadow-[0_0_20px_rgba(255,45,85,0.25)]"
-      >
+    <motion.div whileTap={tap} className="shrink-0">
+      <Link href={`/games/${game.slug}`} className="hub-card block w-[168px] overflow-hidden rounded-2xl">
         <div className="relative h-28 w-full bg-white/5">
           <Image src={game.image} alt="" fill className="object-cover" />
           {game.popular ? (
-            <span className="absolute left-2 top-2 rounded bg-[#f5c542] px-1.5 py-0.5 text-[9px] font-bold uppercase text-zinc-950">
+            <span className="absolute left-2 top-2 rounded-full bg-[#f5c542] px-2 py-0.5 text-[9px] font-bold uppercase text-zinc-950">
               Featured
             </span>
           ) : null}
+          <span className="absolute bottom-2 right-2 flex h-7 w-7 items-center justify-center rounded-full bg-primary text-white shadow-[0_0_12px_rgba(255,45,85,0.45)]">
+            <ChevronRight className="h-4 w-4" />
+          </span>
         </div>
-        <div className="flex items-start justify-between gap-1 p-3">
-          <div className="min-w-0">
-            <p className="truncate text-sm font-bold">{game.name}</p>
-            <p className="text-xs text-zinc-400">Load + redeem</p>
-          </div>
-          <ChevronRight className="mt-0.5 h-4 w-4 shrink-0 text-zinc-500" />
+        <div className="p-3">
+          <p className="truncate text-sm font-bold">{game.name}</p>
+          <p className="text-xs capitalize text-zinc-400">{game.category}</p>
         </div>
       </Link>
     </motion.div>
@@ -60,11 +57,13 @@ export function PlayerHome({
   const [q, setQ] = useState("");
   const [showSearch, setShowSearch] = useState(false);
   const [ownedOnly, setOwnedOnly] = useState(false);
+  const [catalog, setCatalog] = useState<"rooms" | "instant">("rooms");
+  const [hideVerify, setHideVerify] = useState(false);
   const { stagger, tap } = usePlayerMotion();
 
   const filtered = useMemo(() => {
     let rows = rooms;
-    if (ownedOnly && linkedSlugs.length > 0) {
+    if (ownedOnly) {
       rows = rows.filter((g) => linkedSlugs.includes(g.slug));
     }
     if (q.trim()) {
@@ -79,8 +78,6 @@ export function PlayerHome({
     return rows;
   }, [rooms, ownedOnly, linkedSlugs, q]);
 
-  const showOwned = linkedSlugs.length > 0;
-
   return (
     <MotionPage className="space-y-6 pb-4">
       {verify?.show ? (
@@ -91,15 +88,32 @@ export function PlayerHome({
         <button
           type="button"
           onClick={() => setShowSearch((v) => !v)}
-          className="flex h-10 w-10 items-center justify-center rounded-full bg-white/8"
+          className="flex h-11 w-11 items-center justify-center rounded-full bg-white/8"
           aria-label="Search games"
         >
           <Search className="h-4 w-4" />
         </button>
-        <div className="flex flex-1 rounded-full bg-white/8 p-1">
-          <span className="flex-1 rounded-full bg-[#f5c542] py-2 text-center text-sm font-bold text-zinc-950">
+        <div className="flex flex-1 rounded-full bg-[#1c1830] p-1">
+          <button
+            type="button"
+            onClick={() => setCatalog("rooms")}
+            className={cn(
+              "flex-1 rounded-full py-2.5 text-sm font-bold",
+              catalog === "rooms" ? "bg-[#f5c542] text-zinc-950" : "text-zinc-400"
+            )}
+          >
             Game Rooms
-          </span>
+          </button>
+          <button
+            type="button"
+            onClick={() => setCatalog("instant")}
+            className={cn(
+              "flex-1 rounded-full py-2.5 text-sm font-semibold",
+              catalog === "instant" ? "bg-[#f5c542] text-zinc-950" : "text-zinc-300"
+            )}
+          >
+            Instant Games
+          </button>
         </div>
       </div>
 
@@ -113,24 +127,38 @@ export function PlayerHome({
         />
       ) : null}
 
-      <section className="hub-card relative overflow-hidden rounded-[24px]">
-        <div className="relative h-44 w-full bg-[radial-gradient(ellipse_at_top,_rgba(255,45,85,0.35),_transparent_55%),linear-gradient(160deg,#1a1028_0%,#07060c_70%)]">
-          <div className="pointer-events-none absolute inset-0 bg-[linear-gradient(90deg,transparent,rgba(245,197,66,0.12),transparent)]" />
-          <div className="absolute inset-0 flex items-end p-5">
-            <div>
-              <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-[#ffd666]">Sweepstakes Hub</p>
-              <h1 className="mt-1 text-2xl font-extrabold">Welcome to the floor</h1>
-              <p className="text-sm text-zinc-400">Game Rooms — load credits, redeem winnings.</p>
-              <Button asChild size="sm" className="hub-cta-glow mt-3 rounded-full">
-                <Link href="/play">Enter Game Rooms</Link>
-              </Button>
+      {catalog === "instant" ? (
+        <section className="hub-card rounded-[24px] p-5">
+          <h2 className="text-xl font-extrabold">Instant Games</h2>
+          <p className="mt-2 text-sm text-zinc-400">
+            Instant play is not on this floor. Game Rooms are ready — load credits, then redeem winnings back to your wallet.
+          </p>
+          <Button type="button" className="mt-4 rounded-full bg-[#f5c542] font-bold text-zinc-950 hover:bg-[#f5c542]/90" onClick={() => setCatalog("rooms")}>
+            Back to Game Rooms
+          </Button>
+        </section>
+      ) : (
+        <section className="relative overflow-hidden rounded-[24px]">
+          <div className="relative h-48 w-full">
+            <Image src="/games/game-vault.webp" alt="" fill sizes="480px" className="object-cover" priority />
+            <div className="absolute inset-0 bg-gradient-to-r from-[#07060c] via-[#07060c]/80 to-[#07060c]/20" />
+            <div className="absolute inset-0 flex items-end p-5">
+              <div>
+                <h2 className="text-3xl font-extrabold">Game Rooms</h2>
+                <Link
+                  href="/play"
+                  className="mt-3 inline-flex rounded-full bg-[#f5c542] px-4 py-2 text-sm font-bold text-zinc-950"
+                >
+                  Browse rooms →
+                </Link>
+              </div>
             </div>
           </div>
-        </div>
-      </section>
+        </section>
+      )}
 
-      {showOwned ? (
-        <div className="flex gap-2">
+      {catalog === "rooms" ? (
+        <div className="flex gap-5 px-1">
           {(
             [
               [false, "All rooms"],
@@ -142,8 +170,8 @@ export function PlayerHome({
               type="button"
               onClick={() => setOwnedOnly(owned)}
               className={cn(
-                "rounded-full px-4 py-1.5 text-sm font-semibold",
-                ownedOnly === owned ? "bg-white text-zinc-950" : "bg-white/8 text-zinc-400"
+                "text-sm font-semibold",
+                ownedOnly === owned ? "text-white" : "text-zinc-500"
               )}
             >
               {label}
@@ -152,11 +180,15 @@ export function PlayerHome({
         </div>
       ) : null}
 
+      {catalog === "rooms" ? (
       <section>
         <div className="mb-3 flex items-end justify-between">
-          <h2 className="text-xl font-extrabold">Game Rooms</h2>
+          <div>
+            <h2 className="text-2xl font-extrabold">Game Rooms</h2>
+            <p className="text-sm text-zinc-400">Choose a room to view its details</p>
+          </div>
           <Link href="/play" className="text-sm font-semibold text-primary">
-            See all
+            See all →
           </Link>
         </div>
         <motion.div
@@ -181,6 +213,30 @@ export function PlayerHome({
           <p className="py-6 text-center text-sm text-zinc-400">No rooms match that filter.</p>
         ) : null}
       </section>
+      ) : null}
+
+      {verify?.show && !hideVerify ? (
+        <section className="hub-card flex items-center gap-3 rounded-[22px] p-4">
+          <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-emerald-500/15 text-emerald-400">
+            <Shield className="h-5 w-5" />
+          </span>
+          <div className="min-w-0 flex-1">
+            <p className="font-extrabold">Verify your account</p>
+            <p className="text-xs text-zinc-400">Confirm your email and phone to secure your account.</p>
+          </div>
+          <Link href={verify.href} className="shrink-0 rounded-full bg-primary px-3 py-2 text-xs font-bold text-white">
+            Verify now →
+          </Link>
+          <button
+            type="button"
+            onClick={() => setHideVerify(true)}
+            className="shrink-0 text-zinc-500"
+            aria-label="Hide getting started"
+          >
+            <X className="h-4 w-4" />
+          </button>
+        </section>
+      ) : null}
 
       <motion.div whileTap={tap}>
         <Link href="/play" className="hub-card flex items-center gap-3 rounded-2xl p-4">
@@ -197,7 +253,7 @@ export function PlayerHome({
           <div className="mb-3 flex items-end justify-between">
             <h2 className="text-xl font-extrabold">Your rewards</h2>
             <Link href="/dashboard/rewards" className="text-sm font-semibold text-primary">
-              See all
+              See all →
             </Link>
           </div>
           <div className="space-y-3">
@@ -250,7 +306,7 @@ export function LoggedInHomeStrip(props: {
         props.kycStatus && props.kycStatus !== "verified"
           ? {
               show: true,
-              href: "/dashboard/kyc",
+              href: "/dashboard/verification",
               title: "Verify to cash out",
               body: "Finish ID checks before redeeming.",
             }

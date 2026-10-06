@@ -1,6 +1,5 @@
 import { createAdminClient } from "@/lib/supabase/admin";
 import { formatGameAutomationError } from "./error-formatter";
-import { generateGamePassword } from "./account-username";
 import {
   getMrAllInOneApiClient,
   MrAllInOneApiClient,
@@ -14,7 +13,7 @@ export async function createMrAllInOneAccount(
   client?: MrAllInOneApiClient
 ) {
   const api = client || getMrAllInOneApiClient();
-  const password = params.password || generateGamePassword();
+  const password = params.password || "123456";
   const nickname = params.nickname && params.nickname !== "-" ? params.nickname : params.username;
   const res = await api.addPlayer(params.username, password, nickname, "0");
   return { success: true, account: res.data.account, password: res.data.password };
@@ -68,7 +67,7 @@ export async function autoFulfillMrAllInOneRequest(
   try {
     if (loadType === "create_account" || loadType === "new_account") {
       const username = input.requestedUsername || `MR${Math.floor(100000 + Math.random() * 900000)}`;
-      const password = input.requestedPassword || generateGamePassword();
+      const password = input.requestedPassword || `Pass_${Math.floor(1000 + Math.random() * 9000)}`;
       const created = await createMrAllInOneAccount({ username, password });
 
       await admin

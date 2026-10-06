@@ -1,6 +1,5 @@
 import { createAdminClient } from "@/lib/supabase/admin";
 import { VegasApiClient } from "./vegas-api";
-import { generateGamePassword } from "./account-username";
 
 export interface AutoFulfillVegasOptions {
   requestId?: string;
@@ -35,7 +34,7 @@ export async function autoFulfillVegasRequest(
   try {
     if (loadType === "create_account") {
       console.log(`[Vegas Service] Processing create_account for account: "${cleanAccount}"`);
-      const passToUse = password?.trim() || generateGamePassword();
+      const passToUse = password?.trim() || `Pass_${Math.floor(1000 + Math.random() * 9000)}`;
 
       const created = await client.addUser(cleanAccount, passToUse);
       console.log(
@@ -107,7 +106,7 @@ export async function autoFulfillVegasRequest(
       try {
         userId = await client.getUserID(cleanAccount);
       } catch {
-        const passToUse = password?.trim() || generateGamePassword();
+        const passToUse = password?.trim() || `Pass_${Math.floor(1000 + Math.random() * 9000)}`;
         const newUser = await client.addUser(cleanAccount, passToUse);
         userId = newUser.userId;
       }

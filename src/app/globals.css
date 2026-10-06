@@ -110,6 +110,10 @@ body.lobby-mode {
   background-color: #07060c;
 }
 
+html[data-text="sm"] { font-size: 14px; }
+html[data-text="lg"] { font-size: 18px; }
+html[data-text="xl"] { font-size: 20px; }
+
 /* VIP page content — shared inner pages styling */
 .vip-page-content h1,
 .vip-page-content h2,
@@ -141,6 +145,44 @@ body.lobby-mode .glass {
   background: rgba(30, 30, 30, 0.85);
   backdrop-filter: blur(12px);
   border: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+.auth-panel,
+.auth-panel .text-foreground,
+.auth-panel h2,
+.auth-panel h3 {
+  color: #18181b;
+}
+
+.auth-panel .text-muted-foreground {
+  color: #71717a !important;
+}
+
+.auth-panel .text-primary {
+  color: #e11d48 !important;
+}
+
+.auth-panel .glass {
+  background: transparent;
+  border: 0;
+  box-shadow: none;
+  backdrop-filter: none;
+}
+
+.auth-panel input,
+.auth-panel select,
+.auth-panel textarea {
+  background: #f4f4f5 !important;
+  color: #18181b !important;
+  border-color: #e4e4e7 !important;
+}
+
+.auth-panel input::placeholder {
+  color: #a1a1aa !important;
+}
+
+.auth-panel label {
+  color: #3f3f46 !important;
 }
 
 .gradient-text {

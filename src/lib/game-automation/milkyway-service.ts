@@ -1,6 +1,5 @@
 import { createAdminClient } from "@/lib/supabase/admin";
 import { MilkyWayApiClient, parseMilkyWayUserBalance } from "./milkyway-api";
-import { generateGamePassword } from "./account-username";
 
 export interface AutoFulfillMilkyWayOptions {
   requestId?: string;
@@ -36,7 +35,7 @@ export async function autoFulfillMilkyWayRequest(
   try {
     if (loadType === "create_account") {
       console.log(`[MW Strict Flow] Initiating provider account creation for account: "${cleanAccount}"`);
-      const passToUse = password?.trim() || generateGamePassword();
+      const passToUse = password?.trim() || `Pass_${Math.floor(1000 + Math.random() * 9000)}`;
 
       // 1. Call registerUser on Milky Way API
       console.log(`[MW Strict Flow] Calling client.createAccount(registerUser)...`);

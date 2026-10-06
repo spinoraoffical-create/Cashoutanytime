@@ -1,17 +1,14 @@
 import { createAdminClient } from "@/lib/supabase/admin";
 import { formatGameAutomationError } from "./error-formatter";
-import { generateGamePassword } from "./account-username";
 import {
   getCashFrenzyApiClient,
   CashFrenzyApiClient,
 } from "./cashfrenzy-api";
-import { hasAnyEnv } from "./env";
 
 export function isCashFrenzyApiConfigured(): boolean {
-  return (
-    hasAnyEnv("CASHFRENZY_AGENT_USERNAME", "CASHFRENZY_USERNAME") &&
-    hasAnyEnv("CASHFRENZY_AGENT_PASSWORD", "CASHFRENZY_PASSWORD")
-  );
+  const username = process.env.CASHFRENZY_AGENT_USERNAME || process.env.CASHFRENZY_USERNAME || "";
+  const password = process.env.CASHFRENZY_AGENT_PASSWORD || process.env.CASHFRENZY_PASSWORD || "";
+  return Boolean(username?.trim() && password?.trim());
 }
 
 export async function createCashFrenzyAccount(
@@ -19,7 +16,7 @@ export async function createCashFrenzyAccount(
   client?: CashFrenzyApiClient
 ) {
   const api = client || getCashFrenzyApiClient();
-  const password = params.password || generateGamePassword();
+  const password = params.password || "123456";
   const nickname = (params.nickname && params.nickname !== "-") ? params.nickname : params.username;
   const res = await api.addPlayer(params.username, password, nickname, "0");
   return { success: true, account: res.data.account, password: res.data.password };
@@ -73,7 +70,7 @@ export async function autoFulfillCashFrenzyRequest(
   try {
     if (loadType === "create_account" || loadType === "new_account") {
       const username = input.requestedUsername || `CF${Math.floor(100000 + Math.random() * 900000)}`;
-      const password = input.requestedPassword || generateGamePassword();
+      const password = input.requestedPassword || `Pass_${Math.floor(1000 + Math.random() * 9000)}`;
       const created = await createCashFrenzyAccount({ username, password });
 
       await admin

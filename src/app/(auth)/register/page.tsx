@@ -3,7 +3,6 @@
 import { Suspense } from "react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { EmailAuthForm } from "@/components/auth/email-auth-form";
 import { GoogleAuthButton } from "@/components/auth/google-auth-button";
 
@@ -12,25 +11,27 @@ function RegisterForm() {
   const refFromUrl = searchParams.get("ref");
 
   return (
-    <Card className="border-0 bg-transparent shadow-none text-zinc-900">
-      <CardHeader className="px-0">
-        <CardTitle className="text-zinc-900">Create account</CardTitle>
-        <CardDescription className="text-zinc-500">
-          We&apos;ll email a confirmation link before you can play
-        </CardDescription>
-      </CardHeader>
-      <CardContent className="space-y-6 px-0">
-        <GoogleAuthButton redirect="/" referralCode={refFromUrl} label="Continue with Google" />
-        <EmailAuthForm mode="register" redirect="/" referralCodeFromUrl={refFromUrl} />
-
-        <p className="text-sm text-muted-foreground text-center">
-          Already have an account?{" "}
-          <Link href="/login" className="text-primary hover:underline">
-            Sign In
-          </Link>
+    <div className="space-y-6">
+      <div>
+        <h2 className="text-2xl font-extrabold text-zinc-950">Create account</h2>
+        <p className="mt-1 text-sm text-zinc-500">
+          We&apos;ll email a confirmation link before you can play.
         </p>
-      </CardContent>
-    </Card>
+      </div>
+      <GoogleAuthButton redirect="/" referralCode={refFromUrl} label="Continue with Google" />
+      <div className="flex items-center gap-3 text-[11px] font-semibold uppercase tracking-wider text-zinc-400">
+        <span className="h-px flex-1 bg-zinc-200" />
+        or
+        <span className="h-px flex-1 bg-zinc-200" />
+      </div>
+      <EmailAuthForm mode="register" redirect="/" referralCodeFromUrl={refFromUrl} />
+      <p className="text-center text-sm text-zinc-500">
+        Already have an account?{" "}
+        <Link href="/login" className="font-semibold text-rose-600 hover:underline">
+          Sign in
+        </Link>
+      </p>
+    </div>
   );
 }
 

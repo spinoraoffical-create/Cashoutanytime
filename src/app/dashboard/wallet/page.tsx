@@ -12,6 +12,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { ClaimVerifyBanner } from "@/components/player/claim-verify-banner";
 import { MotionPage } from "@/components/player/motion-page";
+import { WalletBalanceCard } from "@/components/player/wallet-balance-card";
 
 export const metadata: Metadata = { title: "Wallet | Sweepstakes Hub" };
 
@@ -62,58 +63,17 @@ export default async function WalletPage() {
         />
       ) : null}
 
-      <div className="flex items-end justify-between">
-        <h1 className="text-3xl font-extrabold">Wallet</h1>
-        <span className="inline-flex items-center gap-1 text-xs font-semibold text-emerald-400">
-          <span className="h-1.5 w-1.5 rounded-full bg-emerald-400" /> Live
-        </span>
-      </div>
-
-      <section className="hub-gold-edge hub-card relative overflow-hidden rounded-[24px]">
-        <div className="pointer-events-none absolute -right-10 -top-12 h-40 w-40 rounded-full bg-primary/20 blur-3xl" />
-        <div className="flex items-start justify-between p-5 pb-2">
-          <div>
-            <p className="text-lg font-extrabold">Main Wallet</p>
-            <p className="text-sm text-muted-foreground">Cash + Freeplay</p>
-          </div>
-          <span className="flex h-14 w-14 items-center justify-center rounded-2xl bg-primary text-sm font-black text-white">
-            SH
-          </span>
-        </div>
-        <div className="px-5 pb-5">
-          <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-muted-foreground">
-            Ready when you are
-          </p>
-          <p className="mt-1 text-5xl font-extrabold tabular-nums">${main.toFixed(2)}</p>
-          <div className="mt-4 grid grid-cols-2 gap-3">
-            <div className="rounded-2xl bg-white/5 p-3">
-              <p className="text-xs text-muted-foreground">Available to cash out</p>
-              <p className="mt-1 text-lg font-extrabold tabular-nums">${cash.toFixed(2)}</p>
-              <p className="text-[11px] text-muted-foreground">Cash</p>
-            </div>
-            <div className="rounded-2xl bg-white/5 p-3">
-              <p className="text-xs text-muted-foreground">Freeplay</p>
-              <p className="mt-1 text-lg font-extrabold tabular-nums">${freeplay.toFixed(2)}</p>
-              <p className="text-[11px] text-muted-foreground">Play only</p>
-            </div>
-          </div>
-          <div className="mt-4 grid grid-cols-2 gap-2">
-            <Button asChild className="rounded-full">
-              <Link href="/dashboard/deposit">+ Add money</Link>
-            </Button>
-            <Button asChild variant="outline" className="rounded-full">
-              <Link href="/dashboard/withdraw">Cash out</Link>
-            </Button>
-          </div>
-        </div>
-      </section>
+      <WalletBalanceCard main={main} cash={cash} freeplay={freeplay} />
 
       <Link
         href="/dashboard/activity"
-        className="hub-card flex items-center justify-between rounded-2xl px-4 py-3 text-sm font-semibold"
+        className="hub-card flex items-center justify-between rounded-2xl px-4 py-3"
       >
-        Activity & receipts
-        <span className="text-primary">→</span>
+        <span>
+          <span className="block text-sm font-semibold">Activity & receipts</span>
+          <span className="text-xs text-zinc-400">Deposits, cash outs, and transfers</span>
+        </span>
+        <span className="text-zinc-400">→</span>
       </Link>
 
       <div className="hub-card rounded-[24px] p-5">

@@ -6,8 +6,6 @@ import {
 } from "@/lib/payments/paydora";
 import { creditPaydoraDeposit, reversePaydoraDeposit } from "@/lib/payments/paydora-wallet";
 
-const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
-
 export async function POST(req: Request) {
   const raw = Buffer.from(await req.arrayBuffer());
   const signature = req.headers.get("x-signature") || "";
@@ -29,33 +27,25 @@ export async function POST(req: Request) {
   }
 
   try {
-    const userId = String(payload.data?.userName || "").trim();
+    const userId = payload.data?.userName || "";
     const amount = Number(payload.data?.paidAmount ?? payload.data?.amount ?? 0);
-    const depositId = payload.data?.depositId;
 
-    if (payload.event === "deposit.paid" && depositId && UUID_RE.test(userId) && amount > 0) {
-      const status = payload.data?.status || "paid";
-      if (!isPaidDepositStatus(status)) {
-        return new NextResponse("IGNORED", { status: 200 });
+    if (payload.event === "deposit.paid" && payload.data?.depositId && userId && amount > 0) {
+      if (isPaidDepositStatus(payload.data.status || "paid") || payload.event === "deposit.paid") {
+        await creditPaydoraDeposit({
+          userId,
+          amount,
+          depositId: payload.data.depositId,
+          referenceId: payload.data.referenceId,
+        });
       }
-      await creditPaydoraDeposit({
-        userId,
-        amount,
-        depositId,
-        referenceId: payload.data?.referenceId,
-      });
     }
 
-    if (
-      payload.event === "deposit.refunded" &&
-      depositId &&
-      UUID_RE.test(userId) &&
-      amount > 0
-    ) {
+    if (payload.event === "deposit.refunded" && payload.data?.depositId && userId && amount > 0) {
       await reversePaydoraDeposit({
         userId,
         amount,
-        depositId,
+        depositId: payload.data.depositId,
       });
     }
   } catch (err) {

@@ -124,11 +124,15 @@ export async function createPaydoraDeposit(input: {
   amount: number;
   userName?: string;
   gameId?: string;
+  customerIp: string;
+  deviceFingerprint: string;
   idempotencyKey: string;
 }): Promise<PaydoraDeposit> {
   const body: Record<string, unknown> = {
     paymentMethodId: input.paymentMethodId,
     amount: input.amount,
+    customerIp: input.customerIp,
+    deviceFingerprint: input.deviceFingerprint.slice(0, 128),
   };
   if (input.userName) body.userName = input.userName.slice(0, 100);
   if (input.gameId) body.gameId = input.gameId;

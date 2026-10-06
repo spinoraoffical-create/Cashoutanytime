@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import Image from "next/image";
 import Link from "next/link";
-import { ChevronRight, Search, Star } from "lucide-react";
+import { ChevronRight, Gamepad2, LayoutGrid, Search, SlidersHorizontal, Sparkles, Star } from "lucide-react";
 import { motion } from "framer-motion";
 import { cn } from "@/lib/utils";
 import type { Game } from "@/lib/games";
@@ -12,8 +12,8 @@ import { MotionPage } from "@/components/player/motion-page";
 
 const FAV_KEY = "hub-favorite-games";
 
-type Segment = "all" | "rooms";
-type Chip = "all" | "popular" | "favorites";
+type Segment = "all" | "rooms" | "instant";
+type Chip = "all" | "popular" | "favorites" | "yours";
 
 export function PlayCatalog({ games }: { games: Game[] }) {
   const rooms = games.filter((g) => !g.upcoming);
@@ -21,6 +21,8 @@ export function PlayCatalog({ games }: { games: Game[] }) {
   const [chip, setChip] = useState<Chip>("all");
   const [q, setQ] = useState("");
   const [favs, setFavs] = useState<string[]>([]);
+  const [showFilters, setShowFilters] = useState(false);
+  const [category, setCategory] = useState("all");
   const { stagger, tap } = usePlayerMotion();
 
   useEffect(() => {
@@ -39,10 +41,17 @@ export function PlayCatalog({ games }: { games: Game[] }) {
     });
   }
 
+  const categories = useMemo(
+    () => ["all", ...Array.from(new Set(rooms.map((g) => g.category)))],
+    [rooms]
+  );
+
   const list = useMemo(() => {
     let rows = rooms;
+    if (segment === "instant") return [];
     if (chip === "popular") rows = rows.filter((g) => g.popular);
-    if (chip === "favorites") rows = rows.filter((g) => favs.includes(g.slug));
+    if (chip === "favorites" || chip === "yours") rows = rows.filter((g) => favs.includes(g.slug));
+    if (category !== "all") rows = rows.filter((g) => g.category === category);
     if (q.trim()) {
       const s = q.toLowerCase();
       rows = rows.filter(
@@ -53,7 +62,7 @@ export function PlayCatalog({ games }: { games: Game[] }) {
       );
     }
     return rows;
-  }, [rooms, chip, q, favs]);
+  }, [rooms, segment, chip, category, q, favs]);
 
   return (
     <MotionPage className="space-y-4">
@@ -65,26 +74,28 @@ export function PlayCatalog({ games }: { games: Game[] }) {
           </span>
         </h1>
         <p className="mt-1 text-sm text-zinc-400">
-          Game Rooms use load + redeem. Instant play is not on this catalog.
+          Open a Game Room. Instant play uses a separate balance and is not on this floor.
         </p>
       </div>
 
-      <div className="flex rounded-full bg-white/8 p-1">
+      <div className="flex rounded-full bg-[#1a1730] p-1">
         {(
           [
-            ["all", "All Games"],
-            ["rooms", "Game Rooms"],
+            ["all", "All Games", LayoutGrid],
+            ["rooms", "Game Rooms", Gamepad2],
+            ["instant", "Instant Games", Sparkles],
           ] as const
-        ).map(([id, label]) => (
+        ).map(([id, label, Icon]) => (
           <button
             key={id}
             type="button"
             onClick={() => setSegment(id)}
             className={cn(
-              "flex-1 rounded-full py-2 text-sm font-semibold",
-              segment === id ? "bg-[#f5c542] text-zinc-950" : "text-zinc-400"
+              "flex flex-1 items-center justify-center gap-1.5 rounded-full py-2.5 text-xs font-semibold sm:text-sm",
+              segment === id ? "bg-[#2a2548] text-white" : "text-zinc-400"
             )}
           >
+            <Icon className="h-3.5 w-3.5" />
             {label}
           </button>
         ))}
@@ -100,30 +111,76 @@ export function PlayCatalog({ games }: { games: Game[] }) {
         />
       </label>
 
-      <div className="flex gap-2 overflow-x-auto scrollbar-hide">
-        {(
-          [
-            ["all", "All"],
-            ["popular", "Popular"],
-            ["favorites", "Favorites"],
-          ] as const
-        ).map(([id, label]) => (
-          <button
-            key={id}
-            type="button"
-            onClick={() => setChip(id)}
-            className={cn(
-              "whitespace-nowrap rounded-full px-4 py-1.5 text-sm font-semibold",
-              chip === id ? "bg-primary text-white hub-neon-pill" : "bg-white/8 text-zinc-400"
-            )}
-          >
-            {label}
-          </button>
-        ))}
+      <div className="flex items-center gap-2">
+        <div className="flex flex-1 gap-2 overflow-x-auto scrollbar-hide">
+          {(
+            [
+              ["all", "All"],
+              ["popular", "Popular"],
+              ["favorites", "Favorites"],
+              ["yours", "Yours"],
+            ] as const
+          ).map(([id, label]) => (
+            <button
+              key={id}
+              type="button"
+              onClick={() => setChip(id)}
+              className={cn(
+                "whitespace-nowrap rounded-full px-4 py-1.5 text-sm font-semibold",
+                chip === id ? "bg-white text-zinc-950" : "bg-white/8 text-zinc-300"
+              )}
+            >
+              {label}
+            </button>
+          ))}
+        </div>
+        <button
+          type="button"
+          onClick={() => setShowFilters((v) => !v)}
+          className="flex shrink-0 items-center gap-1 rounded-full bg-white/8 px-3 py-1.5 text-sm font-semibold text-zinc-200"
+          aria-expanded={showFilters}
+        >
+          <SlidersHorizontal className="h-3.5 w-3.5" />
+          Filter
+        </button>
       </div>
 
-      {list.length === 0 ? (
-        <p className="py-12 text-center text-sm text-zinc-400">No games match that search.</p>
+      {showFilters ? (
+        <div className="flex gap-2 overflow-x-auto scrollbar-hide">
+          {categories.map((name) => (
+            <button
+              key={name}
+              type="button"
+              onClick={() => setCategory(name)}
+              className={cn(
+                "whitespace-nowrap rounded-full px-3 py-1 text-xs font-semibold capitalize",
+                category === name ? "bg-primary text-white" : "bg-white/8 text-zinc-400"
+              )}
+            >
+              {name === "all" ? "All categories" : name}
+            </button>
+          ))}
+        </div>
+      ) : null}
+
+      {segment !== "instant" ? (
+        <h2 className="text-lg font-extrabold">
+          {segment === "rooms" ? "Game Rooms" : "All games"}{" "}
+          <span className="text-sm font-semibold text-zinc-500">{list.length}</span>
+        </h2>
+      ) : null}
+
+      {segment === "instant" ? (
+        <div className="hub-card rounded-[24px] px-5 py-10 text-center">
+          <p className="font-bold">Instant Games are not on this floor</p>
+          <p className="mt-1 text-sm text-zinc-400">Game Rooms use load and redeem from your wallet.</p>
+        </div>
+      ) : list.length === 0 ? (
+        <p className="py-12 text-center text-sm text-zinc-400">
+          {chip === "yours" || chip === "favorites"
+            ? "Star a room and it will show up here."
+            : "No games match that search."}
+        </p>
       ) : (
         <motion.div
           className="grid grid-cols-2 gap-3"

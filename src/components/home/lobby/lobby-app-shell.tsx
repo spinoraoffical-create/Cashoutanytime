@@ -8,6 +8,8 @@ import { EnterFloorSplash } from "@/components/player/enter-floor-splash";
 export function LobbyAppShell({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     document.body.classList.add("lobby-mode");
+    const size = localStorage.getItem("hub-text-size");
+    if (size) document.documentElement.dataset.text = size;
     return () => document.body.classList.remove("lobby-mode");
   }, []);
 

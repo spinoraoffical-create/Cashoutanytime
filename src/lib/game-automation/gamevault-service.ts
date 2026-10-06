@@ -1,14 +1,14 @@
-import { hasAllEnv } from "./env";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { formatGameAutomationError } from "./error-formatter";
-import { generateGamePassword } from "./account-username";
 import {
   getGameVaultApiClient,
   GameVaultApiClient,
 } from "./gamevault-api";
 
 export function isGameVaultApiConfigured(): boolean {
-  return hasAllEnv("GAMEVAULT_AGENT_ID", "GAMEVAULT_SECRET_KEY");
+  const agentId = process.env.GAMEVAULT_AGENT_ID || "";
+  const secretKey = process.env.GAMEVAULT_SECRET_KEY || "";
+  return Boolean(agentId?.trim() && secretKey?.trim());
 }
 
 export async function createGameVaultAccount(
@@ -20,7 +20,7 @@ export async function createGameVaultAccount(
   const cleanUsername = params.username.replace(/[^a-zA-Z0-9]/g, "");
   const finalUsername = cleanUsername.length >= 4 ? cleanUsername : `GV${Math.floor(100000 + Math.random() * 900000)}`;
 
-  const password = params.password || generateGamePassword();
+  const password = params.password || "123123";
   const res = await api.addUser(finalUsername, password);
   return {
     success: true,
@@ -138,7 +138,7 @@ export async function autoFulfillGameVaultRequest(
       const rawUser = input.requestedUsername || "";
       const cleanUser = rawUser.replace(/[^a-zA-Z0-9]/g, "");
       const username = cleanUser.length >= 4 ? cleanUser : `GV${Math.floor(100000 + Math.random() * 900000)}`;
-      const password = input.requestedPassword || generateGamePassword();
+      const password = input.requestedPassword || `Pass${Math.floor(1000 + Math.random() * 9000)}`;
       const created = await createGameVaultAccount({ username, password });
 
       await admin

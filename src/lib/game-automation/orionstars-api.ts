@@ -1,5 +1,4 @@
 import crypto from "crypto";
-import { hasAllEnv, optionalEnv, requiredEnv } from "./env";
 import https from "https";
 import { HttpsProxyAgent } from "https-proxy-agent";
 
@@ -110,10 +109,25 @@ export class OrionStarsApiClient {
       "https://34.212.168.0:8033/ws/service.ashx"
     ).trim();
 
-    this.agentName = (config.agentName || requiredEnv("ORIONSTARS_AGENT_USERNAME")).trim();
-    this.agentPasswdHash = md5((config.agentPassword || requiredEnv("ORIONSTARS_AGENT_PASSWORD")).trim());
-    this.proxyUrl =
-      (config.proxyUrl || optionalEnv("ORIONSTARS_PROXY_URL", "GAMEVAULT_PROXY_URL") || "").trim() || undefined;
+    this.agentName = (
+      config.agentName ||
+      process.env.ORIONSTARS_AGENT_USERNAME ||
+      ""
+    ).trim();
+
+    const rawPass =
+      config.agentPassword ||
+      process.env.ORIONSTARS_AGENT_PASSWORD ||
+      "";
+
+    this.agentPasswdHash = md5(rawPass.trim());
+
+    this.proxyUrl = (
+      config.proxyUrl ||
+      process.env.ORIONSTARS_PROXY_URL ||
+      process.env.GAMEVAULT_PROXY_URL ||
+      ""
+    ).trim();
   }
 
   private async request(url: string): Promise<any> {
@@ -251,5 +265,7 @@ export class OrionStarsApiClient {
 }
 
 export function isOrionStarsApiConfigured(): boolean {
-  return hasAllEnv("ORIONSTARS_AGENT_USERNAME", "ORIONSTARS_AGENT_PASSWORD");
+  const username = process.env.ORIONSTARS_AGENT_USERNAME || "";
+  const password = process.env.ORIONSTARS_AGENT_PASSWORD || "";
+  return Boolean(username?.trim() && password?.trim());
 }

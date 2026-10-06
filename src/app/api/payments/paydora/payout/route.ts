@@ -1,13 +1,9 @@
-import { randomUUID } from "crypto";
 import { NextResponse } from "next/server";
 import { createPaydoraWithdrawal, getPaydoraPaymentMethods } from "@/lib/payments/paydora";
-import {
-  debitPaydoraPayout,
-  refundFailedPaydoraPayout,
-} from "@/lib/payments/paydora-wallet";
+import { creditPaydoraDeposit } from "@/lib/payments/paydora-wallet";
 import { createClient } from "@/lib/supabase/server";
+import { createAdminClient } from "@/lib/supabase/admin";
 import { checkRateLimit, rateLimitUserMessage } from "@/lib/rate-limit";
-import { playerPaymentError } from "@/lib/player-safe-error";
 
 export async function POST(req: Request) {
   try {
@@ -19,29 +15,7 @@ export async function POST(req: Request) {
 
     const limited = await checkRateLimit("paydoraPayout", user.id);
     if (!limited.allowed) {
-      const unavailable = limited.reason === "unavailable";
-      return NextResponse.json(
-        { error: rateLimitUserMessage(limited) },
-        { status: unavailable ? 503 : 429 }
-      );
-    }
-
-    const { data: profile } = await supabase
-      .from("profiles")
-      .select("wallet_balance, kyc_status")
-      .eq("id", user.id)
-      .single();
-
-    if (profile?.kyc_status !== "verified") {
-      return NextResponse.json(
-        {
-          error:
-            profile?.kyc_status === "pending"
-              ? "KYC is under review. Cashout is available after approval."
-              : "KYC verification is required before cashout.",
-        },
-        { status: 403 }
-      );
+      return NextResponse.json({ error: rateLimitUserMessage(limited) }, { status: 429 });
     }
 
     const body = await req.json();
@@ -54,6 +28,12 @@ export async function POST(req: Request) {
     if (!Number.isFinite(amount) || amount < 1) {
       return NextResponse.json({ error: "Payout amount must be at least $1.00" }, { status: 400 });
     }
+
+    const { data: profile } = await supabase
+      .from("profiles")
+      .select("wallet_balance")
+      .eq("id", user.id)
+      .single();
 
     const currentBalance = Number(profile?.wallet_balance || 0);
     if (currentBalance < amount) {
@@ -69,18 +49,29 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: "That payout method is not enabled." }, { status: 400 });
     }
 
-    const payoutKey = `payout:${randomUUID()}`;
-    const debit = await debitPaydoraPayout({
-      userId: user.id,
-      amount,
-      payoutKey,
+    const idempotencyKey = `wd_${user.id}_${Date.now()}`;
+    const admin = createAdminClient();
+    if (!admin) return NextResponse.json({ error: "Payouts are temporarily unavailable." }, { status: 503 });
+
+    const { data: debit, error: debitError } = await admin.rpc("debit_paydora_payout", {
+      p_user_id: user.id,
+      p_amount: amount,
+      p_payout_key: idempotencyKey,
     });
-    if (!debit.debited) {
-      return NextResponse.json({ error: "This payout was already submitted." }, { status: 409 });
+    if (debitError) {
+      const message = /insufficient/i.test(debitError.message)
+        ? `Insufficient wallet balance ($${currentBalance.toFixed(2)})`
+        : "Could not reserve that payout. Try again.";
+      return NextResponse.json({ error: message }, { status: 400 });
+    }
+    const debitRow = (debit ?? {}) as { debited?: boolean; duplicate?: boolean };
+    if (!debitRow.debited && !debitRow.duplicate) {
+      return NextResponse.json({ error: "Could not reserve that payout. Try again." }, { status: 400 });
     }
 
+    let withdrawal;
     try {
-      const withdrawal = await createPaydoraWithdrawal({
+      withdrawal = await createPaydoraWithdrawal({
         paymentMethodId: method.id,
         amount,
         userName: user.id,
@@ -88,34 +79,28 @@ export async function POST(req: Request) {
         chimePhoneEmail: chimePhoneEmail || undefined,
         cardNumber: body.cardNumber ? String(body.cardNumber) : undefined,
         cardValid: body.cardValid ? String(body.cardValid) : undefined,
-        idempotencyKey: payoutKey,
-      });
-
-      return NextResponse.json({
-        success: true,
-        withdrawalId: withdrawal.id,
-        referenceId: withdrawal.referenceId,
-        status: withdrawal.status,
-        amount: withdrawal.amount,
+        idempotencyKey,
       });
     } catch (err) {
-      await refundFailedPaydoraPayout({
+      await creditPaydoraDeposit({
         userId: user.id,
         amount,
-        payoutKey,
+        depositId: `payout-void:${idempotencyKey}`,
+        methodName: "Payout refund",
       });
       throw err;
     }
+
+    return NextResponse.json({
+      success: true,
+      withdrawalId: withdrawal.id,
+      referenceId: withdrawal.referenceId,
+      status: withdrawal.status,
+      amount: withdrawal.amount,
+    });
   } catch (err) {
+    const msg = err instanceof Error ? err.message : String(err);
     const status = (err as { status?: number }).status || 500;
-    return NextResponse.json(
-      {
-        error: playerPaymentError(
-          err,
-          "Cash outs are temporarily unavailable. Please try again later or contact support."
-        ),
-      },
-      { status: status >= 400 && status < 600 ? status : 500 }
-    );
+    return NextResponse.json({ error: msg }, { status: status >= 400 && status < 600 ? status : 500 });
   }
 }

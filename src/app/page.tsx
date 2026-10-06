@@ -19,17 +19,20 @@ export default async function HomePage() {
 
   const lobbyCatalog = buildLobbyCatalog(dbGames);
   const row = profile as typeof profile & { kyc_status?: string | null };
-  const needsPhone = Boolean(row && !row.phone);
-  const needsKyc = Boolean(row && row.kyc_status && row.kyc_status !== "verified");
+  const metaPhone = typeof user?.user_metadata?.phone === "string" ? user.user_metadata.phone : "";
+  const needsPhone = Boolean(user && row && !row.phone && !user.phone && !metaPhone);
+  const needsKyc = Boolean(row && row.kyc_status && row.kyc_status !== "verified" && row.kyc_status !== "approved");
   const verify =
     needsPhone || needsKyc
       ? {
           show: true,
-          href: "/dashboard/kyc",
+          href: needsPhone ? "/dashboard/welcome" : "/dashboard/verification",
           title: needsPhone
-            ? "Add your phone to keep cash-outs moving"
+            ? "Get $5 free play — just verify your email & phone"
             : "Finish verification to keep cash-outs moving",
-          body: "Email, phone, and ID when required.",
+          body: needsPhone
+            ? "No deposit needed. Verify your email and phone number to unlock free play."
+            : "Email, phone, and ID when required.",
         }
       : null;
 

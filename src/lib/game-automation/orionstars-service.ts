@@ -1,6 +1,5 @@
 import { createAdminClient } from "@/lib/supabase/admin";
 import { OrionStarsApiClient, parseOrionStarsUserBalance } from "./orionstars-api";
-import { generateGamePassword } from "./account-username";
 
 export interface AutoFulfillOrionStarsOptions {
   requestId?: string;
@@ -36,7 +35,7 @@ export async function autoFulfillOrionStarsRequest(
   try {
     if (loadType === "create_account") {
       console.log(`[OS Strict Flow] Initiating provider account creation for account: "${cleanAccount}"`);
-      const passToUse = password?.trim() || generateGamePassword();
+      const passToUse = password?.trim() || `Pass_${Math.floor(1000 + Math.random() * 9000)}`;
 
       // 1. Call registerUser on Orion Stars API
       console.log(`[OS Strict Flow] Calling client.createAccount(registerUser)...`);

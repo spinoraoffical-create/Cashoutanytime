@@ -1,7 +1,6 @@
 import { createAdminClient } from "@/lib/supabase/admin";
 import { formatGameAutomationError } from "./error-formatter";
 import { MafiaApiClient, isMafiaApiConfigured } from "./mafia-api";
-import { generateGamePassword } from "./account-username";
 
 export interface MafiaDirectApiResult {
   success: boolean;
@@ -56,7 +55,7 @@ export async function processMafiaAccountCreationDirectApi(
 
   try {
     const client = new MafiaApiClient();
-    const pass = desiredPassword || generateGamePassword();
+    const pass = desiredPassword || "123123";
     const result = await client.createAccount(accountName, pass);
     return {
       success: true,
@@ -112,7 +111,7 @@ export async function autoFulfillMafiaRequest(
     // 1. Create account / New account
     if (loadType === "create_account" || loadType === "new_account") {
       const username = input.requestedUsername || `Mafia_${Math.floor(100000 + Math.random() * 900000)}`;
-      const password = input.requestedPassword || generateGamePassword();
+      const password = input.requestedPassword || "123123";
 
       const created = await client.createAccount(username, password);
 

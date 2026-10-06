@@ -57,10 +57,10 @@ export function GameLoadActions({ load }: GameLoadActionsProps) {
         </Button>
       </div>
       {load.game_username && (
-        <p className="text-xs text-muted-foreground">User: {load.game_username}</p>
+        <p className="text-xs text-[#6b6d8f]">User: {load.game_username}</p>
       )}
       {load.game_password && (
-        <p className="text-xs font-mono text-primary break-all">Pass: {load.game_password}</p>
+        <p className="text-xs font-mono text-[#00E5FF] break-all">Pass: {load.game_password}</p>
       )}
       {load.error_message && (
         <p className="text-xs text-destructive">{load.error_message}</p>

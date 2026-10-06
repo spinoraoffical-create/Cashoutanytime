@@ -20,7 +20,11 @@ export default async function DashboardLayout({ children }: { children: React.Re
   const profile = await getProfile();
   if (!profile || profile.is_suspended) redirect("/login");
 
-  const needsPhone = !profile?.phone;
+  const savedPhone =
+    profile?.phone ||
+    user.phone ||
+    (typeof user.user_metadata?.phone === "string" ? user.user_metadata.phone : "");
+  const needsPhone = !savedPhone;
   const email = profile?.email || user.email || "";
 
   return (
