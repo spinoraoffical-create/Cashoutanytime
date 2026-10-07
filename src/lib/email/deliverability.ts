@@ -26,7 +26,7 @@ export function htmlToPlainText(html: string): string {
 export const PROMO_REPLY_TO =
   process.env.RESEND_REPLY_TO ?? "support@spinoracasinos.com";
 
-const SETTINGS_URL = `${SITE_URL}/dashboard/settings`;
+const SETTINGS_URL = `${SITE_URL}/dashboard/notifications`;
 
 export function promoEmailHeaders(): Record<string, string> {
   return {

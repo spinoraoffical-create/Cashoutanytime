@@ -9,11 +9,11 @@ import { Button } from "@/components/ui/button";
 export const metadata = supportMetadata;
 
 const TOPICS = [
-  { id: "adding-money", title: "Adding money", hint: "Deposits to Main Wallet" },
-  { id: "cash-outs", title: "Cash outs", hint: "Redeem, then withdraw" },
-  { id: "games", title: "Games and balances", hint: "Load + redeem in Game Rooms" },
-  { id: "account", title: "Account and safety", hint: "Login, KYC, devices" },
-  { id: "rules", title: "Rules and responsible play", hint: "Terms, limits, 18+" },
+  { id: "adding-money", title: "Adding money", hint: "Payment methods, pending deposits, and confirmations" },
+  { id: "cash-outs", title: "Cash outs", hint: "Eligibility, payout status, and returned funds" },
+  { id: "games", title: "Games and balances", hint: "Launching games, in-game funds, and game cash outs" },
+  { id: "account", title: "Account and safety", hint: "Sign-in, verification, privacy, and account protection" },
+  { id: "rules", title: "Rules and responsible play", hint: "Program rules, limits, and play controls" },
 ];
 
 export default async function SupportPage() {
@@ -28,7 +28,7 @@ export default async function SupportPage() {
         <div>
           <h1 className="text-3xl font-extrabold">How can we help?</h1>
           <p className="mt-2 text-sm text-muted-foreground">
-            Search topics or start a conversation. Guest chat can&apos;t see balances or payments — sign in for private support.
+            Open a private, account-aware conversation or browse a topic first.
           </p>
         </div>
 
@@ -47,7 +47,7 @@ export default async function SupportPage() {
           <Search className="h-4 w-4 text-muted-foreground" />
           <input
             name="q"
-            placeholder="Search support"
+            placeholder="Search support topics"
             className="w-full bg-transparent text-sm outline-none placeholder:text-muted-foreground"
           />
         </form>
@@ -62,6 +62,19 @@ export default async function SupportPage() {
               </a>
             ))}
           </div>
+        </section>
+
+        <section className="space-y-2">
+          <h2 className="text-lg font-bold">Contact us</h2>
+          <p className="text-sm text-muted-foreground">
+            An automated assistant answers first and identifies itself. You can request a person at any time.
+          </p>
+          <Link href={chatHref} className="inline-flex text-sm font-bold text-[#ff6b89]">
+            Start private chat
+          </Link>
+          <Link href="/help" className="block text-sm font-bold text-[#ff6b89]">
+            Read frequently asked questions
+          </Link>
         </section>
 
         {faqs.length > 0 && (

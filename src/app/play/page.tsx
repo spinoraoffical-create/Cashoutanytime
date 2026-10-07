@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { Suspense } from "react";
 import { PlayCatalog } from "@/components/player/play-catalog";
 import { VipPageLayout } from "@/components/layout/vip-page-layout";
 import { getGameRooms } from "@/lib/games";
@@ -19,7 +20,9 @@ export default async function PlayPage() {
   return (
     <VipPageLayout>
       <main>
-        <PlayCatalog games={games} />
+        <Suspense fallback={null}>
+          <PlayCatalog games={games} />
+        </Suspense>
       </main>
     </VipPageLayout>
   );

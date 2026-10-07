@@ -17,47 +17,50 @@ export function LobbyTopBar() {
   const initial = (profile?.name || displayName || "P").slice(0, 1).toUpperCase();
 
   return (
-    <header className="flex h-14 shrink-0 items-center justify-between gap-2 border-b border-white/8 bg-[#07060c]/80 px-4 backdrop-blur-md">
-      <Link href="/" className="flex min-w-0 items-center gap-2" aria-label={`${SITE_NAME} home`}>
-        <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-primary text-[10px] font-black text-white shadow-[0_0_16px_rgba(255,45,85,0.45)]">
-          SH
-        </span>
-        <span className="truncate text-sm font-extrabold tracking-tight">{SITE_NAME}</span>
-      </Link>
+    <header className="jg-mobile-header sticky top-0 z-20 lg:hidden">
+      <div className="jg-mobile-header-row flex items-center justify-between px-4 py-3">
+        <Link href="/" className="flex min-h-11 min-w-11 items-center gap-2 rounded-xl pr-1" aria-label={`${SITE_NAME} home`}>
+          <span className="grid h-11 w-11 place-items-center rounded-2xl bg-[#160812] text-lg font-black text-[#f3264f] ring-1 ring-white/10">
+            SH
+          </span>
+        </Link>
 
-      <div className="flex shrink-0 items-center gap-2">
-        <Link
-          href="/dashboard/wallet"
-          className="flex items-center gap-1.5 rounded-full border border-white/10 bg-white/8 px-3 py-1.5 text-sm font-extrabold tabular-nums text-white"
-          aria-label="Wallet balances"
-        >
-          <Wallet className="h-3.5 w-3.5 text-primary" />
-          ${fmt}
-        </Link>
-        <Link
-          href="/dashboard/notifications"
-          className="relative flex h-9 w-9 items-center justify-center rounded-full border border-white/10 bg-white/8"
-          aria-label="Notifications"
-        >
-          <Bell className="h-4 w-4" />
-          {unreadMessages > 0 && (
-            <span className="absolute -right-0.5 -top-0.5 flex h-[14px] min-w-[14px] items-center justify-center rounded-full bg-primary px-0.5 text-[8px] font-bold text-white">
-              {unreadMessages > 9 ? "9+" : unreadMessages}
-            </span>
-          )}
-        </Link>
-        <Link
-          href="/dashboard"
-          className="relative flex h-9 w-9 items-center justify-center overflow-hidden rounded-full bg-primary text-xs font-bold text-white"
-          aria-label="Profile"
-        >
-          {profile?.avatarUrl ? (
-            // eslint-disable-next-line @next/next/no-img-element
-            <img src={profile.avatarUrl} alt="" className="h-full w-full object-cover" />
-          ) : (
-            initial
-          )}
-        </Link>
+        <div className="flex shrink-0 items-center gap-1">
+          <Link
+            href="/dashboard/wallet"
+            className="inline-flex h-11 items-center gap-1.5 rounded-2xl border border-white/15 bg-[#24152e]/90 px-3 text-sm font-extrabold tabular-nums text-[#fcf9fb]"
+            aria-label="Wallet balances"
+          >
+            <Wallet className="h-3.5 w-3.5 text-[#ff718c]" />
+            ${fmt}
+          </Link>
+          <Link
+            href="/dashboard/messages"
+            className="relative grid h-11 w-11 place-items-center rounded-full text-[#fcf9fb] hover:bg-white/10"
+            aria-label="Notifications"
+          >
+            <Bell className="h-4 w-4" />
+            {unreadMessages > 0 && (
+              <span className="absolute right-1 top-1 grid h-4 min-w-4 place-items-center rounded-full bg-[#f3264f] px-1 text-[10px] font-extrabold text-white">
+                {unreadMessages > 9 ? "9+" : unreadMessages}
+              </span>
+            )}
+          </Link>
+          <Link
+            href="/dashboard"
+            className="grid h-11 w-11 place-items-center rounded-full"
+            aria-label="Your profile"
+          >
+            {profile?.avatarUrl ? (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img src={profile.avatarUrl} alt="" className="h-8 w-8 rounded-full object-cover ring-2 ring-[#100914]" />
+            ) : (
+              <span className="grid h-8 w-8 place-items-center rounded-full bg-[#f3264f] text-xs font-black text-white ring-2 ring-[#100914]">
+                {initial}
+              </span>
+            )}
+          </Link>
+        </div>
       </div>
     </header>
   );

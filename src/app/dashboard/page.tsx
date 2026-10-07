@@ -4,20 +4,24 @@ import {
   BadgeCheck,
   Bell,
   ChevronRight,
+  Download,
+  FileText,
   Gift,
+  HelpCircle,
   History,
   Lock,
   MessageCircle,
+  ScrollText,
   Shield,
   Sparkles,
   Wallet,
 } from "lucide-react";
+import { AccountInboxLink, WhatsNewLink } from "@/components/player/account-inbox-link";
 import { getDashboardCore } from "@/lib/data/dashboard";
 import { getProfileEditorState } from "@/lib/actions/profile";
 import { ProfileIdentityCard } from "@/components/player/profile-identity-card";
 import { ClaimVerifyBanner } from "@/components/player/claim-verify-banner";
 import { SignOutButton } from "@/components/player/sign-out-button";
-import { PlayerVideoGuides } from "@/components/player/player-video-guides";
 import { ProfilePreferences } from "@/components/player/profile-preferences";
 import { MotionPage } from "@/components/player/motion-page";
 
@@ -33,25 +37,29 @@ const GRID = [
 const HELP = [
   { href: "/dashboard/messages", label: "Inbox" },
   { href: "/dashboard/notifications", label: "Notification settings" },
-  { href: "/support", label: "Help & FAQ" },
+  { href: "/help", label: "Help & FAQ" },
 ];
 
 const PROGRESS = [
-  { href: "/dashboard/vip", label: "VIP" },
-  { href: "/dashboard/rewards", label: "Rewards & bonuses" },
-  { href: "/dashboard/missions", label: "Missions" },
-  { href: "/dashboard/achievements", label: "Achievements" },
-  { href: "/dashboard/referrals", label: "Refer & earn" },
+  { href: "/dashboard/rewards", label: "Rewards & bonuses", icon: Gift },
+  { href: "/dashboard/missions", label: "Missions", icon: Sparkles },
+  { href: "/dashboard/achievements", label: "Achievements", icon: BadgeCheck },
 ];
 
-const LEGAL = [
-  { href: "/terms", label: "Program rules" },
-  { href: "/terms", label: "Terms" },
-  { href: "/privacy", label: "Privacy" },
+const RULES = [
+  { href: "/terms", label: "Program rules", icon: ScrollText },
+  { href: "/get-app", label: "Install or update app", icon: Download },
+  { href: "/terms", label: "Terms of Service", icon: FileText },
+  { href: "/whats-new", label: "What's new", icon: Sparkles, dot: true },
 ];
 
 export default async function AccountHubPage() {
-  const [{ tier }, editor] = await Promise.all([getDashboardCore(), getProfileEditorState()]);
+  const [{ tier, nextTier, profile }, editor] = await Promise.all([
+    getDashboardCore(),
+    getProfileEditorState(),
+  ]);
+  const xp = Number((profile as { xp?: number; vip_points?: number }).xp ?? (profile as { vip_points?: number }).vip_points ?? 0);
+  const xpToNext = nextTier ? Math.max(0, nextTier.min_xp - xp) : 0;
   const row = editor;
   const kyc = row.kycStatus === "verified" || row.kycStatus === "approved" ? 1 : 0;
   const phone = row.phone ? 1 : 0;
@@ -78,7 +86,7 @@ export default async function AccountHubPage() {
       <section className="relative overflow-hidden rounded-[24px]">
         <div className="relative h-40 w-full">
           <Image src="/games/game-vault.webp" alt="" fill sizes="480px" className="object-cover" />
-          <div className="absolute inset-0 bg-gradient-to-r from-[#120818] via-[#120818]/85 to-[#120818]/25" />
+          <div className="absolute inset-0 bg-gradient-to-r from-[#030b26] via-[#100914]/88 to-[#24152e]/30" />
           <div className="absolute inset-0 flex flex-col justify-end p-5">
             <p className="max-w-[220px] text-2xl font-extrabold leading-tight">Your account, in one place.</p>
             <p className="mt-1 max-w-[220px] text-sm text-white/70">Review identity, security, preferences, and help.</p>
@@ -111,14 +119,22 @@ export default async function AccountHubPage() {
         </div>
       </div>
 
+      <Link href="/dashboard/affiliate" className="hub-card block rounded-2xl p-4">
+        <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Affiliate Program</p>
+        <p className="mt-1 font-bold">Affiliate Program</p>
+        <p className="text-sm text-zinc-400">Apply, share your disclosed link, and track who joins from it.</p>
+      </Link>
+
       <div className="space-y-2">
         <p className="px-1 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
           Messages & help
         </p>
-        {HELP.map((item) => (
+        <AccountInboxLink />
+        {HELP.filter((item) => item.href !== "/dashboard/messages").map((item) => (
           <Link key={item.href} href={item.href} className="hub-card flex items-center justify-between rounded-2xl px-4 py-3">
             <span className="flex items-center gap-2 font-medium">
-              <Bell className="h-4 w-4 text-primary" /> {item.label}
+              {item.href.includes("notifications") ? <Bell className="h-4 w-4" /> : <HelpCircle className="h-4 w-4" />}
+              {item.label}
             </span>
             <ChevronRight className="h-4 w-4 text-muted-foreground" />
           </Link>
@@ -130,35 +146,67 @@ export default async function AccountHubPage() {
           Rewards & progress
         </p>
         {tier ? (
-          <p className="px-1 text-sm text-muted-foreground">VIP · {tier.name}</p>
+          <Link href="/dashboard/vip" className="hub-card flex items-center justify-between rounded-2xl px-4 py-3">
+            <span className="flex items-center gap-2 font-semibold">
+              <Gift className="h-4 w-4 text-[#f4c64e]" /> {tier.name}
+            </span>
+            <span className="text-sm text-muted-foreground">
+              {nextTier ? `${xpToNext.toLocaleString()} XP to ${nextTier.name}` : "Top tier"}
+            </span>
+          </Link>
         ) : null}
         {PROGRESS.map((item) => (
           <Link key={item.href} href={item.href} className="hub-card flex items-center justify-between rounded-2xl px-4 py-3">
             <span className="flex items-center gap-2 font-medium">
-              <Gift className="h-4 w-4 text-primary" /> {item.label}
+              <item.icon className="h-4 w-4" /> {item.label}
             </span>
             <ChevronRight className="h-4 w-4 text-muted-foreground" />
           </Link>
         ))}
+        <Link href="/dashboard/referrals" className="hub-card block rounded-2xl border border-[#f4c64e]/40 p-4">
+          <p className="flex items-center gap-2 font-bold"><Gift className="h-4 w-4 text-[#f4c64e]" /> Refer & earn</p>
+          <p className="mt-1 text-sm font-semibold">Earn Freeplay when a friend qualifies</p>
+          <p className="text-sm text-zinc-400">Your friend gets Freeplay after both of you qualify.</p>
+        </Link>
       </div>
 
       <div className="space-y-2">
         <p className="px-1 text-xs font-semibold uppercase tracking-wider text-muted-foreground">Rules & app</p>
-        {LEGAL.map((item) => (
-          <Link key={item.label} href={item.href} className="block px-1 py-2 text-sm text-muted-foreground">
-            {item.label}
+        {RULES.filter((item) => !item.dot).map((item) => (
+          <Link key={item.label} href={item.href} className="hub-card flex items-center justify-between rounded-2xl px-4 py-3">
+            <span className="flex items-center gap-2 font-medium">
+              <item.icon className="h-4 w-4" /> {item.label}
+            </span>
+            <ChevronRight className="h-4 w-4 text-muted-foreground" />
           </Link>
         ))}
+        <WhatsNewLink />
       </div>
 
-      <Link href="/dashboard/referrals" className="hub-card block rounded-2xl p-4">
-        <p className="font-bold">Affiliate program</p>
-        <p className="text-sm text-zinc-400">Share your link and track who joins from it.</p>
+      <Link href="/help#video-help" className="hub-card block rounded-2xl p-4">
+        <p className="font-bold">Video help</p>
+        <p className="text-sm text-zinc-400">Wallet, Freeplay, game-load, and cash-out guides.</p>
+        <p className="mt-2 text-sm font-bold text-[#ff6b89]">Choose a guide · {6} videos</p>
       </Link>
 
-      <ProfilePreferences />
+      <details className="hub-card rounded-2xl px-4">
+        <summary className="flex cursor-pointer list-none items-center justify-between gap-3 py-3 [&::-webkit-details-marker]:hidden">
+          <span>
+            <span className="block font-bold">Preferences</span>
+            <span className="text-sm text-zinc-400">Theme, text size, sound and play settings</span>
+          </span>
+          <ChevronRight className="h-4 w-4 shrink-0 text-muted-foreground" />
+        </summary>
+        <ProfilePreferences />
+      </details>
 
-      <PlayerVideoGuides />
+      <Link href="/privacy" className="hub-card flex items-center justify-between rounded-2xl px-4 py-3">
+        <span>
+          <span className="block font-bold">Privacy & data</span>
+          <span className="text-sm text-zinc-400">Balance privacy, public activity and data export</span>
+        </span>
+        <ChevronRight className="h-4 w-4 text-muted-foreground" />
+      </Link>
 
       <SignOutButton />
     </MotionPage>

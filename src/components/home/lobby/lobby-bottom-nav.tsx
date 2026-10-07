@@ -2,10 +2,8 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Home, Gamepad2, Wallet, History } from "lucide-react";
-import { motion } from "framer-motion";
+import { Gamepad2, History, Home, Wallet } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { usePlayerMotion } from "@/lib/player-motion";
 
 const TABS = [
   { label: "Home", href: "/", icon: Home, match: (p: string) => p === "/" || p === "/home" },
@@ -20,7 +18,6 @@ const TABS = [
     href: "/dashboard/wallet",
     icon: Wallet,
     match: (p: string) =>
-      p === "/wallet" ||
       p.startsWith("/dashboard/wallet") ||
       p.startsWith("/dashboard/deposit") ||
       p.startsWith("/dashboard/withdraw"),
@@ -29,40 +26,35 @@ const TABS = [
     label: "Activity",
     href: "/dashboard/activity",
     icon: History,
-    match: (p: string) => p === "/activity" || p.startsWith("/dashboard/activity"),
+    match: (p: string) => p.startsWith("/dashboard/activity"),
   },
 ] as const;
 
 export function LobbyBottomNav() {
   const pathname = usePathname();
-  const { reduced } = usePlayerMotion();
 
   return (
-    <nav className="lobby-bottom-nav z-50 shrink-0" aria-label="Player navigation">
-      <div className="mx-auto flex max-w-[480px] items-center justify-around px-2 pb-[max(0.4rem,env(safe-area-inset-bottom))] pt-2">
-        {TABS.map(({ label, href, icon: Icon, match }) => {
-          const active = match(pathname);
-          return (
-            <Link
-              key={label}
-              href={href}
-              className={cn(
-                "relative flex min-w-[64px] flex-col items-center gap-0.5 rounded-full px-4 py-2 text-[11px] font-semibold",
-                active ? "text-white" : "text-zinc-400 hover:text-foreground"
-              )}
-            >
-              {active ? (
-                <motion.span
-                  layoutId={reduced ? undefined : "player-nav-pill"}
-                  className="hub-neon-pill absolute inset-0 rounded-full bg-primary"
-                  transition={{ type: "spring", stiffness: 380, damping: 32 }}
-                />
-              ) : null}
-              <Icon className="relative z-10 h-5 w-5" strokeWidth={active ? 2.4 : 1.85} />
-              <span className="relative z-10">{label}</span>
-            </Link>
-          );
-        })}
+    <nav className="lobby-bottom-nav z-30 shrink-0 lg:hidden" aria-label="Player navigation">
+      <div className="jg-bottom-nav mx-auto mb-3 w-[calc(100%-1.5rem)] max-w-[600px] overflow-hidden rounded-2xl">
+        <div className="grid grid-cols-4">
+          {TABS.map(({ label, href, icon: Icon, match }) => {
+            const active = match(pathname);
+            return (
+              <Link
+                key={label}
+                href={href}
+                aria-label={label}
+                className="relative grid min-h-[56px] place-items-center py-2 text-[11px] font-bold"
+              >
+                {active ? <span className="jg-nav-active-pill absolute inset-1.5 rounded-xl" /> : null}
+                <span className={cn("relative grid place-items-center gap-0.5", active ? "text-white" : "text-[#b9b3c6]")}>
+                  <Icon className="h-5 w-5" strokeWidth={active ? 2.4 : 2} />
+                  <span className="leading-none">{label}</span>
+                </span>
+              </Link>
+            );
+          })}
+        </div>
       </div>
     </nav>
   );

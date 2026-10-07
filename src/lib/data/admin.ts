@@ -207,6 +207,7 @@ export const ADMIN_MODULES = [
   { href: "/admin/reviews", label: "Reviews", icon: "Star", permission: "cms.manage", group: "Content" },
   { href: "/admin/notifications", label: "Broadcasts", icon: "Megaphone", permission: "notifications.broadcast", group: "Content" },
   { href: "/admin/newsletters", label: "Newsletters", icon: "Mail", permission: "newsletters.manage", group: "Content" },
+  { href: "/admin/marketing", label: "Marketing", icon: "Smartphone", permission: "cms.manage", group: "Content" },
   { href: "/admin/ai-blog", label: "AI Auto Blog", icon: "Sparkles", permission: "cms.manage", group: "AI Automation" },
   { href: "/admin/telegram", label: "Telegram Bot", icon: "Send", permission: "cms.manage", group: "AI Automation" },
   { href: "/admin/ai-bot", label: "AI Chatbot", icon: "Bot", permission: "support.manage", group: "AI Automation" },

@@ -3,15 +3,7 @@
 import { useMemo, useRef, useState } from "react";
 import Image from "next/image";
 import { useRouter } from "next/navigation";
-import {
-  Banknote,
-  Check,
-  Copy,
-  Download,
-  ExternalLink,
-  Loader2,
-  Upload,
-} from "lucide-react";
+import { Check, Copy, Download, ExternalLink, Loader2, Upload } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { submitDepositRequest } from "@/lib/actions/deposits";
 import { uploadDepositProofImage } from "@/lib/deposits/proof-upload";
@@ -129,20 +121,20 @@ export function GameDepositSection({ game, hideSectionAnchor }: GameDepositSecti
   return (
     <section
       id={hideSectionAnchor ? undefined : "deposit"}
-      className="rounded-2xl border border-white/10 bg-[#1a1a1a] p-4 sm:p-5 scroll-mt-24"
+      className="scroll-mt-24 space-y-4"
     >
-      <div className="flex items-center gap-2 mb-4">
-        <Banknote className="h-5 w-5 text-emerald-400" />
-        <h2 className="font-bold text-white">Deposit to {game.name}</h2>
-      </div>
-
       <DollarPayDepositSection gameSlug={game.slug} gameName={game.name} />
+
+      <div className="rounded-2xl border border-white/10 bg-[#24152e] p-4 sm:p-5">
+        <p className="text-[11px] font-black uppercase tracking-[0.16em] text-[#ff6b89]">Step 2 of 2</p>
+        <h2 className="mt-1 text-lg font-black">Send a manual payment</h2>
+        <p className="mt-1 text-sm text-[#b9b3c6]">For {game.name}. Upload a screenshot after you pay.</p>
 
       <p className="text-xs text-muted-foreground my-5">
         Or pay manually: send to a QR / handle below, then upload a screenshot. We credit {game.name} after verification.
       </p>
 
-      <div className="flex flex-wrap gap-2 mb-5">
+      <div className="grid gap-2">
         {DEPOSIT_PAYMENT_METHODS.map((m) => (
           <button
             key={m.id}
@@ -152,13 +144,14 @@ export function GameDepositSection({ game, hideSectionAnchor }: GameDepositSecti
               setQrError(false);
             }}
             className={cn(
-              "rounded-full px-3.5 py-1.5 text-xs font-semibold border transition-colors",
+              "flex min-h-14 items-center justify-between rounded-xl border px-4 text-left text-sm font-bold",
               selectedMethod === m.id
-                ? "bg-orange-500/20 border-orange-500/50 text-orange-300"
-                : "bg-white/5 border-white/10 text-muted-foreground hover:text-white hover:border-white/20"
+                ? "border-[#ff6b89] bg-[#ff6b89]/15 text-[#fcf9fb]"
+                : "border-white/10 bg-[#160812] text-[#b9b3c6]"
             )}
           >
-            {m.label}
+            <span>{m.label}</span>
+            <span className="text-xs font-semibold text-[#b9b3c6]">{m.username}</span>
           </button>
         ))}
       </div>
@@ -275,7 +268,7 @@ export function GameDepositSection({ game, hideSectionAnchor }: GameDepositSecti
           type="button"
           onClick={handleSubmit}
           disabled={submitting || !proofFile}
-          className="w-full flex items-center justify-center gap-2 rounded-xl py-4 px-6 text-base font-bold text-black bg-gradient-to-r from-emerald-400 to-teal-500 hover:opacity-95 transition-opacity disabled:opacity-50 disabled:cursor-not-allowed"
+          className="flex h-12 w-full items-center justify-center gap-2 rounded-xl bg-[#ff6b89] text-base font-bold text-[#0f172a] disabled:cursor-not-allowed disabled:opacity-50"
         >
           {submitting ? (
             <Loader2 className="h-5 w-5 animate-spin" />
@@ -284,6 +277,7 @@ export function GameDepositSection({ game, hideSectionAnchor }: GameDepositSecti
           )}
           Submit deposit proof
         </button>
+      </div>
       </div>
     </section>
   );

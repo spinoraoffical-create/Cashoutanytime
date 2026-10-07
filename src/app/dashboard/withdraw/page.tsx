@@ -16,7 +16,7 @@ export default async function DashboardWithdrawPage() {
   return (
     <div className="space-y-6 max-w-4xl mx-auto">
       <div>
-        <h1 className="text-2xl font-black text-foreground">💵 Withdraw & Cash Out Wallet</h1>
+        <h1 className="text-2xl font-black text-foreground">Cash out</h1>
         <p className="text-sm text-muted-foreground mt-1">
           Request instant cashouts from your game winnings directly to Cash App, USDT, PayPal, or Zelle.
         </p>
@@ -29,14 +29,14 @@ export default async function DashboardWithdrawPage() {
           </div>
 
           <div>
-            <h2 className="text-lg font-bold text-foreground">🛡️ KYC Verification Required Before Cashout</h2>
+            <h2 className="text-lg font-bold text-foreground">Verification required before cash out</h2>
             <p className="text-xs text-muted-foreground max-w-md mx-auto mt-1">
               To prevent bonus fraud and comply with age verification laws (18+), please upload your ID document before requesting your first withdrawal.
             </p>
           </div>
 
           <Link href="/dashboard/kyc" className="inline-block">
-            <Button className="bg-amber-500 text-black hover:bg-amber-400 font-bold px-6 py-5 rounded-xl text-sm gap-2">
+            <Button className="bg-[#f3264f] text-white hover:bg-[#b70d3a] font-bold px-6 py-5 rounded-xl text-sm gap-2">
               <ShieldCheck className="h-4 w-4" /> Complete KYC ID Verification Now <ArrowRight className="h-4 w-4" />
             </Button>
           </Link>
@@ -74,7 +74,7 @@ export default async function DashboardWithdrawPage() {
                   <span className="text-[11px] text-muted-foreground mt-0.5 block">Speed: {method.time}</span>
                 </div>
                 <Link href="/dashboard/games">
-                  <Button size="sm" className="bg-amber-500 text-black hover:bg-amber-400 font-bold text-xs">
+                  <Button size="sm" className="bg-[#f3264f] text-white hover:bg-[#b70d3a] font-bold text-xs">
                     Cash Out
                   </Button>
                 </Link>

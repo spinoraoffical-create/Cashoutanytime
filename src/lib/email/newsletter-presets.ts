@@ -1,6 +1,7 @@
 import { SITE_URL } from "@/lib/constants";
 
 import type { SimpleNewsletterInput } from "@/lib/email/newsletter-form";
+import type { NewsletterSegmentId } from "@/lib/email/newsletter-segments";
 import type { NewsletterVibe } from "@/lib/email/newsletter-templates";
 
 export type NewsletterPreset = {
@@ -8,239 +9,153 @@ export type NewsletterPreset = {
   label: string;
   description: string;
   vibe: NewsletterVibe;
+  suggestedSegment: Exclude<NewsletterSegmentId, "test">;
   values: Omit<SimpleNewsletterInput, "segment" | "name" | "vibe">;
 };
 
-const PROMO = `${SITE_URL}/promotions`;
 const DEPOSIT = `${SITE_URL}/dashboard/deposit`;
-const SPIN = `${SITE_URL}/spin`;
 const VIP = `${SITE_URL}/dashboard/vip`;
-const REFERRALS = `${SITE_URL}/dashboard/referrals`;
-const LEADERBOARD = `${SITE_URL}/leaderboard`;
-const GAMES = `${SITE_URL}/games/juwa`;
+const PROMO = `${SITE_URL}/promotions`;
 
-/** Ready-made casino promo templates — pick one, tweak if needed, send. */
+/**
+ * Short lifecycle notes. Pick one, adjust a line if needed, then test-send.
+ * Suggested audiences match the moment — avoid using these as daily blasts.
+ */
 export const NEWSLETTER_PRESETS: NewsletterPreset[] = [
   {
-    id: "welcome-50",
-    label: "50% welcome bonus",
-    description: "Jackpot-style first deposit offer",
-    vibe: "jackpot",
+    id: "welcome",
+    label: "Welcome",
+    description: "One note for people who joined in the last 48 hours",
+    vibe: "gold",
+    suggestedSegment: "new_signups",
     values: {
-      template_id: "welcome-50",
-      subject: "JACKPOT: 50% bonus on your first deposit at Sweepstakes Hub",
-      eyebrow: "New player exclusive",
-      heading: "Double your first deposit — 50% extra credits",
-      subhead: "All 12 games. Zero codes. Instant wallet credit.",
+      template_id: "welcome",
+      subject: "Your Sweepstakes Hub account is ready",
+      eyebrow: "Welcome",
+      heading: "You're in",
+      subhead: "Play when you want. This is the only welcome email.",
       message:
-        "Your welcome bonus is locked and loaded. New Sweepstakes Hub players get <strong>50% extra</strong> on their first deposit — Fire Kirin, Juwa, Game Vault and the full lineup included.<br><br>Fund once, load any game, and you're in the action within minutes.",
-      cta_label: "Claim 50% bonus",
+        "Thanks for creating an account. Your wallet is ready whenever you want to play.\n\nOffer emails are easy to turn off in Notification settings.",
+      cta_label: "Open my account",
       cta_href: DEPOSIT,
-      stat1_value: "50%",
-      stat1_label: "Bonus",
-      stat2_value: "12",
-      stat2_label: "Games",
-      stat3_value: "2 min",
-      stat3_label: "Credit time",
+      stat1_value: "1",
+      stat1_label: "Welcome",
+      stat2_value: "You",
+      stat2_label: "Control it",
+      stat3_value: "Off",
+      stat3_label: "Anytime",
     },
   },
   {
-    id: "reload-weekend",
-    label: "Weekend reload bonus",
-    description: "Hot weekend deposit boost",
-    vibe: "fire",
+    id: "first-deposit",
+    label: "First deposit reminder",
+    description: "One nudge for accounts that have never deposited",
+    vibe: "gold",
+    suggestedSegment: "never_deposited",
     values: {
-      template_id: "reload-weekend",
-      subject: "Weekend heat: reload bonus on every deposit",
-      eyebrow: "Weekend special",
-      heading: "Stack credits all weekend long",
-      subhead: "VIP tiers unlock up to 15% reload — automatically.",
+      template_id: "first-deposit",
+      subject: "Your first deposit is still open",
+      eyebrow: "When you're ready",
+      heading: "No rush",
+      subhead: "A completed deposit is what unlocks play. One reminder, then we leave it.",
       message:
-        "The weekend table is open. Every deposit earns a <strong>reload bonus</strong> stacked on your usual credits — higher VIP tiers get a bigger cut, no forms to fill.<br><br>Load up and hit your favorite fish table or slot before the weekend closes.",
-      cta_label: "Reload & play",
+        "You have an account and haven't deposited yet. When you want to play, add funds from your wallet and you're set.\n\nIf you'd rather not get offer emails, turn them off in Notification settings.",
+      cta_label: "Review deposit",
       cta_href: DEPOSIT,
-      stat1_value: "15%",
-      stat1_label: "Max reload",
-      stat2_value: "VIP",
-      stat2_label: "Tier boost",
-      stat3_value: "Instant",
-      stat3_label: "Credit",
+      stat1_value: "1",
+      stat1_label: "Reminder",
+      stat2_value: "You",
+      stat2_label: "Choose",
+      stat3_value: "Off",
+      stat3_label: "Anytime",
     },
   },
   {
-    id: "happy-hour",
-    label: "Happy hour +20%",
-    description: "Urgent limited-time fire promo",
+    id: "reload",
+    label: "Reload",
+    description: "A single reload note for people who deposited recently",
     vibe: "fire",
+    suggestedSegment: "deposited_14d",
     values: {
-      template_id: "happy-hour",
-      subject: "HAPPY HOUR LIVE: +20% on every deposit right now",
-      eyebrow: "Limited time only",
-      heading: "Happy hour is ON — grab +20% extra",
-      subhead: "Every deposit boosted for the next few hours only.",
+      template_id: "reload",
+      subject: "A reload is available on your next deposit",
+      eyebrow: "Recent players",
+      heading: "Reload when you want",
+      subhead: "For players who deposited in the last two weeks.",
       message:
-        "Clock's ticking. For a short window, <strong>every Sweepstakes Hub deposit</strong> gets an extra 20% on top of your normal bonus.<br><br>Fire Kirin, Juwa, Orion Stars — load credits now and ride the happy hour wave.",
-      cta_label: "Grab +20% now",
+        "Your last deposit is on file. If you want to add more, the usual reload applies on the next one — nothing to enter.\n\nWe send this occasionally, not every day.",
+      cta_label: "Add funds",
       cta_href: DEPOSIT,
-      stat1_value: "+20%",
-      stat1_label: "Extra",
-      stat2_value: "HOT",
-      stat2_label: "Limited",
-      stat3_value: "12",
-      stat3_label: "Games",
-    },
-  },
-  {
-    id: "daily-spin",
-    label: "Free daily spin",
-    description: "Daily wheel reminder",
-    vibe: "jackpot",
-    values: {
-      template_id: "daily-spin",
-      subject: "Your FREE spin is waiting — don't miss today's prize",
-      eyebrow: "Daily jackpot wheel",
-      heading: "Spin free. Win coins & XP.",
-      subhead: "One free spin every 24 hours — resets at midnight.",
-      message:
-        "Today's free spin is sitting on the wheel waiting for you. Land <strong>bonus coins, XP boosts</strong> and more — completely free.<br><br>Log in before midnight to keep your streak alive.",
-      cta_label: "Spin the wheel",
-      cta_href: SPIN,
-      stat1_value: "FREE",
-      stat1_label: "Daily spin",
-      stat2_value: "24h",
-      stat2_label: "Reset",
-      stat3_value: "WIN",
-      stat3_label: "Prizes",
-    },
-  },
-  {
-    id: "refer-friends",
-    label: "Refer & earn",
-    description: "Referral rewards push",
-    vibe: "jackpot",
-    values: {
-      template_id: "refer-friends",
-      subject: "Invite friends — unlimited bonus credits for both of you",
-      eyebrow: "Referral rewards",
-      heading: "Your crew earns you real credits",
-      subhead: "Unlimited invites. Both players win on first deposit.",
-      message:
-        "Share your personal link — when a friend signs up and deposits, <strong>you both get bonus credits</strong> automatically. No codes, no cap on invites.<br><br>Your referral link is ready in the dashboard.",
-      cta_label: "Get referral link",
-      cta_href: REFERRALS,
-      stat1_value: "2×",
-      stat1_label: "Both win",
-      stat2_value: "∞",
-      stat2_label: "Invites",
-      stat3_value: "Auto",
-      stat3_label: "Payout",
-    },
-  },
-  {
-    id: "vip-climb",
-    label: "VIP tier boost",
-    description: "Luxury VIP progression promo",
-    vibe: "vip",
-    values: {
-      template_id: "vip-climb",
-      subject: "VIP alert: you're closer to the next tier",
-      eyebrow: "VIP lounge",
-      heading: "Level up. Multiply every win.",
-      subhead: "Silver → Elite. Up to 2× coin rewards at the top.",
-      message:
-        "Every claim and deposit pushes you toward the next VIP tier. Higher tiers mean <strong>bigger multipliers, fatter reload bonuses</strong> and priority support.<br><br>Check your progress — your next tier might be closer than you think.",
-      cta_label: "View VIP status",
-      cta_href: VIP,
-      stat1_value: "2×",
-      stat1_label: "Elite mult",
-      stat2_value: "5",
-      stat2_label: "VIP tiers",
-      stat3_value: "24/7",
-      stat3_label: "Concierge",
-    },
-  },
-  {
-    id: "trending-juwa",
-    label: "Juwa trending",
-    description: "Hot game spotlight",
-    vibe: "fire",
-    values: {
-      template_id: "trending-juwa",
-      subject: "Juwa is ON FIRE — #1 played game this week",
-      eyebrow: "Hot game alert",
-      heading: "Juwa is dominating the floor",
-      subhead: "Chain combos. Boss battles. Non-stop action.",
-      message:
-        "Juwa is the hottest game on Sweepstakes Hub right now. One-click account setup, instant wallet load, and you're in the middle of the action.<br><br>Your reload bonus applies on every deposit — stack credits and go.",
-      cta_label: "Play Juwa now",
-      cta_href: GAMES,
-      stat1_value: "#1",
-      stat1_label: "Trending",
-      stat2_value: "1-tap",
-      stat2_label: "Setup",
-      stat3_value: "Fish",
-      stat3_label: "Table",
-    },
-  },
-  {
-    id: "leaderboard",
-    label: "Leaderboard prizes",
-    description: "Competition / prize pool promo",
-    vibe: "jackpot",
-    values: {
-      template_id: "leaderboard",
-      subject: "Leaderboard prizes live — climb the ranks, win credits",
-      eyebrow: "Prize pool live",
-      heading: "Top players get paid this week",
-      subhead: "Bonus credits for the leaderboard elite.",
-      message:
-        "The weekly leaderboard is heating up. Every coin you earn moves you up the ranks — <strong>top spots take home bonus credits</strong> when the week closes.<br><br>Check your position and make your move before time runs out.",
-      cta_label: "Climb the board",
-      cta_href: LEADERBOARD,
-      stat1_value: "TOP",
-      stat1_label: "10 paid",
-      stat2_value: "7",
-      stat2_label: "Days left",
-      stat3_value: "LIVE",
-      stat3_label: "Now",
+      stat1_value: "14d",
+      stat1_label: "Window",
+      stat2_value: "1",
+      stat2_label: "Note",
+      stat3_value: "You",
+      stat3_label: "Decide",
     },
   },
   {
     id: "win-back",
-    label: "We miss you",
-    description: "Win-back / return player promo",
-    vibe: "fire",
+    label: "Inactive win-back",
+    description: "One note for players last seen 7–14 days ago",
+    vibe: "gold",
+    suggestedSegment: "inactive_7_14",
     values: {
       template_id: "win-back",
-      subject: "Your seat is saved — reload bonus waiting inside",
-      eyebrow: "Come back & play",
-      heading: "The table's still yours",
-      subhead: "VIP progress saved. Reload bonus on your next deposit.",
+      subject: "Your progress is saved",
+      eyebrow: "It's been a week",
+      heading: "Your place is still here",
+      subhead: "VIP progress stays on the account. Come back only if you want to.",
       message:
-        "We've been holding your spot. Log back in this week — your <strong>VIP progress is exactly where you left it</strong>, and a reload bonus kicks in on your next deposit.<br><br>Fire Kirin, Juwa and all 12 games are ready when you are.",
-      cta_label: "Return & claim bonus",
-      cta_href: PROMO,
+        "You haven't been in for a little while. Your progress is where you left it.\n\nThis is a single note for this quiet stretch, not a daily reminder.",
+      cta_label: "Return to my account",
+      cta_href: `${SITE_URL}/dashboard`,
+      stat1_value: "Saved",
+      stat1_label: "Progress",
+      stat2_value: "1",
+      stat2_label: "Note",
+      stat3_value: "You",
+      stat3_label: "Choose",
+    },
+  },
+  {
+    id: "vip-exclusive",
+    label: "VIP exclusive",
+    description: "A short note for VIP tiers only",
+    vibe: "vip",
+    suggestedSegment: "vip",
+    values: {
+      template_id: "vip-exclusive",
+      subject: "A note for VIP players",
+      eyebrow: "VIP",
+      heading: "For your tier",
+      subhead: "Silver and above. Not sent to the full player list.",
+      message:
+        "This note is only for players on a VIP tier. Your multiplier and reload rate stay tied to that tier.\n\nCheck your status when you have a minute — there is nothing you need to claim by tonight.",
+      cta_label: "View VIP status",
+      cta_href: VIP,
       stat1_value: "VIP",
-      stat1_label: "Saved",
-      stat2_value: "Reload",
-      stat2_label: "Bonus",
-      stat3_value: "12",
-      stat3_label: "Games",
+      stat1_label: "Only",
+      stat2_value: "You",
+      stat2_label: "Tier",
+      stat3_value: "Off",
+      stat3_label: "Anytime",
     },
   },
   {
     id: "custom",
     label: "Blank — write your own",
-    description: "Start from scratch",
+    description: "Start from scratch. Prefer a specific audience over everyone.",
     vibe: "gold",
+    suggestedSegment: "all",
     values: {
       template_id: "custom",
       subject: "",
-      eyebrow: "Sweepstakes Hub exclusive",
+      eyebrow: "Sweepstakes Hub",
       heading: "",
       subhead: "",
       message: "",
-      cta_label: "Play now",
+      cta_label: "Open account",
       cta_href: PROMO,
       stat1_value: "",
       stat1_label: "",
@@ -258,17 +173,17 @@ export function getNewsletterPreset(id: string): NewsletterPreset | undefined {
 
 export function presetToSimpleForm(
   presetId: string,
-  segment: "all" | "test" = "test"
+  segment?: NewsletterSegmentId
 ): SimpleNewsletterInput {
   const preset = getNewsletterPreset(presetId) ?? NEWSLETTER_PRESETS[0];
   return {
     ...preset.values,
     vibe: preset.vibe,
     name: preset.label,
-    segment,
+    segment: segment ?? preset.suggestedSegment,
   };
 }
 
-export function emptySimpleForm(segment: "all" | "test" = "test"): SimpleNewsletterInput {
-  return presetToSimpleForm("welcome-50", segment);
+export function emptySimpleForm(): SimpleNewsletterInput {
+  return presetToSimpleForm("welcome");
 }

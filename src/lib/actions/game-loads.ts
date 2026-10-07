@@ -398,6 +398,10 @@ export async function requestGameLoad(input: {
   } = await supabase.auth.getUser();
   if (!user) return { error: "Not authenticated" };
 
+  const { responsibleBlock } = await import("@/lib/responsible/play-guard");
+  const blocked = await responsibleBlock(input.amount);
+  if (blocked) return { error: blocked };
+
   if (!isWalletLoadEnabledForGame(input.gameSlug)) {
     return { error: "Wallet load is not enabled for this game yet." };
   }

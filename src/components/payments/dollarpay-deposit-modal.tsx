@@ -1,16 +1,7 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import {
-  CreditCard,
-  ExternalLink,
-  Flame,
-  Globe,
-  Loader2,
-  ShieldCheck,
-  Smartphone,
-  Zap,
-} from "lucide-react";
+import { useEffect, useState, type ReactNode } from "react";
+import { ExternalLink, Loader2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
 import { DEPOSITS_UNAVAILABLE, friendlyPlayerError } from "@/lib/player-safe-error";
@@ -35,24 +26,93 @@ interface PayMethod {
   amounts: string[];
 }
 
+function MethodMark({ name }: { name: string }) {
+  const n = name.toLowerCase();
+  if (n.includes("card") || n.includes("visa") || n.includes("debit")) {
+    return (
+      <span className="inline-flex h-8 items-center gap-1 rounded-md bg-white px-2 text-[11px] font-black tracking-wide text-[#1a1f71]">
+        VISA
+        <span className="text-[#eb001b]">●</span>
+        <span className="-ml-1.5 text-[#f79e1b]">●</span>
+      </span>
+    );
+  }
+  if (n.includes("google")) {
+    return (
+      <span className="inline-flex h-8 items-center rounded-md bg-white px-2 text-sm font-black text-[#4285F4]">
+        G Pay
+      </span>
+    );
+  }
+  if (n.includes("apple")) {
+    return (
+      <span className="inline-flex h-8 items-center rounded-md bg-black px-2 text-sm font-black text-white">
+        Pay
+      </span>
+    );
+  }
+  if (n.includes("chime")) {
+    return (
+      <span className="grid h-8 w-8 place-items-center rounded-md bg-[#1ec677] text-sm font-black text-white">
+        C
+      </span>
+    );
+  }
+  if (n.includes("cash")) {
+    return (
+      <span className="grid h-8 w-8 place-items-center rounded-md bg-[#00d632] text-sm font-black text-white">
+        $
+      </span>
+    );
+  }
+  if (n.includes("paypal")) {
+    return (
+      <span className="inline-flex h-8 items-center rounded-md bg-white px-2 text-sm font-black text-[#003087]">
+        PayPal
+      </span>
+    );
+  }
+  if (n.includes("light")) {
+    return (
+      <span className="grid h-8 w-8 place-items-center rounded-md bg-[#f7931a] text-sm font-black text-white">
+        ⚡
+      </span>
+    );
+  }
+  if (n.includes("bit") || n.includes("crypto")) {
+    return (
+      <span className="grid h-8 w-8 place-items-center rounded-md bg-[#f7931a] text-sm font-black text-white">
+        ₿
+      </span>
+    );
+  }
+  return (
+    <span className="inline-flex h-8 items-center rounded-md bg-white px-2 text-xs font-black text-[#24152e]">
+      {name.slice(0, 6)}
+    </span>
+  );
+}
+
 export function DollarPayDepositSection({
   gameSlug,
   gameName,
+  gamePicker,
 }: {
   userId?: string;
   gameSlug?: string;
   gameName?: string;
   onSuccess?: () => void;
+  gamePicker?: ReactNode;
 }) {
   const [methods, setMethods] = useState<PayMethod[]>([]);
   const [methodId, setMethodId] = useState("");
-  const [selectedAmount, setSelectedAmount] = useState("19.99");
+  const [selectedAmount, setSelectedAmount] = useState("");
+  const [step, setStep] = useState<1 | 2 | 3>(1);
   const [loadingMethods, setLoadingMethods] = useState(true);
   const [loading, setLoading] = useState(false);
 
-  const selected = methods.find((m) => m.id === methodId) ?? methods[0];
+  const selected = methods.find((m) => m.id === methodId);
   const amounts = selected?.amounts ?? [];
-  const featured = amounts.slice(0, 12);
 
   useEffect(() => {
     let cancelled = false;
@@ -62,10 +122,6 @@ export function DollarPayDepositSection({
         if (cancelled) return;
         const list: PayMethod[] = data.deposits || [];
         setMethods(list);
-        if (list[0]) {
-          setMethodId(list[0].id);
-          setSelectedAmount(list[0].amounts.includes("19.99") ? "19.99" : list[0].amounts[0]);
-        }
         if (data.error) toast.error(friendlyPlayerError(data.error, DEPOSITS_UNAVAILABLE));
       })
       .catch(() => {
@@ -78,14 +134,6 @@ export function DollarPayDepositSection({
       cancelled = true;
     };
   }, []);
-
-  function iconFor(value: string) {
-    const v = value.toLowerCase();
-    if (v.includes("apple")) return <Smartphone className="h-4 w-4 text-sky-400" />;
-    if (v.includes("google")) return <Globe className="h-4 w-4 text-amber-400" />;
-    if (v.includes("card")) return <CreditCard className="h-4 w-4 text-purple-400" />;
-    return <Zap className="h-4 w-4 text-emerald-400" />;
-  }
 
   async function handlePayNow() {
       if (!selected || !selectedAmount) {
@@ -161,139 +209,152 @@ export function DollarPayDepositSection({
     }
   }
 
+  const minAmount = amounts.length ? Math.min(...amounts.map(Number)) : 0;
+  const maxAmount = amounts.length ? Math.max(...amounts.map(Number)) : 0;
+  const floor = methods.reduce((low, method) => {
+    const mins = method.amounts.map(Number).filter((n) => Number.isFinite(n));
+    if (!mins.length) return low;
+    const methodMin = Math.min(...mins);
+    return low == null ? methodMin : Math.min(low, methodMin);
+  }, null as number | null);
+
+  const stepLabel = step === 1 ? "Choose payment method" : step === 2 ? "Enter amount" : "Confirm & pay";
+
   return (
-    <div className="rounded-2xl border border-[rgba(0,229,255,0.2)] bg-gradient-to-b from-[#12122b] to-[#0a0a18] p-4 sm:p-6 shadow-2xl relative overflow-hidden">
-      <div className="absolute -top-24 -right-24 w-48 h-48 bg-[#00E5FF]/10 rounded-full blur-3xl pointer-events-none" />
-      <div className="absolute -bottom-24 -left-24 w-48 h-48 bg-purple-500/10 rounded-full blur-3xl pointer-events-none" />
-
-      <div className="flex items-center justify-between mb-4 pb-3 border-b border-[rgba(0,229,255,0.1)]">
-        <div className="flex items-center gap-2.5">
-          <div className="p-2 rounded-xl bg-gradient-to-tr from-emerald-500/20 to-cyan-500/20 border border-emerald-500/30">
-            <Zap className="h-5 w-5 text-emerald-400 animate-pulse" />
+    <div className="space-y-4">
+      <div className="flex items-center gap-2">
+        {[1, 2, 3].map((n, index) => (
+          <div key={n} className="flex min-w-0 flex-1 items-center gap-2">
+            <span
+              className={cn(
+                "grid h-6 w-6 shrink-0 place-items-center rounded-full text-xs font-black",
+                step === n ? "bg-[#ff6b89] text-[#3a1020]" : "bg-white/10 text-[#b9b3c6]"
+              )}
+            >
+              {n}
+            </span>
+            {index < 2 ? <span className="h-px min-w-4 flex-1 bg-white/15" /> : null}
           </div>
-          <div>
-            <h3 className="font-bold text-white text-base sm:text-lg flex items-center gap-2">
-              Instant Automated Deposit
-              <span className="text-[10px] font-semibold uppercase px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">
-                Auto-Credit
-              </span>
-            </h3>
-            <p className="text-xs text-[#7af5ff]/70">
-              No receipt upload required. Your wallet is credited after payment.
-            </p>
-          </div>
-        </div>
+        ))}
       </div>
+      <p className="text-sm text-[#b9b3c6]">
+        Step {step} of 3 · {stepLabel}
+      </p>
 
-      <div className="mb-5">
-        <label className="text-xs font-semibold text-[#8b8dae] uppercase tracking-wider block mb-2">
-          Select Payment Method
-        </label>
-        {loadingMethods ? (
-          <div className="flex items-center gap-2 text-xs text-[#8b8dae] py-3">
-            <Loader2 className="h-4 w-4 animate-spin" /> Loading methods...
+      {step === 1 ? (
+        <div className="space-y-3">
+          {gamePicker}
+          <div className="flex items-end justify-between gap-3">
+            <p className="text-xs font-black uppercase tracking-[0.14em]">Choose a payment method</p>
+            <p className="text-xs text-[#b9b3c6]">from ${floor == null ? "0.00" : floor.toFixed(2)}</p>
           </div>
-        ) : (
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
-            {methods.map((m) => (
+          {loadingMethods ? (
+            <p className="flex items-center gap-2 text-sm text-[#b9b3c6]">
+              <Loader2 className="h-4 w-4 animate-spin" /> Loading methods...
+            </p>
+          ) : (
+            <div className="grid grid-cols-2 gap-3">
+              {methods.map((m) => {
+                const min = m.amounts.length ? Math.min(...m.amounts.map(Number)).toFixed(2) : "";
+                const on = selected?.id === m.id;
+                return (
+                  <button
+                    key={m.id}
+                    type="button"
+                    onClick={() => {
+                      setMethodId(m.id);
+                      setSelectedAmount("");
+                    }}
+                    className={cn(
+                      "rounded-2xl border px-3 py-3 text-left",
+                      on ? "border-[#ff6b89] bg-[#ff6b89]/10" : "border-white/10 bg-[#1a1024]"
+                    )}
+                  >
+                    <MethodMark name={m.name} />
+                    <span className="mt-3 block text-sm font-bold">{m.name}</span>
+                    <span className="mt-0.5 block text-xs text-[#b9b3c6]">
+                      {min ? `Min $${min}` : "Available"}
+                    </span>
+                  </button>
+                );
+              })}
+            </div>
+          )}
+          <button
+            type="button"
+            disabled={!selected}
+            onClick={() => setStep(2)}
+            className={cn(
+              "flex h-12 w-full items-center justify-center rounded-xl text-base font-bold",
+              selected
+                ? "bg-[#ff6b89] text-[#3a1020]"
+                : "cursor-not-allowed bg-[#2a1830] text-[#8d8498]"
+            )}
+          >
+            {selected ? "Continue →" : "Select a payment method"}
+          </button>
+        </div>
+      ) : null}
+
+      {step === 2 ? (
+        <div className="space-y-3">
+          <button type="button" onClick={() => setStep(1)} className="text-sm font-bold text-[#b9b3c6]">
+            ← Change payment method
+          </button>
+          <p className="text-sm font-bold">Step 2 of 3 · Enter amount</p>
+          <p className="text-xs text-[#b9b3c6]">
+            Min ${minAmount.toFixed(2)} · Max ${maxAmount.toFixed(2)}
+          </p>
+          <div className="grid grid-cols-3 gap-2 sm:grid-cols-4">
+            {amounts.map((amt) => (
               <button
-                key={m.id}
+                key={amt}
                 type="button"
-                onClick={() => {
-                  setMethodId(m.id);
-                  if (!m.amounts.includes(selectedAmount)) setSelectedAmount(m.amounts[0]);
-                }}
+                onClick={() => setSelectedAmount(amt)}
                 className={cn(
-                  "flex items-center justify-center gap-2 rounded-xl py-3 px-3 text-xs font-bold transition-all border",
-                  selected?.id === m.id
-                    ? "bg-gradient-to-r from-[rgba(0,229,255,0.15)] to-purple-500/20 border-[#00E5FF] text-white shadow-[0_0_15px_rgba(0,229,255,0.25)] scale-[1.02]"
-                    : "bg-[#0b0b1a] border-white/10 text-[#6b6d8f] hover:text-white hover:border-white/20"
+                  "h-11 rounded-xl border text-sm font-bold",
+                  selectedAmount === amt
+                    ? "border-[#ff6b89] bg-[#ff6b89] text-[#0f172a]"
+                    : "border-white/10 bg-[#160812] text-[#fcf9fb]"
                 )}
               >
-                {iconFor(m.value)}
-                <span>{m.name}</span>
+                $ {amt}
               </button>
             ))}
           </div>
-        )}
-      </div>
-
-      <div className="mb-6">
-        <div className="flex items-center justify-between mb-2">
-          <label className="text-xs font-semibold text-[#8b8dae] uppercase tracking-wider block">
-            Select Deposit Amount (USD)
-          </label>
-          <span className="text-[11px] text-amber-400 flex items-center gap-1 font-medium">
-            <Flame className="h-3.5 w-3.5" />
-            Supported Tiers
-          </span>
+          <button
+            type="button"
+            disabled={!selectedAmount}
+            onClick={() => setStep(3)}
+            className="flex h-12 w-full items-center justify-center rounded-xl bg-[#ff6b89] text-base font-bold text-[#0f172a] disabled:cursor-not-allowed disabled:opacity-40"
+          >
+            {selectedAmount ? `Pay $${selectedAmount} →` : "Continue — pay $0.00"}
+          </button>
         </div>
+      ) : null}
 
-        <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-6 gap-2">
-          {featured.map((amt) => (
-            <button
-              key={amt}
-              type="button"
-              onClick={() => setSelectedAmount(amt)}
-              className={cn(
-                "rounded-xl py-2.5 px-2 text-sm font-bold transition-all border text-center flex flex-col items-center justify-center",
-                selectedAmount === amt
-                  ? "bg-gradient-to-r from-emerald-500/20 to-teal-500/20 border-emerald-400 text-emerald-300 shadow-[0_0_12px_rgba(16,185,129,0.3)] scale-105"
-                  : "bg-[#0c0c1e] border-white/10 text-[#8b8dae] hover:text-white hover:border-white/20"
-              )}
-            >
-              <span className="text-xs text-gray-400 font-normal">$</span>
-              <span className="text-base">{amt}</span>
-            </button>
-          ))}
-        </div>
-
-        {amounts.length > 0 && (
-          <div className="mt-3">
-            <select
-              value={selectedAmount}
-              onChange={(e) => setSelectedAmount(e.target.value)}
-              className="w-full rounded-xl border border-white/10 bg-[#0c0c1e] px-3 py-2.5 text-xs text-white focus:outline-none focus:border-[#00E5FF]"
-            >
-              {amounts.map((amt) => (
-                <option key={amt} value={amt}>
-                  Deposit Tier: ${amt} USD
-                </option>
-              ))}
-            </select>
+      {step === 3 ? (
+        <div className="space-y-3">
+          <button type="button" onClick={() => setStep(2)} className="text-sm font-bold text-[#b9b3c6]">
+            ← Change amount
+          </button>
+          <p className="text-sm font-bold">Step 3 of 3 · Confirm & pay</p>
+          <div className="rounded-2xl border border-white/10 bg-[#160812] p-4 text-sm">
+            <p className="font-bold">{selected?.name}</p>
+            <p className="mt-1 text-[#b9b3c6]">{gameName ? `For ${gameName}` : "Wallet"}</p>
+            <p className="mt-3 text-2xl font-black">${selectedAmount}</p>
           </div>
-        )}
-      </div>
-
-      <div className="rounded-xl bg-[#090915] p-3.5 border border-white/5 mb-5 flex items-center justify-between text-xs">
-        <div className="flex items-center gap-2 text-gray-400">
-          <ShieldCheck className="h-4 w-4 text-emerald-400" />
-          <span>Automated Instant Credit</span>
+          <button
+            type="button"
+            onClick={handlePayNow}
+            disabled={loading || !selected || !selectedAmount}
+            className="flex h-12 w-full items-center justify-center gap-2 rounded-xl bg-[#ff6b89] text-base font-bold text-[#0f172a] disabled:opacity-50"
+          >
+            {loading ? <Loader2 className="h-5 w-5 animate-spin" /> : <ExternalLink className="h-5 w-5" />}
+            Pay ${selectedAmount || "0.00"}
+          </button>
         </div>
-        <div className="text-right">
-          <span className="text-gray-400 mr-1">Total:</span>
-          <span className="font-bold text-base text-emerald-400">${selectedAmount || "0.00"} USD</span>
-        </div>
-      </div>
-
-      <button
-        type="button"
-        onClick={handlePayNow}
-        disabled={loading || loadingMethods || !selected}
-        className="w-full flex items-center justify-center gap-2 rounded-xl py-4 px-6 text-base font-extrabold text-black bg-gradient-to-r from-emerald-400 via-teal-400 to-[#00E5FF] hover:opacity-95 transition-all shadow-[0_0_20px_rgba(0,229,255,0.3)] disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer active:scale-[0.99]"
-      >
-        {loading ? (
-          <>
-            <Loader2 className="h-5 w-5 animate-spin" />
-            Connecting to {selected?.name || "checkout"}...
-          </>
-        ) : (
-          <>
-            <ExternalLink className="h-5 w-5" />
-            Pay ${selectedAmount || "0.00"} via {selected?.name || "checkout"} Now
-          </>
-        )}
-      </button>
+      ) : null}
     </div>
   );
 }

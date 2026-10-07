@@ -201,6 +201,18 @@ export function UserMessagesInbox({
 
   const selectedConversation = conversations.find((c) => c.id === selectedId);
 
+  useEffect(() => {
+    function markAll() {
+      if (!supabase || !userId) return;
+      void Promise.all(conversations.map((conv) => markConversationReadClient(supabase, conv.id, userId))).then(() => {
+        setConversations((prev) => prev.map((conv) => ({ ...conv, unreadCount: 0 })));
+        void refreshUnread();
+      });
+    }
+    window.addEventListener("hub-mark-all-read", markAll);
+    return () => window.removeEventListener("hub-mark-all-read", markAll);
+  }, [conversations, refreshUnread, supabase, userId]);
+
   const loadConversations = useCallback(async () => {
     await ensureUserConversation();
     const list = await getUserConversations();
@@ -506,12 +518,7 @@ export function UserMessagesInbox({
             )}
           >
             <div className="flex flex-col flex-1 min-h-0 h-full overflow-hidden">
-              <div className="p-4 border-b border-white/10 shrink-0">
-                <h2 className="font-semibold text-white">Chats</h2>
-                <p className="text-xs text-muted-foreground">Your conversations</p>
-              </div>
-
-              <div className={`${CHAT_SCROLL_CLASS} p-2 space-y-1`}>
+              <div className={`${CHAT_SCROLL_CLASS} space-y-2 p-2`}>
               {conversations.length === 0 ? (
                 <p className="text-sm text-muted-foreground text-center py-8 px-4">
                   No chats yet. Start one with our support team below.
@@ -522,31 +529,18 @@ export function UserMessagesInbox({
                     key={conv.id}
                     type="button"
                     onClick={() => selectConversation(conv.id)}
-                    className={cn(
-                      "w-full text-left p-3 rounded-xl transition-colors border",
-                      selectedId === conv.id
-                        ? "bg-white/10 border-orange-500/30"
-                        : "border-transparent hover:bg-white/5"
-                    )}
+                    className="w-full rounded-2xl border border-white/10 bg-[#1a1024] px-4 py-3 text-left"
                   >
-                    <div className="flex items-center gap-3">
-                      <div className="w-11 h-11 rounded-full bg-gradient-to-br from-purple-600 to-orange-500 flex items-center justify-center shrink-0">
-                        <Headphones className="h-5 w-5 text-white" />
-                      </div>
-                      <div className="flex-1 min-w-0">
-                        <div className="flex items-center justify-between gap-2 mb-0.5">
-                          <span className="font-semibold text-sm text-white truncate">{conv.title}</span>
-                          {conv.lastMessageAt && (
-                            <span className="text-[10px] text-muted-foreground shrink-0">
-                              {formatRelativeTime(conv.lastMessageAt)}
-                            </span>
-                          )}
-                        </div>
-                        <div className="flex items-center justify-between gap-2">
-                          <p className="text-xs text-muted-foreground truncate flex-1">{conv.lastMessage}</p>
-                          <UnreadBadge count={conv.unreadCount} />
-                        </div>
-                      </div>
+                    <div className="flex items-start gap-2">
+                      {conv.unreadCount > 0 ? <span className="mt-1.5 h-2 w-2 shrink-0 rounded-full bg-[#f3264f]" /> : <span className="mt-1.5 h-2 w-2 shrink-0" />}
+                      <span className="min-w-0 flex-1">
+                        <span className="block font-bold">{conv.title || "New chat message"}</span>
+                        <span className="mt-1 block truncate text-sm text-[#b9b3c6]">{conv.lastMessage}</span>
+                        {conv.lastMessageAt ? (
+                          <span className="mt-1 block text-xs text-[#b9b3c6]">{formatRelativeTime(conv.lastMessageAt)}</span>
+                        ) : null}
+                      </span>
+                      <UnreadBadge count={conv.unreadCount} />
                     </div>
                   </button>
                 ))

@@ -9,9 +9,11 @@ import { cn } from "@/lib/utils";
 
 export function MobileBottomNav() {
   const pathname = usePathname();
+  const [mounted, setMounted] = useState(false);
   const [isLoggedIn, setIsLoggedIn] = useState(false);
 
   useEffect(() => {
+    setMounted(true);
     const supabase = createClient();
     if (!supabase) return;
     void supabase.auth.getUser().then(({ data: { user } }) => {
@@ -26,7 +28,7 @@ export function MobileBottomNav() {
     return () => subscription.unsubscribe();
   }, []);
 
-  if (isLoggedIn) return null;
+  if (!mounted || isLoggedIn) return null;
   if (pathname.startsWith("/login") || pathname.startsWith("/register")) return null;
 
   const navItems = [

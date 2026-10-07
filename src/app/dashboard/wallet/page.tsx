@@ -13,6 +13,7 @@ import { Button } from "@/components/ui/button";
 import { ClaimVerifyBanner } from "@/components/player/claim-verify-banner";
 import { MotionPage } from "@/components/player/motion-page";
 import { WalletBalanceCard } from "@/components/player/wallet-balance-card";
+import { DepositPageClient } from "@/components/dashboard/deposit-page-client";
 
 export const metadata: Metadata = { title: "Wallet | Sweepstakes Hub" };
 
@@ -63,7 +64,14 @@ export default async function WalletPage() {
         />
       ) : null}
 
-      <WalletBalanceCard main={main} cash={cash} freeplay={freeplay} />
+      <WalletBalanceCard
+        main={main}
+        cash={cash}
+        freeplay={freeplay}
+        name={(row?.full_name as string | undefined) || "Player"}
+      />
+
+      <DepositPageClient embedded />
 
       <Link
         href="/dashboard/activity"

@@ -3,6 +3,7 @@ import { createPaydoraDeposit } from "@/lib/payments/paydora";
 import { createClient } from "@/lib/supabase/server";
 import { checkRateLimit, clientIp, rateLimitUserMessage } from "@/lib/rate-limit";
 import { playerPaymentError } from "@/lib/player-safe-error";
+import { responsibleBlock } from "@/lib/responsible/play-guard";
 
 export async function POST(req: Request) {
   try {
@@ -30,6 +31,10 @@ export async function POST(req: Request) {
     }
     if (!Number.isFinite(amount) || amount <= 0) {
       return NextResponse.json({ error: "Choose a deposit amount." }, { status: 400 });
+    }
+    const blocked = await responsibleBlock(amount);
+    if (blocked) {
+      return NextResponse.json({ error: blocked }, { status: 403 });
     }
 
     const ip = clientIp(req);

@@ -395,6 +395,8 @@ export type NotificationPreferences = {
   email_referrals: boolean;
   email_support: boolean;
   email_announcements: boolean;
+  sms_marketing: boolean;
+  whatsapp_marketing: boolean;
   inapp_rewards: boolean;
   inapp_promotions: boolean;
   inapp_vip: boolean;
@@ -774,7 +776,16 @@ export type TelegramPromoMessage = {
   created_at: string;
 };
 
-export type NewsletterCampaignSegment = "all" | "test";
+export type NewsletterCampaignSegment =
+  | "all"
+  | "test"
+  | "new_signups"
+  | "never_deposited"
+  | "deposited_7d"
+  | "deposited_14d"
+  | "deposited_30d"
+  | "inactive_7_14"
+  | "vip";
 export type NewsletterCampaignStatus =
   | "draft"
   | "scheduled"

@@ -41,7 +41,6 @@ const nextConfig: NextConfig = {
       { source: "/inbox", destination: "/dashboard/messages", permanent: false },
       { source: "/affiliate", destination: "/dashboard/referrals", permanent: false },
       { source: "/rewards", destination: "/dashboard/rewards", permanent: false },
-      { source: "/help", destination: "/support", permanent: false },
     ];
   },
   experimental: {

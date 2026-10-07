@@ -1,4 +1,5 @@
 import type { NewsletterCampaign } from "@/lib/database.types";
+import { isNewsletterSegment, type NewsletterSegmentId } from "@/lib/email/newsletter-segments";
 import type { NewsletterVibe } from "@/lib/email/newsletter-templates";
 import { presetToSimpleForm } from "@/lib/email/newsletter-presets";
 
@@ -21,11 +22,11 @@ export type SimpleNewsletterInput = {
   stat2_label: string;
   stat3_value: string;
   stat3_label: string;
-  segment: "all" | "test";
+  segment: NewsletterSegmentId;
 };
 
 export function campaignToSimpleForm(c?: NewsletterCampaign): SimpleNewsletterInput {
-  if (!c) return presetToSimpleForm("welcome-50", "test");
+  if (!c) return presetToSimpleForm("welcome");
 
   return {
     template_id: "custom",
@@ -44,7 +45,7 @@ export function campaignToSimpleForm(c?: NewsletterCampaign): SimpleNewsletterIn
     stat2_label: c.stat2_label ?? "",
     stat3_value: c.stat3_value ?? "",
     stat3_label: c.stat3_label ?? "",
-    segment: c.segment === "test" ? "test" : "all",
+    segment: isNewsletterSegment(c.segment) ? c.segment : "all",
   };
 }
 

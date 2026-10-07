@@ -2,8 +2,11 @@
 
 import { useEffect } from "react";
 import { LobbyTopBar } from "@/components/home/lobby/lobby-top-bar";
+import { LobbyDesktopHeader } from "@/components/home/lobby/lobby-desktop-header";
+import { LobbyDesktopSidebar } from "@/components/home/lobby/lobby-desktop-sidebar";
 import { LobbyBottomNav } from "@/components/home/lobby/lobby-bottom-nav";
 import { EnterFloorSplash } from "@/components/player/enter-floor-splash";
+import { BreakReminder } from "@/components/player/break-reminder";
 
 export function LobbyAppShell({ children }: { children: React.ReactNode }) {
   useEffect(() => {
@@ -14,15 +17,20 @@ export function LobbyAppShell({ children }: { children: React.ReactNode }) {
   }, []);
 
   return (
-    <div className="flex h-screen flex-col overflow-hidden bg-[#07060c]">
+    <div className="jg-stage flex h-[100dvh] min-h-0 w-full overflow-hidden bg-[#030b26] lg:min-h-screen">
       <EnterFloorSplash />
-      <div className="lobby-layout mx-auto flex min-h-0 w-full max-w-[480px] flex-1 flex-col">
+      <BreakReminder />
+      <LobbyDesktopSidebar />
+      <div className="flex min-h-0 min-w-0 flex-1 flex-col">
+        <LobbyDesktopHeader />
         <LobbyTopBar />
-        <div className="lobby-scroll min-h-0 flex-1 overflow-x-hidden overflow-y-auto scrollbar-hide px-4 pb-28 pt-3">
-          {children}
+        <div className="jg-inside-main min-h-0 flex-1 overflow-x-hidden overflow-y-auto">
+          <div className="mx-auto w-full max-w-[1280px] px-4 pb-6 pt-4 lg:px-6 lg:pb-10 lg:pt-6">
+            {children}
+          </div>
         </div>
+        <LobbyBottomNav />
       </div>
-      <LobbyBottomNav />
     </div>
   );
 }

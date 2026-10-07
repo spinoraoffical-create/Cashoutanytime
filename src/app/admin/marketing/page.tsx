@@ -3,23 +3,26 @@ import type { Metadata } from "next";
 import { AdminPageHeader } from "@/components/admin/admin-page-header";
 import { AdminPromoGeneratorCard } from "@/components/admin/admin-promo-generator-card";
 import { AdminPlayerFollowupCard } from "@/components/admin/admin-player-followup-card";
-import { requirePermission } from "@/lib/data/admin";
+import { can, requirePermission } from "@/lib/data/admin";
+import { getConsentedPhoneOutreach } from "@/lib/data/admin-phone-outreach";
 
-export const metadata: Metadata = { title: "Non-Coder Marketing Hub" };
+export const metadata: Metadata = { title: "Marketing" };
 
 export default async function AdminMarketingPage() {
-  await requirePermission("cms.manage");
+  const staff = await requirePermission("cms.manage");
+  const canViewPhones = can(staff, "users.manage");
+  const outreach = canViewPhones ? await getConsentedPhoneOutreach() : null;
 
   return (
     <div className="mx-auto max-w-7xl space-y-6">
       <AdminPageHeader
-        title="Non-Coder Marketing & Player Follow-Up Hub"
-        description="Generate 1-click promo codes, deposit match vouchers, and zero-cost automated email & WhatsApp follow-up campaigns."
+        title="Marketing"
+        description="Promo codes, plus one-to-one phone follow-ups for players who opted in. Email campaigns are sent from Newsletters."
       />
 
       <AdminPromoGeneratorCard />
 
-      <AdminPlayerFollowupCard />
+      <AdminPlayerFollowupCard canView={canViewPhones} outreach={outreach} />
     </div>
   );
 }

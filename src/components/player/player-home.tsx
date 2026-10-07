@@ -9,6 +9,7 @@ import type { Game } from "@/lib/games";
 import type { PublicPromotion } from "@/lib/data/promotions-public";
 import { ClaimVerifyBanner } from "@/components/player/claim-verify-banner";
 import { WalletSnapshot } from "@/components/player/wallet-snapshot";
+import { useLobbyProfile } from "@/components/home/lobby/use-lobby-profile";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { usePlayerMotion } from "@/lib/player-motion";
@@ -17,8 +18,8 @@ import { MotionPage } from "@/components/player/motion-page";
 function RoomCard({ game, tap }: { game: Game; tap?: { scale: number } }) {
   return (
     <motion.div whileTap={tap} className="shrink-0">
-      <Link href={`/games/${game.slug}`} className="hub-card block w-[168px] overflow-hidden rounded-2xl">
-        <div className="relative h-28 w-full bg-white/5">
+      <Link href={`/games/${game.slug}`} className="hub-card block w-40 overflow-hidden rounded-3xl transition hover:-translate-y-0.5">
+        <div className="relative h-44 w-full bg-white/5">
           <Image src={game.image} alt="" fill className="object-cover" />
           {game.popular ? (
             <span className="absolute left-2 top-2 rounded-full bg-[#f5c542] px-2 py-0.5 text-[9px] font-bold uppercase text-zinc-950">
@@ -60,6 +61,7 @@ export function PlayerHome({
   const [catalog, setCatalog] = useState<"rooms" | "instant">("rooms");
   const [hideVerify, setHideVerify] = useState(false);
   const { stagger, tap } = usePlayerMotion();
+  const { displayName } = useLobbyProfile();
 
   const filtered = useMemo(() => {
     let rows = rooms;
@@ -84,22 +86,29 @@ export function PlayerHome({
         <ClaimVerifyBanner href={verify.href} title={verify.title} body={verify.body} />
       ) : null}
 
+      <div>
+        <p className="text-base text-[#fff9fb]">Welcome, {displayName}</p>
+        <h1 className="mt-1 text-4xl font-black leading-10">Home</h1>
+      </div>
+
       <div className="flex items-center gap-2">
         <button
           type="button"
           onClick={() => setShowSearch((v) => !v)}
-          className="flex h-11 w-11 items-center justify-center rounded-full bg-white/8"
+          className="grid h-11 w-11 shrink-0 place-items-center rounded-2xl bg-[#24152e] text-[#fcf9fb]"
           aria-label="Search games"
         >
           <Search className="h-4 w-4" />
         </button>
-        <div className="flex flex-1 rounded-full bg-[#1c1830] p-1">
+        <div className="flex h-[50px] flex-1 rounded-[15px] bg-white/[0.055] p-0.5">
           <button
             type="button"
             onClick={() => setCatalog("rooms")}
             className={cn(
-              "flex-1 rounded-full py-2.5 text-sm font-bold",
-              catalog === "rooms" ? "bg-[#f5c542] text-zinc-950" : "text-zinc-400"
+              "flex-1 rounded-[11px] text-sm font-extrabold",
+              catalog === "rooms"
+                ? "bg-[linear-gradient(#ffe38a,#f4c64e)] text-[#241608]"
+                : "text-[#e9e6f0]/70"
             )}
           >
             Game Rooms
@@ -108,8 +117,10 @@ export function PlayerHome({
             type="button"
             onClick={() => setCatalog("instant")}
             className={cn(
-              "flex-1 rounded-full py-2.5 text-sm font-semibold",
-              catalog === "instant" ? "bg-[#f5c542] text-zinc-950" : "text-zinc-300"
+              "flex-1 rounded-[11px] text-sm font-extrabold",
+              catalog === "instant"
+                ? "bg-[linear-gradient(#ffe38a,#f4c64e)] text-[#241608]"
+                : "text-[#e9e6f0]/70"
             )}
           >
             Instant Games
@@ -133,21 +144,21 @@ export function PlayerHome({
           <p className="mt-2 text-sm text-zinc-400">
             Instant play is not on this floor. Game Rooms are ready — load credits, then redeem winnings back to your wallet.
           </p>
-          <Button type="button" className="mt-4 rounded-full bg-[#f5c542] font-bold text-zinc-950 hover:bg-[#f5c542]/90" onClick={() => setCatalog("rooms")}>
+          <Button type="button" className="mt-4 rounded-full bg-[#f3264f] font-bold text-white hover:bg-[#b70d3a]" onClick={() => setCatalog("rooms")}>
             Back to Game Rooms
           </Button>
         </section>
       ) : (
         <section className="relative overflow-hidden rounded-[24px]">
-          <div className="relative h-48 w-full">
-            <Image src="/games/game-vault.webp" alt="" fill sizes="480px" className="object-cover" priority />
-            <div className="absolute inset-0 bg-gradient-to-r from-[#07060c] via-[#07060c]/80 to-[#07060c]/20" />
+          <div className="relative h-48 w-full lg:h-64">
+            <Image src="/games/game-vault.webp" alt="" fill sizes="(min-width: 1024px) 1100px, 100vw" className="object-cover" priority />
+            <div className="absolute inset-0 bg-gradient-to-r from-[#030b26] via-[#100914]/85 to-[#100914]/20" />
             <div className="absolute inset-0 flex items-end p-5">
               <div>
                 <h2 className="text-3xl font-extrabold">Game Rooms</h2>
                 <Link
                   href="/play"
-                  className="mt-3 inline-flex rounded-full bg-[#f5c542] px-4 py-2 text-sm font-bold text-zinc-950"
+                  className="mt-3 inline-flex rounded-full bg-[#f3264f] px-4 py-2 text-sm font-bold text-white"
                 >
                   Browse rooms →
                 </Link>
@@ -256,7 +267,7 @@ export function PlayerHome({
               See all →
             </Link>
           </div>
-          <div className="space-y-3">
+          <div className="grid gap-3 lg:grid-cols-2">
             {dailySpinEnabled ? (
               <Link href="/spin" className="hub-gold-edge hub-card block rounded-2xl p-4">
                 <p className="text-xs font-bold uppercase tracking-wider text-[#f5c542]">Daily</p>

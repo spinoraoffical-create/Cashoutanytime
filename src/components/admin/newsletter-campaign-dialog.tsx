@@ -31,7 +31,16 @@ import {
   simpleFormToCampaignPayload,
   type SimpleNewsletterInput,
 } from "@/lib/email/newsletter-form";
+import { previewNewsletterAudiencesAction } from "@/lib/actions/admin/newsletters";
 import { NEWSLETTER_PRESETS, presetToSimpleForm } from "@/lib/email/newsletter-presets";
+import {
+  isNewsletterSegment,
+  NEWSLETTER_SEGMENT_META,
+  NEWSLETTER_SEGMENTS,
+  segmentNeedsDeposits,
+  segmentNeedsProfileActivity,
+  type AudienceCounts,
+} from "@/lib/email/newsletter-segments";
 import { customCampaignEmail } from "@/lib/email/newsletter-templates";
 
 function statsFromForm(v: SimpleNewsletterInput) {
@@ -62,6 +71,9 @@ export function NewsletterCampaignDialog({
   const [values, setValues] = React.useState<SimpleNewsletterInput>(() =>
     campaignToSimpleForm(initial)
   );
+  const [audience, setAudience] = React.useState<Record<string, AudienceCounts> | null>(null);
+  const [audienceWarnings, setAudienceWarnings] = React.useState<string[]>([]);
+  const [audiencePending, setAudiencePending] = React.useState(false);
 
   React.useEffect(() => {
     if (open) {
@@ -70,10 +82,28 @@ export function NewsletterCampaignDialog({
     }
   }, [open, initial]);
 
+  React.useEffect(() => {
+    if (!open) return;
+    let cancelled = false;
+    setAudiencePending(true);
+    void previewNewsletterAudiencesAction().then((result) => {
+      if (cancelled) return;
+      setAudiencePending(false);
+      if (!result.ok) {
+        setAudience(null);
+        setAudienceWarnings([result.error]);
+        return;
+      }
+      setAudience(result.counts);
+      setAudienceWarnings(result.warnings);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [open]);
+
   function applyTemplate(templateId: string) {
-    setValues((prev) => ({
-      ...presetToSimpleForm(templateId, prev.segment),
-    }));
+    setValues(presetToSimpleForm(templateId));
   }
 
   function submit(e: React.FormEvent) {
@@ -132,7 +162,9 @@ export function NewsletterCampaignDialog({
         <DialogHeader>
           <DialogTitle>{title}</DialogTitle>
           <p className="text-sm text-muted-foreground">
-            Pick a template, tweak the message if you want, then send a test.
+            Pick a short template and a specific audience. Save the draft, then use Test send
+            before Schedule or Send now. Suspended players and anyone who turned off promotional
+            email are always left out.
           </p>
         </DialogHeader>
         <div className="grid gap-6 lg:grid-cols-[minmax(300px,1fr)_340px]">
@@ -181,21 +213,52 @@ export function NewsletterCampaignDialog({
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="nl-segment">Who receives this?</Label>
+              <Label htmlFor="nl-segment">Audience</Label>
               <Select
                 value={values.segment}
-                onValueChange={(v) =>
-                  setValues((prev) => ({ ...prev, segment: v === "test" ? "test" : "all" }))
-                }
+                onValueChange={(v) => {
+                  if (!isNewsletterSegment(v)) return;
+                  setValues((prev) => ({ ...prev, segment: v }));
+                }}
               >
                 <SelectTrigger id="nl-segment" className="w-full">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="test">Test — send to my email only</SelectItem>
-                  <SelectItem value="all">All signed-up players (opted in)</SelectItem>
+                  {NEWSLETTER_SEGMENTS.map((segment) => (
+                    <SelectItem key={segment} value={segment}>
+                      {NEWSLETTER_SEGMENT_META[segment].label}
+                    </SelectItem>
+                  ))}
                 </SelectContent>
               </Select>
+              <p className="text-xs text-muted-foreground">
+                {NEWSLETTER_SEGMENT_META[values.segment].hint}{" "}
+                {NEWSLETTER_SEGMENT_META[values.segment].cadence}
+              </p>
+              {audiencePending ? (
+                <p className="text-xs text-muted-foreground">Counting this audience…</p>
+              ) : audience?.[values.segment] ? (
+                <p className="text-xs text-muted-foreground">
+                  Will receive this: {audience[values.segment].eligible.toLocaleString()}. Opted out
+                  of promo email: {audience[values.segment].optedOut.toLocaleString()}. Suspended,
+                  excluded: {audience[values.segment].suspended.toLocaleString()}.
+                  {audience[values.segment].noEmail > 0
+                    ? ` No email on file: ${audience[values.segment].noEmail.toLocaleString()}.`
+                    : ""}
+                </p>
+              ) : null}
+              {audienceWarnings
+                .filter((warning) => {
+                  if (segmentNeedsDeposits(values.segment)) return warning.toLowerCase().includes("deposit");
+                  if (segmentNeedsProfileActivity(values.segment)) return warning.toLowerCase().includes("activity");
+                  return false;
+                })
+                .map((warning) => (
+                  <p key={warning} className="text-xs text-destructive">
+                    {warning}
+                  </p>
+                ))}
             </div>
 
             <Button

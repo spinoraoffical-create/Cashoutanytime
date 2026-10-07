@@ -18,7 +18,11 @@ create table public.newsletter_campaigns (
   stat2_label       text,
   stat3_value       text,
   stat3_label       text,
-  segment           text not null default 'all' check (segment in ('all', 'test')),
+  segment           text not null default 'all' check (segment in (
+    'all', 'test', 'new_signups', 'never_deposited',
+    'deposited_7d', 'deposited_14d', 'deposited_30d',
+    'inactive_7_14', 'vip'
+  )),
   status            text not null default 'draft' check (status in ('draft', 'scheduled', 'sending', 'sent', 'failed')),
   scheduled_at      timestamptz,
   sent_at           timestamptz,

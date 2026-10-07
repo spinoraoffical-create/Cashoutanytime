@@ -12,6 +12,16 @@ import {
 } from "@/lib/actions/admin/core";
 import { customCampaignEmail } from "@/lib/email/newsletter-templates";
 import {
+  previewNewsletterAudiences,
+  resolveNewsletterRecipients,
+} from "@/lib/email/newsletter-audience";
+import {
+  isNewsletterSegment,
+  NEWSLETTER_SEGMENTS,
+  type AudienceCounts,
+  type NewsletterSegmentId,
+} from "@/lib/email/newsletter-segments";
+import {
   htmlToPlainText,
   promoEmailFooterPlain,
   promoEmailHeaders,
@@ -34,7 +44,7 @@ const campaignSchema = z.object({
   stat2_label: z.string().trim().max(30).optional().default(""),
   stat3_value: z.string().trim().max(30).optional().default(""),
   stat3_label: z.string().trim().max(30).optional().default(""),
-  segment: z.enum(["all", "test"]),
+  segment: z.enum(NEWSLETTER_SEGMENTS),
 });
 
 export async function upsertNewsletterCampaignAction(
@@ -67,7 +77,17 @@ export async function upsertNewsletterCampaignAction(
     ? await db.from("newsletter_campaigns").update(payload).eq("id", input.id)
     : await db.from("newsletter_campaigns").insert(payload);
 
-  if (result.error) return { ok: false, error: "Could not save the campaign." };
+  if (result.error) {
+    const message = result.error.message ?? "";
+    if (/segment|check constraint/i.test(message)) {
+      return {
+        ok: false,
+        error:
+          "That audience is not enabled in the database yet. Apply the newsletter segments migration, then try again.",
+      };
+    }
+    return { ok: false, error: "Could not save the campaign." };
+  }
 
   await writeAudit({
     actorId: auth.staff.userId,
@@ -133,34 +153,24 @@ export async function scheduleNewsletterCampaignAction(
     return { ok: false, error: "Only draft campaigns can be scheduled." };
   }
 
-  const admin = adminDb();
-  let recipients: { user_id: string; email: string }[] = [];
+  const segment: NewsletterSegmentId = isNewsletterSegment(campaign.segment)
+    ? campaign.segment
+    : "all";
+  if (segment === "test" && !auth.staff.email) {
+    return { ok: false, error: "Your account has no email on file." };
+  }
 
-  if (campaign.segment === "test") {
-    if (!auth.staff.email) return { ok: false, error: "Your account has no email on file." };
-    recipients = [{ user_id: auth.staff.userId, email: auth.staff.email }];
-  } else {
-    const { data: bannedRows } = await admin.from("profiles").select("id").eq("is_suspended", true);
-    const bannedSet = new Set((bannedRows ?? []).map((r) => r.id));
-
-    const { data: optOutRows } = await admin
-      .from("notification_preferences")
-      .select("user_id")
-      .eq("email_promotions", false);
-    const optOutSet = new Set((optOutRows ?? []).map((r) => r.user_id));
-
-    let page = 1;
-    const perPage = 1000;
-    for (;;) {
-      const { data, error } = await admin.auth.admin.listUsers({ page, perPage });
-      if (error || !data?.users?.length) break;
-      for (const u of data.users) {
-        if (!u.email || bannedSet.has(u.id) || optOutSet.has(u.id)) continue;
-        recipients.push({ user_id: u.id, email: u.email });
-      }
-      if (data.users.length < perPage) break;
-      page += 1;
-    }
+  let recipients: { user_id: string; email: string }[];
+  try {
+    recipients = await resolveNewsletterRecipients(db, segment, {
+      userId: auth.staff.userId,
+      email: auth.staff.email,
+    });
+  } catch (err) {
+    return {
+      ok: false,
+      error: err instanceof Error ? err.message : "Could not build this audience.",
+    };
   }
 
   if (recipients.length === 0) {
@@ -193,7 +203,7 @@ export async function scheduleNewsletterCampaignAction(
     action: "newsletter_campaign.schedule",
     entityType: "newsletter_campaign",
     entityId: id,
-    after: { scheduled_at: when, total_recipients: recipients.length, segment: campaign.segment },
+    after: { scheduled_at: when, total_recipients: recipients.length, segment },
   });
 
   // Kick off the first batch after the response is sent so "Send Now"
@@ -215,6 +225,122 @@ function sleep(ms: number) {
 }
 
 type CampaignStat = { value: string; label: string };
+
+type CampaignContent = {
+  subject: string;
+  eyebrow: string;
+  heading: string;
+  subhead: string;
+  body: string;
+  cta_label: string;
+  cta_href: string;
+  stat1_value: string | null;
+  stat1_label: string | null;
+  stat2_value: string | null;
+  stat2_label: string | null;
+  stat3_value: string | null;
+  stat3_label: string | null;
+};
+
+function buildCampaignEmail(campaign: CampaignContent) {
+  const stats = (
+    [
+      campaign.stat1_value && campaign.stat1_label
+        ? { value: campaign.stat1_value, label: campaign.stat1_label }
+        : null,
+      campaign.stat2_value && campaign.stat2_label
+        ? { value: campaign.stat2_value, label: campaign.stat2_label }
+        : null,
+      campaign.stat3_value && campaign.stat3_label
+        ? { value: campaign.stat3_value, label: campaign.stat3_label }
+        : null,
+    ] as (CampaignStat | null)[]
+  ).filter((s): s is CampaignStat => s !== null);
+
+  const { subject, html } = customCampaignEmail({
+    subject: campaign.subject,
+    eyebrow: campaign.eyebrow,
+    heading: campaign.heading,
+    subhead: campaign.subhead,
+    body: campaign.body,
+    stats: stats.length ? stats : undefined,
+    cta: { label: campaign.cta_label, href: campaign.cta_href },
+  });
+
+  return {
+    subject,
+    html,
+    text: htmlToPlainText(html) + promoEmailFooterPlain(),
+  };
+}
+
+export type NewsletterAudiencePreview = {
+  ok: true;
+  counts: Record<NewsletterSegmentId, AudienceCounts>;
+  warnings: string[];
+};
+
+/** Live eligible / opted-out / suspended counts for the campaign dialog. */
+export async function previewNewsletterAudiencesAction(): Promise<
+  NewsletterAudiencePreview | { ok: false; error: string }
+> {
+  const auth = await authorize("newsletters.manage");
+  if ("error" in auth) return { ok: false, error: auth.error };
+
+  try {
+    const preview = await previewNewsletterAudiences(adminDb());
+    return { ok: true, ...preview };
+  } catch {
+    return { ok: false, error: "Audience counts are unavailable right now." };
+  }
+}
+
+/**
+ * Sends one copy to the signed-in staff email. Does not change campaign
+ * status or write recipient rows, so the draft can still be scheduled.
+ */
+export async function sendNewsletterTestAction(id: string): Promise<AdminActionResult> {
+  const auth = await authorize("newsletters.manage");
+  if ("error" in auth) return { ok: false, error: auth.error };
+  if (!auth.staff.email) return { ok: false, error: "Your account has no email on file." };
+
+  const resend = getResend();
+  if (!resend) return { ok: false, error: "RESEND_API_KEY is not configured." };
+
+  const db = adminDb();
+  const { data: campaign } = await db
+    .from("newsletter_campaigns")
+    .select("*")
+    .eq("id", id)
+    .maybeSingle();
+  if (!campaign) return { ok: false, error: "Campaign not found." };
+  if (campaign.status !== "draft") {
+    return { ok: false, error: "Only a draft can be test-sent." };
+  }
+
+  const message = buildCampaignEmail(campaign);
+  const { error } = await resend.emails.send({
+    from: FROM,
+    to: auth.staff.email,
+    replyTo: PROMO_REPLY_TO,
+    subject: message.subject,
+    html: message.html,
+    text: message.text,
+    headers: promoEmailHeaders(),
+    tags: [{ name: "category", value: "promo-test" }],
+  });
+  if (error) return { ok: false, error: error.message };
+
+  await writeAudit({
+    actorId: auth.staff.userId,
+    action: "newsletter_campaign.test_send",
+    entityType: "newsletter_campaign",
+    entityId: id,
+    after: { to: auth.staff.email },
+  });
+
+  return { ok: true, message: `Test sent to ${auth.staff.email}. The campaign is still a draft.` };
+}
 
 /**
  * Sends up to `limit` pending recipients for a campaign. Shared by
@@ -264,31 +390,7 @@ export async function processCampaignBatch(campaignId: string, limit = BATCH_SIZ
     return { sent: 0, failed: 0, remaining: 0 };
   }
 
-  const stats = (
-    [
-      campaign.stat1_value && campaign.stat1_label
-        ? { value: campaign.stat1_value, label: campaign.stat1_label }
-        : null,
-      campaign.stat2_value && campaign.stat2_label
-        ? { value: campaign.stat2_value, label: campaign.stat2_label }
-        : null,
-      campaign.stat3_value && campaign.stat3_label
-        ? { value: campaign.stat3_value, label: campaign.stat3_label }
-        : null,
-    ] as (CampaignStat | null)[]
-  ).filter((s): s is CampaignStat => s !== null);
-
-  const { subject, html } = customCampaignEmail({
-    subject: campaign.subject,
-    eyebrow: campaign.eyebrow,
-    heading: campaign.heading,
-    subhead: campaign.subhead,
-    body: campaign.body,
-    stats: stats.length ? stats : undefined,
-    cta: { label: campaign.cta_label, href: campaign.cta_href },
-  });
-
-  const text = htmlToPlainText(html) + promoEmailFooterPlain();
+  const { subject, html, text } = buildCampaignEmail(campaign);
 
   let sent = 0;
   let failed = 0;

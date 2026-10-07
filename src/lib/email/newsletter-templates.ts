@@ -169,11 +169,11 @@ function newsletterShell(opts: NewsletterOpts) {
                 <a href="${opts.cta.href}" style="display:inline-block;color:#1a0f00;font-weight:900;text-decoration:none;padding:18px 40px;border-radius:999px;font-size:15px;text-transform:uppercase;letter-spacing:0.08em;border:2px solid ${v.accentBright};">${opts.cta.label} →</a>
               </td></tr>
             </table>
-            <p style="margin:14px 0 0;font-size:11px;color:${MUTED};">Instant credit · 12 games · 24/7 support</p>
+            <p style="margin:14px 0 0;font-size:11px;color:${MUTED};">Sent occasionally. Unsubscribe any time.</p>
           </td></tr>
           <!-- Footer -->
           <tr><td style="padding:20px 24px;border-top:1px solid ${BORDER};background:${BG};">
-            <p style="margin:0;font-size:11px;line-height:1.5;color:${MUTED};">You're receiving this because you have a ${SITE_NAME} account. <a href="${SITE_URL}/dashboard/settings" style="color:${v.accentBright};">Manage email preferences</a> · reply "unsubscribe" to opt out.</p>
+            <p style="margin:0;font-size:11px;line-height:1.5;color:${MUTED};">You're receiving this because you have a ${SITE_NAME} account and promotional email is on. <a href="${SITE_URL}/dashboard/notifications" style="color:${v.accentBright};">Turn off offer emails</a>.</p>
           </td></tr>
         </table>
         <p style="margin:14px 0 0;font-size:10px;color:#666;">© ${new Date().getFullYear()} ${SITE_NAME} · Play responsibly · ${SITE_URL.replace(/^https?:\/\//, "")}</p>
@@ -372,14 +372,22 @@ export function inferNewsletterVibe(fields: {
   template_id?: string;
 }): NewsletterVibe {
   const id = fields.template_id ?? "";
-  if (id === "vip-climb") return "vip";
-  if (id === "happy-hour" || id === "reload-weekend" || id === "trending-juwa" || id === "win-back")
+  if (id === "vip-climb" || id === "vip-exclusive") return "vip";
+  if (
+    id === "happy-hour" ||
+    id === "reload-weekend" ||
+    id === "reload" ||
+    id === "trending-juwa" ||
+    id === "win-back"
+  )
     return "fire";
   if (
     id === "daily-spin" ||
     id === "leaderboard" ||
     id === "refer-friends" ||
-    id === "welcome-50"
+    id === "welcome-50" ||
+    id === "welcome" ||
+    id === "first-deposit"
   )
     return "jackpot";
 

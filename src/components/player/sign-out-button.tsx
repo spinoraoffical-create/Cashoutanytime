@@ -3,8 +3,9 @@
 import { useState } from "react";
 import { logoutUser } from "@/lib/auth/logout";
 import { toast } from "sonner";
+import { cn } from "@/lib/utils";
 
-export function SignOutButton() {
+export function SignOutButton({ className }: { className?: string }) {
   const [busy, setBusy] = useState(false);
 
   async function onClick() {
@@ -21,7 +22,10 @@ export function SignOutButton() {
       type="button"
       onClick={() => void onClick()}
       disabled={busy}
-      className="w-full rounded-2xl border border-white/10 bg-white/5 py-3 text-sm font-semibold text-muted-foreground hover:text-foreground"
+      className={cn(
+        "w-full rounded-2xl border border-white/10 bg-white/5 py-3 text-sm font-semibold text-muted-foreground hover:text-foreground",
+        className
+      )}
     >
       {busy ? "Signing out…" : "Sign out"}
     </button>

@@ -3,27 +3,13 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import Image from "next/image";
 import { useRouter } from "next/navigation";
-import {
-  Download,
-  Info,
-  MessageCircle,
-  Sparkles,
-  UserPlus,
-} from "lucide-react";
+import { ArrowLeft, ChevronDown, ChevronRight } from "lucide-react";
 import Link from "next/link";
 import { CreateGameAccountModal } from "@/components/games/create-game-account-modal";
+import { GameWalletLoadSection } from "@/components/games/game-wallet-load-section";
 import { createClient } from "@/lib/supabase/client";
 import { getMyGameAccount } from "@/lib/actions/game-loads";
-import {
-  GAME_BONUS_RULES,
-  getOtherGames,
-  UPCOMING_GAME_MESSAGE,
-  type Game,
-} from "@/lib/games";
-import { GameOtherGames } from "@/components/games/game-other-games";
-import { GameDepositSection } from "@/components/games/game-deposit-section";
-import { GameWalletLoadSection } from "@/components/games/game-wallet-load-section";
-import { cn } from "@/lib/utils";
+import { GAME_BONUS_RULES, UPCOMING_GAME_MESSAGE, type Game } from "@/lib/games";
 import { toast } from "sonner";
 
 interface GameLandingClientProps {
@@ -44,23 +30,13 @@ export function GameLandingClient({
 }: GameLandingClientProps) {
   const router = useRouter();
   const supabase = useMemo(() => createClient(), []);
-  const [showHowItWorks, setShowHowItWorks] = useState(false);
-  const howItWorksRef = useRef<HTMLDivElement>(null);
   const autoCreateAttempted = useRef(false);
-  const walletPanelRef = useRef<HTMLDivElement>(null);
   const [accountStatus, setAccountStatus] = useState<"loading" | "none" | "has">(
     initialGameAccount?.game_username ? "has" : "none"
   );
   const [resolvedAccount, setResolvedAccount] = useState(initialGameAccount ?? null);
   const [createOpen, setCreateOpen] = useState(false);
   const [reloadToken, setReloadToken] = useState(0);
-  const otherGames = getOtherGames(game.slug);
-
-  function openWalletPanel() {
-    setTimeout(() => {
-      walletPanelRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
-    }, 50);
-  }
 
   async function handleCreateAccount() {
     if (game.upcoming) {
@@ -78,10 +54,6 @@ export function GameLandingClient({
     }
 
     setCreateOpen(true);
-  }
-
-  function handleAccountChange(hasAccount: boolean) {
-    setAccountStatus(hasAccount ? "has" : "none");
   }
 
   useEffect(() => {
@@ -158,38 +130,14 @@ export function GameLandingClient({
     if (accountStatus === "loading") return;
     autoCreateAttempted.current = true;
 
-    if (walletLoadEnabled && accountStatus === "has") {
-      openWalletPanel();
-      return;
-    }
+    if (walletLoadEnabled && accountStatus === "has") return;
 
     void handleCreateAccount();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [autoCreate, walletLoadEnabled, accountStatus]);
 
-  function handleHowItWorks() {
-    setShowHowItWorks(true);
-    setTimeout(() => {
-      howItWorksRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
-    }, 50);
-  }
-
   const rules = GAME_BONUS_RULES;
-  const showWalletPanel = Boolean(walletLoadEnabled && !game.upcoming);
-  const hasAccount =
-    accountStatus === "has" || Boolean(resolvedAccount?.game_username);
-
-  const walletSection = showWalletPanel ? (
-    <div ref={walletPanelRef} className="scroll-mt-24">
-      <GameWalletLoadSection
-        game={game}
-        initialAccount={resolvedAccount}
-        onAccountChange={handleAccountChange}
-        mode={hasAccount ? "full" : "activity"}
-        reloadToken={reloadToken}
-      />
-    </div>
-  ) : null;
+  const hasAccount = accountStatus === "has" || Boolean(resolvedAccount?.game_username);
 
   const createModal = (
     <CreateGameAccountModal
@@ -200,286 +148,95 @@ export function GameLandingClient({
     />
   );
 
-  if (showWalletPanel && !hasAccount) {
-    return (
-      <div className="max-w-2xl mx-auto space-y-5 pb-8">
-        <section className="relative overflow-hidden rounded-2xl border border-white/10">
-          <div className={cn("absolute inset-0 bg-gradient-to-br opacity-90", game.gradient)} />
-          <div className="absolute inset-0 bg-gradient-to-t from-[#121212] via-[#121212]/50 to-transparent" />
-          <div className="relative p-5 sm:p-6 min-h-[140px] flex flex-col justify-end">
-            <h1 className="text-2xl sm:text-3xl font-bold text-white">{game.name}</h1>
-            <p className="mt-1 text-sm text-white/80">
+  return (
+    <div className="space-y-3 pb-8">
+      <div className="flex min-h-14 items-center gap-2.5">
+        <Link
+          href="/play"
+          aria-label="Back to games"
+          className="grid h-11 w-11 place-items-center rounded-2xl bg-[#24152e] text-[#fcf9fb]"
+        >
+          <ArrowLeft className="h-5 w-5" />
+        </Link>
+        <div className="relative h-11 w-11 shrink-0 overflow-hidden rounded-xl">
+          <Image src={game.image} alt="" fill className="object-cover" priority sizes="44px" />
+        </div>
+        <h1 className="min-w-0 truncate text-lg font-black">{game.name}</h1>
+      </div>
+
+      {game.upcoming ? (
+        <section className="rounded-2xl border border-white/10 bg-[#24152e] p-4">
+          <p className="text-sm font-semibold text-[#f4c64e]">{UPCOMING_GAME_MESSAGE}</p>
+        </section>
+      ) : null}
+
+      {!game.upcoming && hasAccount && resolvedAccount ? (
+        <GameWalletLoadSection
+          mode="owned"
+          game={game}
+          initialAccount={resolvedAccount}
+          reloadToken={reloadToken}
+        />
+      ) : null}
+
+      {!game.upcoming && !hasAccount ? (
+        <section className="overflow-hidden rounded-2xl border border-white/10 bg-[#24152e]">
+          <div className="p-4">
+            <h2 className="text-lg font-black">Start with {game.name}</h2>
+            <p className="mt-1 text-sm text-[#b9b3c6]">
               Create your game sign-in, then load funds when you&apos;re ready.
             </p>
-          </div>
-        </section>
-
-        {accountStatus === "loading" ? (
-          <p className="text-sm text-muted-foreground">Checking your game sign-in…</p>
-        ) : (
-          <>
             <button
               type="button"
               onClick={() => void handleCreateAccount()}
-              className="flex w-full items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-yellow-400 via-orange-400 to-red-500 px-6 py-4 text-base font-bold text-black shadow-lg shadow-orange-500/20"
+              className="mt-4 flex h-12 w-full items-center justify-center rounded-xl bg-[#ff6b89] text-base font-bold text-[#3a1020]"
             >
-              <UserPlus className="h-5 w-5" />
               Create game account
             </button>
-
-            <section className="rounded-2xl border border-white/10 bg-[#1a1a1a] p-4 sm:p-5 space-y-3">
-              <h2 className="font-bold text-white">Before you start</h2>
-              <ol className="space-y-2 text-sm text-muted-foreground">
-                <li>1. Create your game sign-in. It is free.</li>
-                <li>2. Download the app and sign in with the username and password shown here.</li>
-                <li>3. Load funds from your wallet when you are ready.</li>
-              </ol>
-              <a
-                href={game.downloadUrl}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="inline-flex items-center gap-2 text-sm font-semibold text-white underline"
-              >
-                <Download className="h-4 w-4" />
-                Download {game.name}
-              </a>
-            </section>
-
-            <section className="rounded-2xl border border-white/10 bg-[#1a1a1a] p-4 sm:p-5 space-y-4">
-              <div className="flex items-center gap-2">
-                <Sparkles className="h-5 w-5 text-violet-400" />
-                <h2 className="font-bold text-white">Rules &amp; game details</h2>
-              </div>
-              <div className="grid grid-cols-2 gap-3">
-                <div className="rounded-xl bg-[#242424] border border-white/5 p-4 text-center">
-                  <p className="text-xs text-muted-foreground mb-1">First time bonus</p>
-                  <p className="text-3xl font-bold text-emerald-400">{rules.firstTimeBonus}%</p>
-                </div>
-                <div className="rounded-xl bg-[#242424] border border-white/5 p-4 text-center">
-                  <p className="text-xs text-muted-foreground mb-1">Regular bonus</p>
-                  <p className="text-3xl font-bold text-teal-400">{rules.regularBonus}%</p>
-                </div>
-              </div>
-              <div className="flex flex-wrap gap-2">
-                <span className="inline-flex items-center rounded-full border border-white/10 bg-white/5 px-3 py-1.5 text-xs font-medium text-white">
-                  Load: ${rules.minDeposit} – ${rules.maxDeposit}
-                </span>
-                <span className="inline-flex items-center rounded-full border border-violet-500/30 bg-violet-500/10 px-3 py-1.5 text-xs font-medium text-violet-200">
-                  Redeem: {rules.redeemMin}x – {rules.redeemMax}x
-                </span>
-              </div>
-              <p className="text-sm text-muted-foreground leading-relaxed">{game.bio}</p>
-            </section>
-
-            <section className="rounded-2xl border border-white/10 bg-[#161616] p-4 sm:p-5 space-y-3">
-              <h2 className="font-bold text-white">Activity</h2>
-              {walletSection}
-            </section>
-
-            <section className="rounded-2xl border border-white/10 bg-[#1a1a1a] p-4 sm:p-5">
-              <h2 className="font-bold text-white">Get help</h2>
-              <p className="mt-1 text-sm text-muted-foreground">
-                Questions about {game.name}, payments, or your sign-in.
-              </p>
-              <Link
-                href="/support"
-                className="mt-3 inline-flex items-center gap-2 text-sm font-semibold text-white underline"
-              >
-                <MessageCircle className="h-4 w-4" />
-                Sweepstakes Hub support
-              </Link>
-            </section>
-          </>
-        )}
-
-        {createModal}
-        <GameOtherGames games={otherGames} />
-      </div>
-    );
-  }
-
-  return (
-    <div className="max-w-2xl mx-auto space-y-5 pb-8">
-      {/* Upcoming notice */}
-      {game.upcoming && (
-        <section className="rounded-2xl border border-amber-500/30 bg-amber-500/10 p-4 sm:p-5">
-          <p className="text-sm font-semibold text-amber-200 text-center">
-            {UPCOMING_GAME_MESSAGE}
-          </p>
+          </div>
+          <details className="border-t border-white/10">
+            <summary className="flex min-h-12 cursor-pointer list-none items-center justify-between px-4 text-sm font-bold text-[#b9b3c6] [&::-webkit-details-marker]:hidden">
+              Before you start
+              <ChevronDown className="h-4 w-4" />
+            </summary>
+            <p className="px-4 pb-4 text-sm leading-relaxed text-[#b9b3c6]">
+              Loads start at ${rules.minDeposit}. Move winnings after they reach {rules.redeemMin}× your latest load, up to {rules.redeemMax}×. First load bonus {rules.firstTimeBonus}%. Later loads {rules.regularBonus}%.
+            </p>
+          </details>
         </section>
-      )}
+      ) : null}
 
-      {/* Hero banner + game identity */}
-      <section className="relative overflow-hidden rounded-2xl border border-white/10">
-        <div className={cn("absolute inset-0 bg-gradient-to-br opacity-90", game.gradient)} />
-        <div
-          className="absolute inset-0 bg-cover bg-center opacity-30 mix-blend-overlay"
-          style={{ backgroundImage: `url(${game.image})` }}
-        />
-        <div className="absolute inset-0 bg-gradient-to-t from-[#121212] via-[#121212]/60 to-transparent" />
-
-        <div className="relative p-5 sm:p-6 flex items-end gap-4 min-h-[140px]">
-          <div className="relative h-20 w-20 sm:h-24 sm:w-24 shrink-0 rounded-2xl overflow-hidden border-2 border-white/20 shadow-xl">
-            <Image
-              src={game.image}
-              alt={game.name}
-              fill
-              className="object-cover"
-              priority
-              sizes="96px"
-            />
-          </div>
-          <div className="min-w-0 pb-1">
-            <h1 className="text-2xl sm:text-3xl font-bold text-white truncate">{game.name}</h1>
-            <p className="text-sm text-white/70 mt-0.5">{game.category}</p>
-          </div>
+      <details open className="overflow-hidden rounded-2xl border border-white/10 bg-[#1a1024]">
+        <summary className="flex min-h-14 cursor-pointer list-none items-center justify-between px-4 text-sm font-black [&::-webkit-details-marker]:hidden">
+          Rules &amp; game details
+          <ChevronDown className="h-4 w-4 text-[#b9b3c6]" />
+        </summary>
+        <div className="space-y-3 px-4 pb-4 text-sm leading-relaxed text-[#b9b3c6]">
+          <p>
+            Loads start at <strong className="text-[#fcf9fb]">${rules.minDeposit}</strong>. Move winnings after they reach{" "}
+            <strong className="text-[#fcf9fb]">{rules.redeemMin}×</strong> your latest load, up to {rules.redeemMax}×.
+            First load bonus {rules.firstTimeBonus}%. Later loads {rules.regularBonus}%.
+          </p>
+          <p>{game.bio}</p>
         </div>
-      </section>
+      </details>
 
-      {/* Account panel — first thing after hero when wallet load is enabled */}
-      {walletSection}
+      <Link href="/dashboard/activity" className="flex min-h-14 items-center justify-between border-b border-white/10 py-3 text-sm">
+        <span className="font-bold">Activity</span>
+        <span className="flex items-center gap-1 text-[#b9b3c6]">
+          Loads and moved winnings
+          <ChevronRight className="h-4 w-4" />
+        </span>
+      </Link>
 
-      {/* Bonuses & Rules */}
-      <section className="rounded-2xl border border-white/10 bg-[#1a1a1a] p-4 sm:p-5">
-        <div className="flex items-center gap-2 mb-4">
-          <Sparkles className="h-5 w-5 text-violet-400" />
-          <h2 className="font-bold text-white">Bonuses &amp; Rules</h2>
-        </div>
+      <Link href="/support" className="flex min-h-14 items-center justify-between border-b border-white/10 py-3 text-sm">
+        <span className="font-bold">Get help</span>
+        <span className="flex items-center gap-1 text-[#b9b3c6]">
+          Talk to support
+          <ChevronRight className="h-4 w-4" />
+        </span>
+      </Link>
 
-        <div className="grid grid-cols-2 gap-3 mb-4">
-          <div className="rounded-xl bg-[#242424] border border-white/5 p-4 text-center">
-            <p className="text-xs text-muted-foreground mb-1">First Time Bonus</p>
-            <p className="text-3xl font-bold text-emerald-400">{rules.firstTimeBonus}%</p>
-          </div>
-          <div className="rounded-xl bg-[#242424] border border-white/5 p-4 text-center">
-            <p className="text-xs text-muted-foreground mb-1">Regular Bonus</p>
-            <p className="text-3xl font-bold text-teal-400">{rules.regularBonus}%</p>
-          </div>
-        </div>
-
-        <div className="flex flex-wrap gap-2">
-          <span className="inline-flex items-center rounded-full border border-white/10 bg-white/5 px-3 py-1.5 text-xs font-medium text-white">
-            Load: ${rules.minDeposit} – ${rules.maxDeposit}
-          </span>
-          <span className="inline-flex items-center rounded-full border border-violet-500/30 bg-violet-500/10 px-3 py-1.5 text-xs font-medium text-violet-200">
-            Redeem: {rules.redeemMin}x – {rules.redeemMax}x
-          </span>
-        </div>
-      </section>
-
-      {/* SEO bio */}
-      <section className="rounded-2xl border border-white/5 bg-[#161616] p-4 sm:p-5">
-        <h2 className="sr-only">About {game.name}</h2>
-        <p className="text-sm text-muted-foreground leading-relaxed">{game.bio}</p>
-      </section>
-
-      {/* Create Account — only when user has no game login yet */}
-      <section className="space-y-3">
-        {!hasAccount && accountStatus === "none" && (
-          <button
-            type="button"
-            onClick={handleCreateAccount}
-            className={cn(
-              "w-full flex items-center justify-center gap-2 rounded-xl py-4 px-6 text-base font-bold transition-opacity shadow-lg",
-              game.upcoming
-                ? "text-white/80 bg-[#2a2a2a] border border-white/10 cursor-not-allowed opacity-80"
-                : "text-black bg-gradient-to-r from-yellow-400 via-orange-400 to-red-500 hover:opacity-95 shadow-orange-500/20"
-            )}
-          >
-            <UserPlus className="h-5 w-5" />
-            {game.upcoming ? "Coming Soon" : "Create Account"}
-          </button>
-        )}
-
-        <div className="grid grid-cols-2 gap-3">
-          <a
-            href={game.downloadUrl}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="flex items-center justify-center gap-2 rounded-xl py-3.5 px-4 text-sm font-semibold text-white bg-[#2a2a2a] border border-white/10 hover:border-white/20 hover:bg-[#333] transition-colors"
-          >
-            <Download className="h-4 w-4" />
-            Download App
-          </a>
-          <button
-            type="button"
-            onClick={handleHowItWorks}
-            className="flex items-center justify-center gap-2 rounded-xl py-3.5 px-4 text-sm font-semibold text-white bg-[#2a2a2a] border border-white/10 hover:border-white/20 hover:bg-[#333] transition-colors"
-          >
-            <Info className="h-4 w-4" />
-            How it works
-          </button>
-        </div>
-      </section>
-
-      {!game.upcoming && <GameDepositSection game={game} />}
-
-      {/* How it works (expandable) */}
-      {showHowItWorks && (
-        <div
-          ref={howItWorksRef}
-          className="rounded-2xl border border-orange-500/20 bg-[#1a1a1a] p-5 space-y-4 scroll-mt-24"
-        >
-          <h3 className="font-bold text-white">How to get started</h3>
-          {walletLoadEnabled ? (
-            <ol className="space-y-3 text-sm text-muted-foreground">
-              <li className="flex gap-3">
-                <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-orange-500/20 text-orange-400 text-xs font-bold">1</span>
-                <span>
-                  Tap <strong className="text-white">Create Account</strong> to open your {game.name} panel.
-                </span>
-              </li>
-              <li className="flex gap-3">
-                <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-orange-500/20 text-orange-400 text-xs font-bold">2</span>
-                <span>
-                  In the panel, create your game login — username and password appear instantly when ready.
-                </span>
-              </li>
-              <li className="flex gap-3">
-                <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-orange-500/20 text-orange-400 text-xs font-bold">3</span>
-                <span>
-                  Download the app, sign in with your credentials, then use <strong className="text-white">Load</strong> to move Sweepstakes Hub wallet credits into {game.name}.
-                </span>
-              </li>
-              <li className="flex gap-3">
-                <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-orange-500/20 text-orange-400 text-xs font-bold">4</span>
-                <span>
-                  Need more Sweepstakes Hub balance? Use the <strong className="text-white">Deposit</strong> section below for PayPal, Chime, Cash App, Bitcoin, or Venmo.
-                </span>
-              </li>
-            </ol>
-          ) : (
-            <ol className="space-y-3 text-sm text-muted-foreground">
-              <li className="flex gap-3">
-                <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-orange-500/20 text-orange-400 text-xs font-bold">1</span>
-                <span>
-                  Tap <strong className="text-white">Create Account</strong> to open your {game.name} panel.
-                </span>
-              </li>
-              <li className="flex gap-3">
-                <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-orange-500/20 text-orange-400 text-xs font-bold">2</span>
-                <span>
-                  Download the app with the button above, then use your login from the panel.
-                </span>
-              </li>
-              <li className="flex gap-3">
-                <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-orange-500/20 text-orange-400 text-xs font-bold">3</span>
-                <span>
-                  Use the <strong className="text-white">Deposit</strong> section to load funds — pick PayPal, Chime, Cash App, Bitcoin, or Venmo and upload your payment screenshot.
-                </span>
-              </li>
-              <li className="flex gap-3">
-                <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-orange-500/20 text-orange-400 text-xs font-bold">4</span>
-                <span>
-                  Redeem at {rules.redeemMin}x–{rules.redeemMax}x after loading from Total Deposit.
-                </span>
-              </li>
-            </ol>
-          )}
-        </div>
-      )}
-
-      <GameOtherGames games={otherGames} />
       {createModal}
     </div>
   );

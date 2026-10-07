@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import { useSearchParams } from "next/navigation";
 import Image from "next/image";
 import Link from "next/link";
 import { ChevronRight, Gamepad2, LayoutGrid, Search, SlidersHorizontal, Sparkles, Star } from "lucide-react";
@@ -19,7 +20,12 @@ export function PlayCatalog({ games }: { games: Game[] }) {
   const rooms = games.filter((g) => !g.upcoming);
   const [segment, setSegment] = useState<Segment>("all");
   const [chip, setChip] = useState<Chip>("all");
-  const [q, setQ] = useState("");
+  const searchParams = useSearchParams();
+  const [q, setQ] = useState(searchParams.get("q") ?? "");
+
+  useEffect(() => {
+    setQ(searchParams.get("q") ?? "");
+  }, [searchParams]);
   const [favs, setFavs] = useState<string[]>([]);
   const [showFilters, setShowFilters] = useState(false);
   const [category, setCategory] = useState("all");
@@ -67,18 +73,14 @@ export function PlayCatalog({ games }: { games: Game[] }) {
   return (
     <MotionPage className="space-y-4">
       <div>
-        <h1 className="flex items-center gap-2 text-3xl font-extrabold">
-          Play
-          <span className="rounded-full bg-white/10 px-2 py-0.5 text-sm font-bold text-zinc-400">
-            {rooms.length}
-          </span>
-        </h1>
-        <p className="mt-1 text-sm text-zinc-400">
-          Open a Game Room. Instant play uses a separate balance and is not on this floor.
+        <p className="text-xs font-black uppercase tracking-[0.16em] text-[#ff6b89]">Game Room catalog</p>
+        <h1 className="mt-1 text-4xl font-black leading-10">Find your game</h1>
+        <p className="mt-2 max-w-xl text-sm text-[#b9b3c6]">
+          Open a Game Room, or switch to Instant Games. Instant play is not on this floor.
         </p>
       </div>
 
-      <div className="flex rounded-full bg-[#1a1730] p-1">
+      <div className="grid grid-cols-3 gap-2 rounded-2xl bg-white/[0.04] p-1">
         {(
           [
             ["all", "All Games", LayoutGrid],
@@ -91,8 +93,8 @@ export function PlayCatalog({ games }: { games: Game[] }) {
             type="button"
             onClick={() => setSegment(id)}
             className={cn(
-              "flex flex-1 items-center justify-center gap-1.5 rounded-full py-2.5 text-xs font-semibold sm:text-sm",
-              segment === id ? "bg-[#2a2548] text-white" : "text-zinc-400"
+              "flex items-center justify-center gap-1.5 rounded-xl py-3 text-xs font-bold sm:text-sm",
+              segment === id ? "bg-[#24152d] text-[#f8fafc]" : "text-[#a3b0c2]"
             )}
           >
             <Icon className="h-3.5 w-3.5" />
@@ -106,7 +108,7 @@ export function PlayCatalog({ games }: { games: Game[] }) {
         <input
           value={q}
           onChange={(e) => setQ(e.target.value)}
-          placeholder="Search games, providers, categories"
+          placeholder="Search games"
           className="w-full bg-transparent text-sm outline-none placeholder:text-zinc-500"
         />
       </label>
@@ -118,7 +120,7 @@ export function PlayCatalog({ games }: { games: Game[] }) {
               ["all", "All"],
               ["popular", "Popular"],
               ["favorites", "Favorites"],
-              ["yours", "Yours"],
+              ["yours", "Owned"],
             ] as const
           ).map(([id, label]) => (
             <button
@@ -126,8 +128,8 @@ export function PlayCatalog({ games }: { games: Game[] }) {
               type="button"
               onClick={() => setChip(id)}
               className={cn(
-                "whitespace-nowrap rounded-full px-4 py-1.5 text-sm font-semibold",
-                chip === id ? "bg-white text-zinc-950" : "bg-white/8 text-zinc-300"
+                "h-11 whitespace-nowrap rounded-full px-4 text-sm font-semibold",
+                chip === id ? "bg-white text-[#140a19]" : "bg-[#2e1f38] text-[#a3b0c2]"
               )}
             >
               {label}
@@ -183,7 +185,7 @@ export function PlayCatalog({ games }: { games: Game[] }) {
         </p>
       ) : (
         <motion.div
-          className="grid grid-cols-2 gap-3"
+          className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5"
           initial="hidden"
           animate="show"
           variants={{
@@ -196,7 +198,7 @@ export function PlayCatalog({ games }: { games: Game[] }) {
               key={g.slug}
               variants={{ hidden: { opacity: 0, y: 12 }, show: { opacity: 1, y: 0 } }}
               whileTap={tap}
-              className="hub-card relative overflow-hidden rounded-2xl hover:shadow-[0_0_22px_rgba(255,45,85,0.28)]"
+              className="hub-card relative overflow-hidden rounded-2xl transition hover:-translate-y-0.5 hover:shadow-[0_16px_32px_-20px_rgba(243,38,79,0.7)]"
             >
               <button
                 type="button"
@@ -207,7 +209,7 @@ export function PlayCatalog({ games }: { games: Game[] }) {
                 <Star className={cn("h-3.5 w-3.5", favs.includes(g.slug) && "fill-[#f5c542] text-[#f5c542]")} />
               </button>
               <Link href={`/games/${g.slug}`} className="block">
-                <div className="relative h-28 w-full bg-white/5">
+                <div className="relative h-36 w-full bg-white/5 sm:h-40">
                   <Image src={g.image} alt="" fill className="object-cover" />
                   {g.popular ? (
                     <span className="absolute left-2 top-2 rounded bg-[#f5c542] px-1.5 py-0.5 text-[9px] font-bold uppercase text-zinc-950">
@@ -225,7 +227,7 @@ export function PlayCatalog({ games }: { games: Game[] }) {
                     <p className="truncate text-sm font-bold">{g.name}</p>
                     <p className="text-[11px] text-zinc-400">{g.category}</p>
                   </div>
-                  <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-primary text-white shadow-[0_0_12px_rgba(255,45,85,0.45)]">
+                  <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-[#f3264f] text-white shadow-[0_8px_18px_-10px_rgba(243,38,79,0.9)]">
                     <ChevronRight className="h-4 w-4" />
                   </span>
                 </div>

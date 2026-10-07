@@ -51,7 +51,7 @@ interface GameWalletLoadSectionProps {
     game_password: string | null;
   } | null;
   onAccountChange?: (hasAccount: boolean) => void;
-  mode?: "full" | "activity";
+  mode?: "full" | "activity" | "owned";
   reloadToken?: number;
 }
 
@@ -76,6 +76,7 @@ export function GameWalletLoadSection({
   const [customMode, setCustomMode] = useState(false);
   const [customUsername, setCustomUsername] = useState("");
   const [customPassword, setCustomPassword] = useState("");
+  const [ownedPanel, setOwnedPanel] = useState<"load" | "move" | "options" | null>(null);
   const [recentLoads, setRecentLoads] = useState<GameLoadRequest[]>([]);
   const [requesterName, setRequesterName] = useState<string | null>(null);
   const [requesterEmail, setRequesterEmail] = useState<string | null>(null);
@@ -589,40 +590,217 @@ export function GameWalletLoadSection({
     );
   }
 
-  return (
-    <section
-      className="relative overflow-hidden rounded-2xl p-5 space-y-5"
-      style={{
-        background: "linear-gradient(160deg, rgba(0,229,255,0.08) 0%, rgba(8,8,24,0.98) 35%, rgba(255,45,120,0.06) 100%)",
-        border: "1px solid rgba(0,229,255,0.28)",
-        boxShadow: "0 0 40px rgba(0,229,255,0.08), inset 0 1px 0 rgba(0,229,255,0.1)",
-      }}
-    >
-      <div
-        className="pointer-events-none absolute inset-0 opacity-[0.04]"
-        style={{
-          backgroundImage:
-            "linear-gradient(rgba(0,229,255,1) 1px, transparent 1px), linear-gradient(90deg, rgba(0,229,255,1) 1px, transparent 1px)",
-          backgroundSize: "22px 22px",
-        }}
-      />
+  if (mode === "owned" && hasSavedAccount && savedAccount) {
+    const balanceLabel =
+      lastKnownBalance !== null ? `$${lastKnownBalance.toFixed(2)}` : "—";
+    return (
+      <section className="overflow-hidden rounded-3xl border border-white/10 bg-[#24152e]">
+        <div className="space-y-3 border-b border-white/10 p-4">
+          <p className="text-sm font-black">Game login</p>
+          <div className="flex items-center justify-between gap-3 text-sm">
+            <span className="text-[#b9b3c6]">Username</span>
+            <span className="flex items-center gap-2 font-mono font-bold">
+              {savedAccount.game_username}
+              <button
+                type="button"
+                onClick={() => void copyText(savedAccount.game_username, "Username")}
+                className="text-xs font-bold text-[#ff6b89]"
+              >
+                Copy
+              </button>
+            </span>
+          </div>
+          <div className="flex items-center justify-between gap-3 text-sm">
+            <span className="text-[#b9b3c6]">Password</span>
+            <span className="flex items-center gap-2 font-mono font-bold">
+              {savedAccount.game_password || "Not stored"}
+              {savedAccount.game_password ? (
+                <button
+                  type="button"
+                  onClick={() => void copyText(savedAccount.game_password!, "Password")}
+                  className="text-xs font-bold text-[#ff6b89]"
+                >
+                  Copy
+                </button>
+              ) : null}
+            </span>
+          </div>
+          <button
+            type="button"
+            onClick={() => setOwnedPanel((v) => (v === "options" ? null : "options"))}
+            className="flex w-full items-center justify-between py-1 text-sm"
+          >
+            <span className="font-bold">Account options</span>
+            <span className="text-[#b9b3c6]">Reset or replace</span>
+          </button>
+          {ownedPanel === "options" ? (
+            <div className="space-y-2 rounded-xl border border-white/10 p-3">
+              {customMode ? (
+                <>
+                  <input
+                    value={customUsername}
+                    onChange={(e) =>
+                      setCustomUsername(
+                        e.target.value.replace(/[^a-zA-Z0-9]/g, "").slice(0, maxUsernameLenForGame(game.slug))
+                      )
+                    }
+                    placeholder="New username"
+                    className="w-full rounded-xl border border-white/10 bg-[#160812] px-3 py-2 text-sm outline-none"
+                  />
+                  <input
+                    value={customPassword}
+                    onChange={(e) => setCustomPassword(e.target.value.replace(/[^a-zA-Z0-9]/g, "").slice(0, 13))}
+                    placeholder="New password"
+                    className="w-full rounded-xl border border-white/10 bg-[#160812] px-3 py-2 text-sm outline-none"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => void handleCreateCustom()}
+                    disabled={creating || pendingCreate}
+                    className="h-11 w-full rounded-xl bg-[#ff6b89] text-sm font-bold text-[#3a1020] disabled:opacity-50"
+                  >
+                    {creating || pendingCreate ? "Replacing…" : "Replace with these"}
+                  </button>
+                </>
+              ) : (
+                <div className="grid grid-cols-2 gap-2">
+                  <button
+                    type="button"
+                    onClick={() => void handleCreateAccount()}
+                    disabled={creating || pendingCreate}
+                    className="h-11 rounded-xl border border-white/10 text-sm font-bold disabled:opacity-50"
+                  >
+                    {creating || pendingCreate ? "Working…" : "Replace login"}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setCustomMode(true)}
+                    className="h-11 rounded-xl border border-white/10 text-sm font-bold"
+                  >
+                    Choose my own
+                  </button>
+                </div>
+              )}
+            </div>
+          ) : null}
+        </div>
+        <div className="flex items-center justify-between border-b border-white/10 px-4 py-3">
+          <div>
+            <p className="text-sm font-bold">Game balance</p>
+            <p className="text-2xl font-black tabular-nums">{checkingBalance || pendingCheck ? "…" : balanceLabel}</p>
+          </div>
+          <button
+            type="button"
+            onClick={() => void handleCheckBalance()}
+            disabled={checkingBalance || pendingCheck}
+            className="text-sm font-bold text-[#ff6b89] disabled:opacity-50"
+          >
+            Refresh
+          </button>
+        </div>
+        <div className="space-y-3 p-4">
+          <div className="grid grid-cols-3 gap-2">
+            <button
+              type="button"
+              onClick={() => setOwnedPanel((v) => (v === "load" ? null : "load"))}
+              className="h-11 rounded-xl bg-[#ff6b89] text-sm font-bold text-[#3a1020]"
+            >
+              Load game
+            </button>
+            <a
+              href={game.downloadUrl}
+              target="_blank"
+              rel="noreferrer"
+              className="flex h-11 items-center justify-center rounded-xl border border-white/10 text-sm font-bold"
+            >
+              Play
+            </a>
+            <button
+              type="button"
+              onClick={() => setOwnedPanel((v) => (v === "move" ? null : "move"))}
+              className="h-11 rounded-xl border border-white/10 text-sm font-bold"
+            >
+              Move to Wallet
+            </button>
+          </div>
+          <p className="text-xs text-[#b9b3c6]">
+            Load from ${GAME_BONUS_RULES.minDeposit} · Wallet unlocks at {GAME_BONUS_RULES.redeemMin}×
+          </p>
+          {ownedPanel === "load" ? (
+            <div className="flex gap-2">
+              <input
+                type="number"
+                min={WALLET_LOAD_LIMITS.min}
+                max={WALLET_LOAD_LIMITS.max}
+                step="0.01"
+                value={amount}
+                onChange={(e) => setAmount(e.target.value)}
+                className="h-11 flex-1 rounded-xl border border-white/10 bg-[#160812] px-3 text-sm outline-none"
+              />
+              <button
+                type="button"
+                onClick={() => void handleLoad()}
+                disabled={loading || pendingLoad}
+                className="h-11 rounded-xl bg-[#ff6b89] px-4 text-sm font-bold text-[#3a1020] disabled:opacity-50"
+              >
+                {loading || pendingLoad ? "Loading…" : `Load $${amount || "0"}`}
+              </button>
+            </div>
+          ) : null}
+          {ownedPanel === "move" ? (
+            <div className="space-y-2">
+              <label className="flex items-center gap-2 text-sm">
+                <input type="checkbox" checked={redeemAll} onChange={(e) => setRedeemAll(e.target.checked)} />
+                Move the full game balance
+              </label>
+              {redeemAll ? null : (
+                <input
+                  type="number"
+                  min={WALLET_LOAD_LIMITS.min}
+                  step="0.01"
+                  value={redeemAmount}
+                  onChange={(e) => setRedeemAmount(e.target.value)}
+                  className="h-11 w-full rounded-xl border border-white/10 bg-[#160812] px-3 text-sm outline-none"
+                />
+              )}
+              <button
+                type="button"
+                onClick={() => void handleRedeem()}
+                disabled={redeeming || pendingRedeem}
+                className="h-11 w-full rounded-xl border border-[#ff6b89] text-sm font-bold text-[#ff6b89] disabled:opacity-50"
+              >
+                {redeeming || pendingRedeem ? "Moving…" : "Move to Wallet"}
+              </button>
+            </div>
+          ) : null}
+          <button
+            type="button"
+            onClick={() => void handleCheckBalance()}
+            className="text-left text-sm text-[#b9b3c6] underline"
+          >
+            Loaded but didn’t play? Check unused load
+          </button>
+        </div>
+      </section>
+    );
+  }
 
+  return (
+    <section className="relative space-y-5 overflow-hidden rounded-2xl border border-white/10 bg-[#24152e] p-5">
       <div className="relative z-10 flex items-center gap-2">
         <div
           className="flex h-9 w-9 items-center justify-center rounded-lg"
           style={{
-            background: "rgba(0,229,255,0.12)",
-            border: "1px solid rgba(0,229,255,0.35)",
-            boxShadow: "0 0 16px rgba(0,229,255,0.25)",
+            background: "rgba(255,107,137,0.12)",
+            border: "1px solid rgba(255,107,137,0.35)",
+            boxShadow: "none",
           }}
         >
-          <Zap className="h-4 w-4 text-[#00E5FF]" />
+          <Zap className="h-4 w-4 text-[#ff6b89]" />
         </div>
         <h2 className="font-black tracking-wide text-white">
           {game.name}{" "}
-          <span className="bg-gradient-to-r from-[#7af5ff] to-[#ff2d78] bg-clip-text text-transparent">
-            Account
-          </span>
+          <span>Account</span>
         </h2>
       </div>
 
@@ -630,12 +808,12 @@ export function GameWalletLoadSection({
       <div
         className="relative z-10 rounded-xl p-4 space-y-3"
         style={{
-          background: "rgba(5,5,16,0.65)",
-          border: "1px solid rgba(0,229,255,0.18)",
-          boxShadow: "inset 0 0 24px rgba(0,229,255,0.04)",
+          background: "rgba(22,8,18,0.65)",
+          border: "1px solid rgba(255,255,255,0.1)",
+          boxShadow: "none",
         }}
       >
-        <p className="text-[10px] font-black uppercase tracking-[0.2em] text-[#00E5FF]">
+        <p className="text-[10px] font-black uppercase tracking-[0.2em] text-[#ff6b89]">
           Your Account
         </p>
 
@@ -696,10 +874,10 @@ export function GameWalletLoadSection({
               type="button"
               onClick={handleCheckBalance}
               disabled={checkingBalance || pendingCheck}
-              className="w-full flex items-center justify-center gap-2 rounded-xl px-4 py-2.5 text-sm font-bold text-[#7af5ff] transition-all hover:shadow-[0_0_20px_rgba(0,229,255,0.25)] disabled:opacity-50"
+              className="w-full flex items-center justify-center gap-2 rounded-xl px-4 py-2.5 text-sm font-bold text-[#ff6b89] transition-all hover:shadow-[0_0_20px_rgba(255,107,137,0.25)] disabled:opacity-50"
               style={{
-                border: "1px solid rgba(0,229,255,0.35)",
-                background: "rgba(0,229,255,0.08)",
+                border: "1px solid rgba(255,107,137,0.35)",
+                background: "rgba(255,107,137,0.08)",
               }}
             >
               {checkingBalance || pendingCheck ? (
@@ -877,7 +1055,7 @@ export function GameWalletLoadSection({
 
         {!hasSavedAccount && !customMode && previewAccount && (
           <p className="text-xs text-[#6b6d8f] text-center">
-            Will be created as <span className="font-mono text-[#7af5ff]">{previewAccount}</span>{" "}
+            Will be created as <span className="font-mono text-[#ff6b89]">{previewAccount}</span>{" "}
             (same password)
           </p>
         )}
@@ -885,7 +1063,7 @@ export function GameWalletLoadSection({
         {hasSavedAccount && !customMode && previewAccount && usesNumberedAccounts && (
           <p className="text-xs text-[#6b6d8f] text-center">
             Replace will create{" "}
-            <span className="font-mono text-[#7af5ff]">{previewAccount}</span> (or the next free
+            <span className="font-mono text-[#ff6b89]">{previewAccount}</span> (or the next free
             number if that is taken)
           </p>
         )}
@@ -896,8 +1074,8 @@ export function GameWalletLoadSection({
         className="relative z-10 rounded-xl p-4 sm:p-5 space-y-4"
         style={{
           background: "rgba(5,5,16,0.7)",
-          border: "1px solid rgba(0,229,255,0.2)",
-          boxShadow: "inset 0 0 30px rgba(0,229,255,0.03)",
+          border: "1px solid rgba(255,107,137,0.2)",
+          boxShadow: "inset 0 0 30px rgba(255,107,137,0.03)",
         }}
       >
         <div className="grid grid-cols-2 gap-2 sm:gap-3">
@@ -932,17 +1110,17 @@ export function GameWalletLoadSection({
         <div
           className="rounded-xl px-4 py-3.5 sm:px-5 sm:py-4"
           style={{
-            background: "linear-gradient(135deg, rgba(0,229,255,0.1), rgba(123,47,247,0.08))",
-            border: "1px solid rgba(0,229,255,0.28)",
-            boxShadow: "0 0 24px rgba(0,229,255,0.08)",
+            background: "linear-gradient(135deg, rgba(255,107,137,0.1), rgba(123,47,247,0.08))",
+            border: "1px solid rgba(255,107,137,0.28)",
+            boxShadow: "0 0 24px rgba(255,107,137,0.08)",
           }}
         >
-          <span className="text-[10px] font-black uppercase tracking-[0.18em] text-[#00E5FF]">
+          <span className="text-[10px] font-black uppercase tracking-[0.18em] text-[#ff6b89]">
             Total Deposit
           </span>
           <p
             className="mt-1 text-xl sm:text-2xl font-black text-white tabular-nums"
-            style={{ textShadow: "0 0 20px rgba(0,229,255,0.35)" }}
+            style={{ textShadow: "0 0 20px rgba(255,107,137,0.35)" }}
           >
             ${walletBalance.toFixed(2)}
           </p>
@@ -950,7 +1128,7 @@ export function GameWalletLoadSection({
 
         {fundsTab === "load" ? (
           <>
-            <p className="text-[10px] font-black uppercase tracking-[0.18em] text-[#00E5FF]">
+            <p className="text-[10px] font-black uppercase tracking-[0.18em] text-[#ff6b89]">
               Load Credits
             </p>
             <p className="text-sm text-[#6b6d8f]">
@@ -959,7 +1137,7 @@ export function GameWalletLoadSection({
 
             <div className="flex flex-col sm:flex-row gap-3">
               <div className="relative flex-1">
-                <span className="absolute left-4 top-1/2 -translate-y-1/2 text-base text-[#00E5FF]">$</span>
+                <span className="absolute left-4 top-1/2 -translate-y-1/2 text-base text-[#ff6b89]">$</span>
                 <input
                   type="number"
                   min={WALLET_LOAD_LIMITS.min}
