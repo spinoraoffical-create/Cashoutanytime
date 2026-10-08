@@ -14,38 +14,16 @@ interface DepositActionsProps {
   amount: number | null;
 }
 
-export function DepositActions({ depositId, currentStatus, amount }: DepositActionsProps) {
+export function DepositActions({ depositId, currentStatus }: DepositActionsProps) {
   const [adminNotes, setAdminNotes] = useState("");
-  const [creditAmount, setCreditAmount] = useState(
-    amount != null && amount > 0 ? String(amount) : ""
-  );
   const [loading, setLoading] = useState(false);
   const router = useRouter();
 
   async function handleStatus(status: RequestStatus) {
-    if (status === "completed") {
-      const parsed = parseFloat(creditAmount);
-      if (!parsed || parsed <= 0 || Number.isNaN(parsed)) {
-        toast.error("Enter the amount the player paid.");
-        return;
-      }
-    }
-
     setLoading(true);
-    const parsedAmount =
-      status === "completed" ? Math.round(parseFloat(creditAmount) * 100) / 100 : undefined;
-    const result = await updateDepositStatus(
-      depositId,
-      status,
-      adminNotes || undefined,
-      parsedAmount
-    );
+    const result = await updateDepositStatus(depositId, status, adminNotes || undefined);
     setLoading(false);
     if (result.error) toast.error(result.error);
-    else if (status === "completed") {
-      const finalCredit = result.finalCredit ?? parsedAmount!;
-      toast.success(`Paid $${parsedAmount!.toFixed(2)}. Credited $${finalCredit.toFixed(2)} with the game bonus.`);
-    }
     else toast.success(`Deposit ${status}`);
     router.refresh();
   }
@@ -57,14 +35,6 @@ export function DepositActions({ depositId, currentStatus, amount }: DepositActi
   return (
     <div className="flex flex-col gap-2 min-w-[200px]">
       <Input
-        type="number"
-        min="0.01"
-        step="0.01"
-        placeholder="Amount the player paid ($)"
-        value={creditAmount}
-        onChange={(e) => setCreditAmount(e.target.value)}
-      />
-      <Input
         placeholder="Admin notes (optional)"
         value={adminNotes}
         onChange={(e) => setAdminNotes(e.target.value)}
@@ -75,9 +45,6 @@ export function DepositActions({ depositId, currentStatus, amount }: DepositActi
             Processing
           </Button>
         )}
-        <Button size="sm" onClick={() => handleStatus("completed")} disabled={loading}>
-          Confirm & credit
-        </Button>
         <Button size="sm" variant="destructive" onClick={() => handleStatus("rejected")} disabled={loading}>
           Reject
         </Button>
