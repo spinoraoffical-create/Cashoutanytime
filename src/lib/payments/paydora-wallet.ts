@@ -1,4 +1,5 @@
 import { createAdminClient } from "@/lib/supabase/admin";
+import { quotePaidDeposit, settleDepositSideEffects } from "@/lib/payments/auto-settle";
 
 const ALLOWED_METHODS = new Set(["paypal", "chime", "cashapp", "bitcoin", "usdt", "venmo"]);
 
@@ -187,15 +188,78 @@ export async function creditPaydoraDeposit(input: {
 
   if (await alreadyApplied(admin, input.userId, marker)) {
     await ensureDepositRequest(admin, { ...input, amount });
+    const { data: ledger } = await admin
+      .from("deposit_bonus_ledger")
+      .select("base_amount, bonus_percent, bonus_amount, final_credit, deposit_kind, game_slug")
+      .eq("deposit_key", marker)
+      .maybeSingle();
+    const saved = ledger as {
+      base_amount: number;
+      bonus_percent: number;
+      bonus_amount: number;
+      final_credit: number;
+      deposit_kind: "first" | "reload";
+      game_slug: string | null;
+    } | null;
+    const { data: intent } = await admin
+      .from("payment_intents")
+      .select("final_credit")
+      .eq("provider", "paydora")
+      .eq("external_id", marker)
+      .maybeSingle();
+    const savedQuote = saved
+      ? {
+          gameSlug: saved.game_slug,
+          gameName: input.gameName ?? null,
+          promoCode: null,
+          baseAmount: Number(saved.base_amount),
+          bonusPercent: Number(saved.bonus_percent),
+          bonusAmount: Number(saved.bonus_amount),
+          finalCredit: Number(saved.final_credit),
+          kind: saved.deposit_kind === "first" ? "first" as const : "reload" as const,
+        }
+      : (intent as { final_credit?: number | null } | null)?.final_credit != null
+        ? await quotePaidDeposit(admin, {
+            userId: input.userId,
+            depositId: marker,
+            baseAmount: amount,
+            gameSlug: input.gameSlug,
+            gameName: input.gameName,
+          }).catch(() => null)
+        : null;
+    if (savedQuote) {
+      await settleDepositSideEffects(admin, {
+        userId: input.userId,
+        depositId: marker,
+        walletCredited: true,
+        quote: savedQuote,
+      });
+    }
     return { credited: false, duplicate: true };
   }
 
+  let quote = null;
+  try {
+    quote = await quotePaidDeposit(admin, {
+      userId: input.userId,
+      depositId: marker,
+      baseAmount: amount,
+      gameSlug: input.gameSlug,
+      gameName: input.gameName,
+    });
+  } catch (err) {
+    console.error("[auto-settle] quote failed, crediting the paid amount only", err);
+  }
+  const creditAmount = quote?.finalCredit ?? amount;
+
   const methodName = input.methodName?.trim() || "Paydora";
-  const description = `Deposit confirmed — $${amount.toFixed(2)} via ${methodName} (${input.referenceId || "order"} ${marker})`;
+  const description = quote && quote.bonusAmount > 0
+    ? `Deposit $${amount.toFixed(2)} + ${quote.bonusPercent}% bonus via ${methodName} (${marker})`
+    : `Deposit confirmed — $${amount.toFixed(2)} via ${methodName} (${input.referenceId || "order"} ${marker})`;
 
   const { data: rpcData, error: rpcError } = await admin.rpc("credit_paydora_deposit", {
     p_user_id: input.userId,
-    p_amount: amount,
+    p_amount: creditAmount,
     p_payment_id: marker,
     p_order_id: input.referenceId ?? null,
     p_description: description,
@@ -209,7 +273,14 @@ export async function creditPaydoraDeposit(input: {
   if (!rpcError) {
     const row = (rpcData ?? {}) as { credited?: boolean; duplicate?: boolean; new_balance?: number };
     await ensureDepositRequest(admin, { ...input, amount });
-    if (row.credited) {
+    if (quote && (row.credited || row.duplicate)) {
+      await settleDepositSideEffects(admin, {
+        userId: input.userId,
+        depositId: marker,
+        quote,
+        walletCredited: true,
+      });
+    } else if (row.credited) {
       await admin.from("notifications").insert({
         user_id: input.userId,
         title: "Deposit confirmed",
@@ -229,20 +300,29 @@ export async function creditPaydoraDeposit(input: {
 
   const newBalance = await applyWalletCredit(admin, {
     userId: input.userId,
-    amount,
+    amount: creditAmount,
     source: "deposit",
     description,
   });
 
   await ensureDepositRequest(admin, { ...input, amount });
 
-  await admin.from("notifications").insert({
-    user_id: input.userId,
-    title: "Deposit confirmed",
-    message: `$${amount.toFixed(2)} has been added to your wallet via ${methodName}.`,
-    type: "success",
-    is_read: false,
-  });
+  if (quote) {
+    await settleDepositSideEffects(admin, {
+      userId: input.userId,
+      depositId: marker,
+      quote,
+      walletCredited: true,
+    });
+  } else {
+    await admin.from("notifications").insert({
+      user_id: input.userId,
+      title: "Deposit confirmed",
+      message: `$${amount.toFixed(2)} has been added to your wallet via ${methodName}.`,
+      type: "success",
+      is_read: false,
+    });
+  }
 
   return { credited: true, newBalance };
 }

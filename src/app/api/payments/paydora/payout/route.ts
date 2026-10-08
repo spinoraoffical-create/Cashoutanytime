@@ -63,7 +63,39 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: "That payout method is not enabled." }, { status: 400 });
     }
 
-    const idempotencyKey = `wd_${user.id}_${Date.now()}`;
+    const day = new Date().toISOString().slice(0, 10);
+    const idempotencyKey =
+      String(body.idempotencyKey || "").trim() ||
+      `wd_${user.id}_${methodValue}_${amount.toFixed(2)}_${address || chimePhoneEmail}_${day}`;
+
+    const adminForRules = createAdminClient();
+    if (!adminForRules) return NextResponse.json({ error: "Payouts are temporarily unavailable." }, { status: 503 });
+    const { data: ops, error: opsError } = await adminForRules.from("platform_ops").select("cashout_auto_limit").eq("key", "cashout").maybeSingle();
+    const rulesReady = !opsError && ops;
+    const autoLimit = Number((ops as { cashout_auto_limit?: number } | null)?.cashout_auto_limit ?? 0);
+    const { data: fraud } = await adminForRules
+      .from("fraud_scores")
+      .select("user_id, blocked, manual_review, risk_score")
+      .eq("user_id", user.id)
+      .maybeSingle();
+    const risk = fraud as { blocked?: boolean; manual_review?: boolean; risk_score?: number } | null;
+    const flagged = Boolean(risk && (risk.blocked || risk.manual_review || Number(risk.risk_score ?? 0) >= 50));
+    if (rulesReady && (autoLimit <= 0 || amount > autoLimit || flagged)) {
+      await adminForRules.from("cashout_holds").upsert(
+        {
+          payout_key: idempotencyKey,
+          user_id: user.id,
+          amount,
+          reason: flagged ? "Risk review" : amount > autoLimit && autoLimit > 0 ? "Above the automatic cash-out limit" : "Automatic cash out is off until a limit is set",
+          status: "held",
+        },
+        { onConflict: "payout_key", ignoreDuplicates: true }
+      );
+      return NextResponse.json({
+        held: true,
+        error: "This cash out is waiting for a Super Admin. Your wallet was not charged.",
+      }, { status: 202 });
+    }
     const admin = createAdminClient();
     if (!admin) return NextResponse.json({ error: "Payouts are temporarily unavailable." }, { status: 503 });
 
@@ -79,7 +111,10 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: message }, { status: 400 });
     }
     const debitRow = (debit ?? {}) as { debited?: boolean; duplicate?: boolean };
-    if (!debitRow.debited && !debitRow.duplicate) {
+    if (debitRow.duplicate) {
+      return NextResponse.json({ success: true, duplicate: true, status: "already_submitted" });
+    }
+    if (!debitRow.debited) {
       return NextResponse.json({ error: "Could not reserve that payout. Try again." }, { status: 400 });
     }
 

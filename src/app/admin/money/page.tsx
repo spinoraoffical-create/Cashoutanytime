@@ -14,14 +14,19 @@ export default async function MoneyCenterPage() {
   const tools = network
     ? [
         {
-          href: "/admin/deposits?status=pending",
-          title: "Incoming deposits",
-          body:
-            scope?.level === "sub"
-              ? "Approve deposits for your players up to your limit. Larger amounts stay with the store creator."
-              : "Approve deposits for players under you and your sub-creators.",
-        },
-      ]
+            href: "/admin/deposits?status=pending",
+            title: "Incoming deposits",
+            body:
+              scope?.level === "sub"
+                ? "Approve deposits for your players up to your limit. Larger amounts stay with the store creator."
+                : "Approve deposits for players under you and your sub-creators.",
+          },
+          {
+            href: "/admin/failed-loads",
+            title: "Failed loads",
+            body: "Game loads that did not finish. Retry does not credit the deposit again.",
+          },
+        ]
     : [
         {
           href: "/admin/deposits?status=pending",
@@ -47,6 +52,16 @@ export default async function MoneyCenterPage() {
           href: "/admin/requests",
           title: "Manual requests",
           body: "Older contact-us deposit requests that are not in the payment queue.",
+        },
+        {
+          href: "/admin/failed-loads",
+          title: "Failed loads",
+          body: "Game API retries. A retry does not credit the deposit again.",
+        },
+        {
+          href: "/admin/cashout-holds",
+          title: "Held cash outs",
+          body: "Set the automatic limit. Larger or flagged cash outs stay here.",
         },
       ];
 

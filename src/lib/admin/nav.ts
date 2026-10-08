@@ -15,6 +15,7 @@ export type AdminNavSection = {
   icon: string;
   /** Visible when the staff member has this permission. Null means any staff, unless other gates apply. */
   permission: string | null;
+  roleAny?: string[];
   /** Visible when the staff member has any of these permissions. */
   anyPermissions?: string[];
   superOnly?: boolean;
@@ -54,6 +55,13 @@ export const ADMIN_NAV: AdminNavSection[] = [
       { href: "/admin/payouts", label: "Cash-out / Payouts", permission: "requests.manage" },
       { href: "/admin/transactions", label: "Transaction History", permission: "requests.manage" },
       { href: "/admin/requests", label: "Manual Requests", permission: "requests.manage" },
+      {
+        href: "/admin/failed-loads",
+        label: "Failed loads",
+        permission: "requests.manage",
+        roleAny: ["store_creator", "sub_creator"],
+      },
+      { href: "/admin/cashout-holds", label: "Held cash outs", permission: "requests.manage" },
     ],
   },
   {
@@ -91,8 +99,9 @@ export const ADMIN_NAV: AdminNavSection[] = [
     label: "Support",
     icon: "LifeBuoy",
     permission: "support.manage",
+    roleAny: ["store_creator"],
     children: [
-      { href: "/admin/support", label: "Tickets", permission: "support.manage" },
+      { href: "/admin/support", label: "Tickets", permission: "support.manage", roleAny: ["store_creator"] },
       { href: "/admin/chat", label: "Live chat", permission: "support.manage" },
     ],
   },

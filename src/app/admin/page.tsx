@@ -30,6 +30,19 @@ async function headCount(
   }
 }
 
+async function statusCount(table: "game_load_requests" | "cashout_holds" | "webhook_events", status: string) {
+  try {
+    const { count, error } = await adminDb()
+      .from(table)
+      .select("id", { count: "exact", head: true })
+      .eq("status", status);
+    if (error) return 0;
+    return count ?? 0;
+  } catch {
+    return 0;
+  }
+}
+
 function since(days: number) {
   return new Date(Date.now() - days * 86_400_000).toISOString();
 }
@@ -89,6 +102,9 @@ export default async function AdminOverviewPage() {
     support ? { href: "/admin/support", label: "Open tickets", count: openTickets } : null,
     kyc ? { href: "/admin/kyc", label: "New identity checks", count: pendingKyc } : null,
     ctx.isSuperAdmin ? { href: "/admin/fraud", label: "Fraud flags", count: fraudFlags } : null,
+    money ? { href: "/admin/failed-loads", label: "Failed game loads", count: await statusCount("game_load_requests", "failed") } : null,
+    money ? { href: "/admin/cashout-holds", label: "Held cash outs", count: await statusCount("cashout_holds", "held") } : null,
+    ctx.isSuperAdmin ? { href: "/admin/failed-loads", label: "Failed webhooks", count: await statusCount("webhook_events", "failed") } : null,
   ].filter((item): item is { href: string; label: string; count: number } => Boolean(item));
 
   const feed: FeedItem[] = [];

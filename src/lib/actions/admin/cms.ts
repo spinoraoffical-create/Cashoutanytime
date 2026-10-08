@@ -227,6 +227,10 @@ const gameSchema = z.object({
   badge_text: z.string().trim().max(20).optional().default(""),
   is_active: z.boolean(),
   is_featured: z.boolean(),
+  is_live: z.boolean().optional().default(false),
+  first_deposit_bonus_percent: z.coerce.number().min(0).max(200).optional().default(50),
+  reload_bonus_percent: z.coerce.number().min(0).max(200).optional().default(10),
+  bonus_text: z.string().trim().max(240).optional().default(""),
 });
 
 export async function upsertGameAction(
@@ -248,15 +252,25 @@ export async function upsertGameAction(
     badge_text: parsed.data.badge_text || null,
     is_active: parsed.data.is_active,
     is_featured: parsed.data.is_featured,
+    is_live: parsed.data.is_live,
+    first_deposit_bonus_percent: parsed.data.first_deposit_bonus_percent,
+    reload_bonus_percent: parsed.data.reload_bonus_percent,
+    bonus_text: parsed.data.bonus_text || null,
   };
 
   const db = adminDb();
   const { error } = await db.from("games").update(patch).eq("id", input.id);
+  if (error && /is_live|bonus_percent|bonus_text|schema cache|column/i.test(error.message)) {
+    const { is_live: _live, first_deposit_bonus_percent: _first, reload_bonus_percent: _reload, bonus_text: _text, ...rest } = patch;
+    const retry = await db.from("games").update(rest).eq("id", input.id);
+    if (retry.error) return { ok: false, error: "Could not save the game." };
+    return { ok: true, message: "Saved the game. Apply 20261008000130_auto_ops.sql before bonus percents will store." };
+  }
   if (error) return { ok: false, error: "Could not save the game." };
 
   await writeAudit({
     actorId: auth.staff.userId,
-    action: "game.update",
+    action: "game.bonus_update",
     entityType: "game",
     entityId: input.id,
     after: patch,

@@ -31,6 +31,13 @@ export async function AgentHome({ scope }: { scope: AgentScope }) {
     ? await db.from("profiles").select("id").in("parent_agent_id", parents).limit(1000)
     : { data: [] as { id: string }[] };
   const ownedIds = ((owned ?? []) as { id: string }[]).map((row) => row.id);
+  let commission = 0;
+  const { data: commissionRows, error: commissionError } = parents.length
+    ? await db.from("agent_commissions").select("commission_amount").in("agent_id", scope.level === "sub" ? [scope.userId] : parents)
+    : { data: [], error: null };
+  if (!commissionError) {
+    commission = ((commissionRows ?? []) as { commission_amount: number }[]).reduce((sum, row) => sum + Number(row.commission_amount || 0), 0);
+  }
   const pending = ownedIds.length
     ? await db
         .from("deposit_requests")
@@ -49,7 +56,7 @@ export async function AgentHome({ scope }: { scope: AgentScope }) {
             : "Only players who registered with your link."
         }
       />
-      <div className="grid gap-3 sm:grid-cols-3">
+      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
         <GlassCard className="p-4">
           <p className="text-sm text-muted-foreground">Players</p>
           <p className="text-3xl font-black">{(count ?? 0).toLocaleString()}</p>
@@ -62,10 +69,17 @@ export async function AgentHome({ scope }: { scope: AgentScope }) {
           <p className="text-sm text-muted-foreground">Pending deposits</p>
           <p className="text-3xl font-black">{(pending.count ?? 0).toLocaleString()}</p>
         </GlassCard>
+        <GlassCard className="p-4">
+          <p className="text-sm text-muted-foreground">Commission</p>
+          <p className="text-3xl font-black">${commission.toFixed(2)}</p>
+        </GlassCard>
       </div>
       <div className="mt-4 flex flex-wrap gap-2">
-        <Link href="/admin/players" className="inline-flex h-10 items-center rounded-full bg-foreground px-4 text-sm font-semibold text-background">
+          <Link href="/admin/players" className="inline-flex h-10 items-center rounded-full bg-foreground px-4 text-sm font-semibold text-background">
           View players
+        </Link>
+        <Link href="/admin/failed-loads" className="inline-flex h-10 items-center rounded-full border border-border px-4 text-sm font-semibold">
+          Failed loads
         </Link>
         {scope.level === "store" ? (
           <Link href="/admin/sub-creators" className="inline-flex h-10 items-center rounded-full border border-border px-4 text-sm font-semibold">

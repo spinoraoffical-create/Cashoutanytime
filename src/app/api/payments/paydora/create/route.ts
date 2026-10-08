@@ -1,5 +1,7 @@
 import { NextResponse } from "next/server";
 import { createPaydoraDeposit } from "@/lib/payments/paydora";
+import { rememberPaymentIntent } from "@/lib/payments/auto-settle";
+import { createAdminClient } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
 import { checkRateLimit, clientIp, rateLimitUserMessage } from "@/lib/rate-limit";
 import { playerPaymentError } from "@/lib/player-safe-error";
@@ -25,6 +27,9 @@ export async function POST(req: Request) {
     const paymentMethodId = String(body.paymentMethodId || "").trim();
     const amount = Number(body.amount);
     const fingerprint = String(body.deviceFingerprint || "").trim();
+    const gameSlug = String(body.gameSlug || "").trim();
+    const gameName = String(body.gameName || "").trim();
+    const promoCode = String(body.promoCode || body.ref || "").trim();
 
     if (!paymentMethodId) {
       return NextResponse.json({ error: "Choose a payment method." }, { status: 400 });
@@ -46,6 +51,19 @@ export async function POST(req: Request) {
       deviceFingerprint: fingerprint || `player_${user.id}`,
       idempotencyKey: `dep_${user.id}_${Date.now()}`,
     });
+
+    const admin = createAdminClient();
+    if (admin && deposit.id) {
+      await rememberPaymentIntent(admin, {
+        provider: "paydora",
+        externalId: deposit.id,
+        userId: user.id,
+        gameSlug,
+        gameName,
+        promoCode,
+        baseAmount: amount,
+      });
+    }
 
     return NextResponse.json({
       success: true,

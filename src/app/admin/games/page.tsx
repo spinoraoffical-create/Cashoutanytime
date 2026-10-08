@@ -1,5 +1,4 @@
 import type { Metadata } from "next";
-import Image from "next/image";
 import { Check, Minus, Webhook } from "lucide-react";
 import { revalidatePath } from "next/cache";
 
@@ -54,19 +53,37 @@ export default async function AdminGamesPage() {
   await requirePermission("cms.manage");
   const db = adminDb();
 
-  const [{ data: gamesData }, { data: configsData }] = await Promise.all([
-    db
-      .from("games")
-      .select(
-        "id, slug, name, description, image_url, badge_text, is_featured, is_active, play_url, download_url"
-      )
-      .order("name"),
+  const baseColumns =
+    "id, slug, name, description, image_url, badge_text, is_featured, is_active, play_url, download_url";
+  const bonusColumns =
+    ", is_live, first_deposit_bonus_percent, reload_bonus_percent, bonus_text";
+  const [gamesResult, configsResult] = await Promise.all([
+    db.from("games").select(baseColumns + bonusColumns).order("name"),
     db
       .from("game_server_configs")
       .select("game_id, webhook_secret, is_enabled, api_base_url, api_username, api_password, notes"),
   ]);
+  const gamesData = gamesResult.error
+    ? (await db.from("games").select(baseColumns).order("name")).data
+    : gamesResult.data;
 
-  const games = gamesData ?? [];
+  const games = (gamesData ?? []) as Array<{
+    id: string;
+    slug: string;
+    name: string;
+    description: string | null;
+    image_url: string | null;
+    badge_text: string | null;
+    is_featured: boolean;
+    is_active: boolean;
+    play_url: string | null;
+    download_url: string | null;
+    is_live?: boolean;
+    first_deposit_bonus_percent?: number;
+    reload_bonus_percent?: number;
+    bonus_text?: string | null;
+  }>;
+  const configsData = configsResult.data;
   const configsByGameId = new Map(
     (configsData ?? []).map((c) => [c.game_id, c])
   );
@@ -109,13 +126,7 @@ export default async function AdminGamesPage() {
               {/* Thumbnail */}
               <div className="relative aspect-video w-full shrink-0 bg-foreground/5">
                 {game.image_url ? (
-                  <Image
-                    src={game.image_url}
-                    alt={game.name}
-                    fill
-                    className="object-cover"
-                    sizes="(max-width: 768px) 100vw, 33vw"
-                  />
+                  <img src={game.image_url} alt={game.name} className="h-full w-full object-cover" />
                 ) : (
                   <div
                     className={`flex h-full w-full items-center justify-center bg-gradient-to-br ${bg}`}
@@ -147,6 +158,11 @@ export default async function AdminGamesPage() {
                         Featured
                       </Badge>
                     )}
+                    {game.is_live ? (
+                      <Badge className="bg-emerald-500/15 text-emerald-400 text-xs">Live</Badge>
+                    ) : (
+                      <Badge className="bg-foreground/8 text-muted-foreground text-xs">Not live</Badge>
+                    )}
                   </div>
                   {game.description && (
                     <p className="mt-1 line-clamp-2 text-xs text-muted-foreground">
@@ -160,6 +176,12 @@ export default async function AdminGamesPage() {
                   <UrlStatus label="Play URL" value={game.play_url} />
                   <UrlStatus label="Download URL" value={game.download_url} />
                   <UrlStatus label="Image URL" value={game.image_url} />
+                  <p className="text-foreground">
+                    First deposit {Number(game.first_deposit_bonus_percent ?? 50)}% · Reload {Number(game.reload_bonus_percent ?? 10)}%
+                  </p>
+                  <p className="text-muted-foreground">
+                    Agent API {cfg?.is_enabled && (cfg.api_username || cfg.api_password) ? "configured" : "not configured"}
+                  </p>
                 </div>
 
                 {/* Webhook config */}
@@ -292,6 +314,34 @@ export default async function AdminGamesPage() {
                         type: "switch",
                         defaultValue: game.is_featured,
                       },
+                      {
+                        name: "is_live",
+                        label: "Live",
+                        type: "switch",
+                        defaultValue: Boolean(game.is_live),
+                      },
+                      {
+                        name: "first_deposit_bonus_percent",
+                        label: "First deposit bonus %",
+                        type: "number",
+                        defaultValue: Number(game.first_deposit_bonus_percent ?? 50),
+                        min: 0,
+                        step: 1,
+                      },
+                      {
+                        name: "reload_bonus_percent",
+                        label: "Reload bonus %",
+                        type: "number",
+                        defaultValue: Number(game.reload_bonus_percent ?? 10),
+                        min: 0,
+                        step: 1,
+                      },
+                      {
+                        name: "bonus_text",
+                        label: "Bonus text shown to players",
+                        type: "text",
+                        defaultValue: game.bonus_text ?? "",
+                      },
                     ]}
                     action={async (v: Record<string, FieldValue>) => {
                       "use server";
@@ -306,6 +356,10 @@ export default async function AdminGamesPage() {
                         badge_text: String(v.badge_text),
                         is_active: Boolean(v.is_active),
                         is_featured: Boolean(v.is_featured),
+                        is_live: Boolean(v.is_live),
+                        first_deposit_bonus_percent: Number(v.first_deposit_bonus_percent ?? 50),
+                        reload_bonus_percent: Number(v.reload_bonus_percent ?? 10),
+                        bonus_text: String(v.bonus_text ?? ""),
                       });
                     }}
                   />

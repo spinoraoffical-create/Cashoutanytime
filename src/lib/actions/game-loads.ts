@@ -76,6 +76,51 @@ async function fulfillOrFail(
   }
 }
 
+export async function fulfillTrackedRequest(requestId: string) {
+  const admin = createAdminClient();
+  if (!admin) return { success: false as const, error: "SUPABASE_SERVICE_ROLE_KEY is not configured." };
+  const { data } = await admin
+    .from("game_load_requests")
+    .select("id, user_id, game_slug, game_name, amount, load_type, game_username, status")
+    .eq("id", requestId)
+    .maybeSingle();
+  const row = data as {
+    id: string;
+    user_id: string;
+    game_slug: string;
+    amount: number | null;
+    load_type: "create_account" | "new_account" | "load" | "reload";
+    game_username: string | null;
+    status: string;
+  } | null;
+  if (!row) return { success: false as const, error: "Load request not found." };
+  if (row.status === "completed") return { success: true as const };
+  const result = await fulfillOrFail(row.game_slug, row.id, row.load_type, {
+    userId: row.user_id,
+    gameUsername: row.game_username,
+    amount: row.amount,
+    requestedUsername: row.game_username,
+  });
+  if (!result) {
+    await admin
+      .from("game_load_requests")
+      .update({
+        status: "failed",
+        error_message: "Game API credentials are not configured.",
+        updated_at: new Date().toISOString(),
+      })
+      .eq("id", row.id)
+      .in("status", ["pending", "processing"]);
+    if (row.load_type === "reload" || row.load_type === "load") {
+      await admin.rpc("refund_game_load_wallet", { p_request_id: row.id });
+    }
+    return { success: false as const, error: "Game API credentials are not configured." };
+  }
+  return result.success
+    ? { success: true as const }
+    : { success: false as const, error: result.error || "Game load failed." };
+}
+
 const API_CONFIGURED_GAMES = ["cash-machine", "cash-frenzy", "gameroom", "game-vault", "mafia", "juwa", "vegas-sweeps", "mr-all-in-one", "orion-stars", "milky-way", "fire-kirin"];
 
 const GAME_API_UNAVAILABLE = "This game is not connected yet. Try again later or contact support.";
