@@ -119,6 +119,8 @@ export async function GET(request: NextRequest) {
             .eq("id", user.id);
         }
       }
+      const { assignPlayerToAgentByCode } = await import("@/lib/agents/assign");
+      await assignPlayerToAgentByCode(user.id, referralCode);
     }
   }
 

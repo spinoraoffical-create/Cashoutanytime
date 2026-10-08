@@ -130,6 +130,12 @@ export default async function AccountHubPage() {
           Messages & help
         </p>
         <AccountInboxLink />
+        <Link href="/dashboard/agent" className="hub-card flex items-center justify-between rounded-2xl px-4 py-3">
+          <span className="flex items-center gap-2 font-medium">
+            <MessageCircle className="h-4 w-4" /> Chat with your agent
+          </span>
+          <ChevronRight className="h-4 w-4 text-muted-foreground" />
+        </Link>
         {HELP.filter((item) => item.href !== "/dashboard/messages").map((item) => (
           <Link key={item.href} href={item.href} className="hub-card flex items-center justify-between rounded-2xl px-4 py-3">
             <span className="flex items-center gap-2 font-medium">

@@ -10,6 +10,7 @@ import {
   writeAudit,
 } from "@/lib/actions/admin/core";
 import { adminLink, tgEsc, tgNotify } from "@/lib/telegram";
+import { getAgentScope, playerInScope } from "@/lib/agents/scope";
 
 export async function setBanAction(input: {
   userId: string;
@@ -149,7 +150,14 @@ export async function adjustWalletAction(input: {
   note: string;
 }): Promise<AdminActionResult> {
   const auth = await authorize("users.manage");
-  if ("error" in auth) return { ok: false, error: auth.error };
+  let actorId = "error" in auth ? null : auth.staff.userId;
+  if (!actorId) {
+    const scope = await getAgentScope();
+    if (!scope || scope.level !== "store" || !(await playerInScope(scope, input.userId))) {
+      return { ok: false, error: "error" in auth ? auth.error : "You don't have permission to do that." };
+    }
+    actorId = scope.userId;
+  }
 
   const parsed = walletSchema.safeParse(input);
   if (!parsed.success) {
@@ -176,7 +184,7 @@ export async function adjustWalletAction(input: {
   }
 
   await writeAudit({
-    actorId: auth.staff.userId,
+    actorId,
     action: "user.wallet_adjust",
     entityType: "profile",
     entityId: parsed.data.userId,

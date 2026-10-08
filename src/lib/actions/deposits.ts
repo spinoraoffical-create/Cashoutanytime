@@ -5,6 +5,8 @@ import { createClient } from "@/lib/supabase/server";
 import { getDepositMethod, type DepositPaymentMethodId } from "@/lib/payments/methods";
 import { notifyAdminOfDeposit } from "@/lib/telegram/notify-admin-deposit";
 import { createNotification } from "@/lib/actions/notifications";
+import { adminDb, writeAudit } from "@/lib/actions/admin/core";
+import { getAgentScope, playerInScope } from "@/lib/agents/scope";
 import type { RequestStatus } from "@/types/database";
 
 export interface DepositRequestRow {
@@ -122,9 +124,13 @@ export async function updateDepositStatus(
     .select("role")
     .eq("id", user.id)
     .single();
-  if (profile?.role !== "admin") return { error: "Unauthorized" };
+  const scope = await getAgentScope();
+  const legacyAdmin = profile?.role === "admin" || profile?.role === "super_admin";
+  const network = scope && (scope.level === "store" || scope.level === "sub");
+  if (!legacyAdmin && !network) return { error: "Unauthorized" };
 
-  const { data: existing, error: selectError } = await supabase
+  const reader = legacyAdmin ? supabase : adminDb();
+  const { data: existing, error: selectError } = await reader
     .from("deposit_requests")
     .select("user_id, game_name, payment_method, amount, status, wallet_credited")
     .eq("id", depositId)
@@ -152,6 +158,15 @@ export async function updateDepositStatus(
       return { error: "Enter the deposit amount before confirming." };
     }
 
+    if (network && scope) {
+      if (!(await playerInScope(scope, existing.user_id))) {
+        return { error: "That player is outside your network." };
+      }
+      if (scope.level === "sub" && (scope.approveLimit == null || amount > scope.approveLimit)) {
+        return { error: "That amount is above your approval limit." };
+      }
+    }
+
     const method = getDepositMethod(existing.payment_method as DepositPaymentMethodId);
     const methodLabel = method?.label ?? existing.payment_method;
 
@@ -177,10 +192,14 @@ export async function updateDepositStatus(
       "success"
     );
   } else {
+    if (network && scope && !(await playerInScope(scope, existing.user_id))) {
+      return { error: "That player is outside your network." };
+    }
     const update: Record<string, string | null> = { status };
     if (adminNotes?.trim()) update.admin_notes = adminNotes.trim();
 
-    const { error } = await supabase
+    const writer = legacyAdmin ? supabase : adminDb();
+    const { error } = await writer
       .from("deposit_requests")
       .update({
         ...update,
@@ -200,6 +219,14 @@ export async function updateDepositStatus(
       );
     }
   }
+
+  await writeAudit({
+    actorId: user.id,
+    action: status === "completed" ? "deposit.complete" : "deposit.update",
+    entityType: "deposit_request",
+    entityId: depositId,
+    after: { status, userId: existing.user_id },
+  });
 
   revalidatePath("/admin/deposits");
   revalidatePath("/dashboard/deposits");

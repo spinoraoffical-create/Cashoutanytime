@@ -20,7 +20,9 @@ export type AppRole =
   | "manager"
   | "support_agent"
   | "moderator"
-  | "customer";
+  | "customer"
+  | "store_creator"
+  | "sub_creator";
 
 export type VipTierKey = "silver" | "gold" | "platinum" | "diamond" | "elite";
 

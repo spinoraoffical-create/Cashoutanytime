@@ -8,6 +8,8 @@ const ROLE_LABEL: Record<string, string> = {
   manager: "Manager",
   support_agent: "Support Agent",
   moderator: "Moderator",
+  store_creator: "Store Creator",
+  sub_creator: "Sub-Creator",
 };
 
 export async function AdminLayoutGate({ children }: { children: React.ReactNode }) {
@@ -27,7 +29,7 @@ export async function AdminLayoutGate({ children }: { children: React.ReactNode 
 
   const topRole =
     ROLE_LABEL[
-      ["super_admin", "admin", "manager", "support_agent", "moderator"].find((role) =>
+      ["super_admin", "admin", "manager", "store_creator", "sub_creator", "support_agent", "moderator"].find((role) =>
         ctx.roles.includes(role as never)
       ) ?? "moderator"
     ] ?? "Staff";

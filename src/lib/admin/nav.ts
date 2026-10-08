@@ -5,6 +5,8 @@ export type AdminNavChild = {
   label: string;
   permission: string | null;
   superOnly?: boolean;
+  /** Visible when the staff member has any of these roles, in addition to permission. */
+  roleAny?: string[];
 };
 
 export type AdminNavSection = {
@@ -42,7 +44,12 @@ export const ADMIN_NAV: AdminNavSection[] = [
     permission: null,
     anyPermissions: ["requests.manage"],
     children: [
-      { href: "/admin/deposits", label: "Incoming Deposits", permission: "requests.manage" },
+      {
+        href: "/admin/deposits",
+        label: "Incoming Deposits",
+        permission: "requests.manage",
+        roleAny: ["store_creator", "sub_creator"],
+      },
       { href: "/admin/game-loads", label: "Wallet Loads & Redeems", permission: "requests.manage" },
       { href: "/admin/payouts", label: "Cash-out / Payouts", permission: "requests.manage" },
       { href: "/admin/transactions", label: "Transaction History", permission: "requests.manage" },
@@ -57,6 +64,24 @@ export const ADMIN_NAV: AdminNavSection[] = [
     anyPermissions: ["users.manage", "cms.manage"],
     children: [
       { href: "/admin/users", label: "All players", permission: "users.manage" },
+      {
+        href: "/admin/players",
+        label: "Network players",
+        permission: "users.manage",
+        roleAny: ["store_creator", "sub_creator"],
+      },
+      {
+        href: "/admin/sub-creators",
+        label: "Sub-creators",
+        permission: "users.manage",
+        roleAny: ["store_creator"],
+      },
+      {
+        href: "/admin/agent-inbox",
+        label: "Player chat",
+        permission: null,
+        roleAny: ["sub_creator"],
+      },
       { href: "/admin/kyc", label: "Identity review", permission: "cms.manage" },
       { href: "/admin/crm", label: "CRM", permission: "users.manage" },
     ],
@@ -161,12 +186,19 @@ function isOperator(access: StaffNavAccess) {
 
 export function canSeeNavItem(
   access: StaffNavAccess,
-  item: { permission: string | null; superOnly?: boolean }
+  item: { permission: string | null; superOnly?: boolean; roleAny?: string[] }
 ) {
   if (item.superOnly && !access.isSuperAdmin) return false;
+  const byPerm = item.permission
+    ? access.isSuperAdmin || permissionSet(access).has(item.permission)
+    : false;
+  const byRole = (item.roleAny ?? []).some(
+    (role) => access.roles.includes(role) || (role === "super_admin" && access.isSuperAdmin)
+  );
+  if (item.roleAny?.length && item.permission) return byPerm || byRole;
+  if (item.roleAny?.length) return byRole;
   if (!item.permission) return true;
-  if (access.isSuperAdmin) return true;
-  return permissionSet(access).has(item.permission);
+  return byPerm;
 }
 
 const HUB_HREFS = new Set([
@@ -190,7 +222,8 @@ export function visibleAdminNav(access: StaffNavAccess): AdminNavSection[] {
     const listed =
       !section.anyPermissions ||
       access.isSuperAdmin ||
-      section.anyPermissions.some((key) => permissionSet(access).has(key));
+      section.anyPermissions.some((key) => permissionSet(access).has(key)) ||
+      children.length > 0;
     if (!listed || !canSeeNavItem(access, section)) continue;
     if (section.children.length > 0 && children.length === 0) continue;
 

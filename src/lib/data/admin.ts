@@ -28,7 +28,38 @@ const STAFF_ROLES: AppRole[] = [
   "manager",
   "support_agent",
   "moderator",
+  "store_creator",
+  "sub_creator",
 ];
+
+async function withAgentRole(
+  ctx: StaffContext | null,
+  userId: string,
+  email: string | null
+): Promise<StaffContext | null> {
+  if (ctx?.isSuperAdmin) return ctx;
+  const admin = createAdminClient();
+  if (!admin) return ctx;
+  const { data, error } = await admin
+    .from("agent_accounts")
+    .select("tier, active")
+    .eq("user_id", userId)
+    .maybeSingle();
+  if (error || !data || data.active === false) return ctx;
+  const tier = data.tier === "store_creator" || data.tier === "sub_creator" ? data.tier : null;
+  if (!tier) return ctx;
+  if (!ctx) {
+    return {
+      userId,
+      email,
+      roles: [tier],
+      permissions: new Set<string>(),
+      isSuperAdmin: false,
+    };
+  }
+  if (ctx.roles.includes(tier)) return ctx;
+  return { ...ctx, roles: [...ctx.roles, tier] };
+}
 
 async function legacyAdminContext(
   supabase: Awaited<ReturnType<typeof createClient>>,
@@ -76,7 +107,8 @@ export const getStaffContext = cache(async (): Promise<StaffContext | null> => {
 
   const isStaff = roles.some((r) => STAFF_ROLES.includes(r));
   if (!isStaff) {
-    return legacyAdminContext(supabase, user.id, user.email ?? null);
+    const legacy = await legacyAdminContext(supabase, user.id, user.email ?? null);
+    return withAgentRole(legacy, user.id, user.email ?? null);
   }
 
   const isSuperAdmin = roles.includes("super_admin");
@@ -92,13 +124,17 @@ export const getStaffContext = cache(async (): Promise<StaffContext | null> => {
     }
   }
 
-  return {
-    userId: user.id,
-    email: user.email ?? null,
-    roles,
-    permissions,
-    isSuperAdmin,
-  };
+  return withAgentRole(
+    {
+      userId: user.id,
+      email: user.email ?? null,
+      roles,
+      permissions,
+      isSuperAdmin,
+    },
+    user.id,
+    user.email ?? null
+  );
 });
 
 /**

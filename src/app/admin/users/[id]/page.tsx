@@ -20,7 +20,8 @@ import {
   profileNum,
   type ProfileRow,
 } from "@/lib/admin/spinora-profile";
-import { requirePermission, can } from "@/lib/data/admin";
+import { assertCanSeePlayer } from "@/lib/agents/scope";
+import { can, getStaffContext } from "@/lib/data/admin";
 import type { VipTierKey } from "@/lib/database.types";
 
 export const metadata: Metadata = { title: "Member" };
@@ -58,8 +59,9 @@ export default async function AdminUserDetailPage({
 }: {
   params: Promise<{ id: string }>;
 }) {
-  const ctx = await requirePermission("users.manage");
   const { id } = await params;
+  const scope = await assertCanSeePlayer(id);
+  const ctx = await getStaffContext();
   const db = adminDb();
 
   const { data: profile } = await db
@@ -116,22 +118,30 @@ export default async function AdminUserDetailPage({
   }>;
   const tickets = ticketsRes.data ?? [];
 
-  const canManageRoles = can(ctx, "users.roles");
-  const canDelete = can(ctx, "users.delete");
+  const canManageRoles = Boolean(ctx && scope.level === "platform" && can(ctx, "users.roles"));
+  const canDelete = Boolean(ctx && scope.level === "platform" && can(ctx, "users.delete"));
+  const parentId = (p as ProfileRow & { parent_agent_id?: string | null }).parent_agent_id ?? null;
+  const { data: parentProfile } = parentId
+    ? await db.from("profiles").select("full_name, email").eq("id", parentId).maybeSingle()
+    : { data: null };
+  const parentName =
+    (parentProfile as { full_name?: string | null; email?: string | null } | null)?.full_name?.trim() ||
+    (parentProfile as { email?: string | null } | null)?.email ||
+    (parentId ? "Agent" : "Unassigned");
 
   return (
     <div className="mx-auto max-w-5xl">
       <Link
-        href="/admin/users"
+        href={scope.level === "platform" ? "/admin/users" : "/admin/players"}
         className="mb-4 inline-flex items-center gap-1.5 text-sm text-muted-foreground transition-colors hover:text-foreground"
       >
         <ArrowLeft className="size-4" aria-hidden />
-        All users
+        {scope.level === "platform" ? "All users" : "Players"}
       </Link>
 
       <AdminPageHeader
         title={profileDisplayName(p)}
-        description={`${profileHandle(p)}${email ? ` · ${email}` : ""} · joined ${format(new Date(p.created_at!), "MMMM d, yyyy")}`}
+        description={`${profileHandle(p)}${email ? ` · ${email}` : ""} · Parent ${parentName} · joined ${format(new Date(p.created_at!), "MMMM d, yyyy")}`}
         action={
           profileIsBanned(p) ? (
             <Badge className="bg-ws-danger/15 text-ws-danger">
@@ -274,17 +284,19 @@ export default async function AdminUserDetailPage({
               </GlassCard>
             </div>
 
-            <UserManagementPanel
-              userId={id}
-              isBanned={profileIsBanned(p)}
-              walletBalance={profileNum(p.wallet_balance)}
-              cashoutWallet={profileNum(p.cashout_wallet)}
-              coinsBalance={profileNum(p.coins_balance)}
-              allRoles={allRoles}
-              userRoleKeys={userRoleKeys}
-              canManageRoles={canManageRoles}
-              canDelete={canDelete}
-            />
+            {scope.level === "sub" ? null : (
+              <UserManagementPanel
+                userId={id}
+                isBanned={profileIsBanned(p)}
+                walletBalance={profileNum(p.wallet_balance)}
+                cashoutWallet={profileNum(p.cashout_wallet)}
+                coinsBalance={profileNum(p.coins_balance)}
+                allRoles={allRoles}
+                userRoleKeys={userRoleKeys}
+                canManageRoles={canManageRoles}
+                canDelete={canDelete}
+              />
+            )}
           </div>
         </TabsContent>
 

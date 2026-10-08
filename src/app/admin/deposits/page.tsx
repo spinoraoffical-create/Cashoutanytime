@@ -1,4 +1,9 @@
 import Link from "next/link";
+import { redirect } from "next/navigation";
+
+import { adminDb } from "@/lib/actions/admin/core";
+import { getAgentScope } from "@/lib/agents/scope";
+import { can, getStaffContext } from "@/lib/data/admin";
 import { createClient } from "@/lib/supabase/server";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -31,19 +36,52 @@ export default async function AdminDepositsPage({
 }) {
   const { status } = await searchParams;
   const activeFilter = status ?? "all";
-  const supabase = await createClient();
+  const ctx = await getStaffContext();
+  const scope = await getAgentScope();
+  const platform = Boolean(ctx && (ctx.isSuperAdmin || can(ctx, "requests.manage")));
+  const network = scope && (scope.level === "store" || scope.level === "sub");
+  if (!platform && !network) redirect("/admin");
 
-  let query = supabase
-    .from("deposit_requests")
-    .select("*, user:profiles!deposit_requests_user_id_fkey(full_name, email)")
-    .order("created_at", { ascending: false })
-    .limit(100);
-
-  if (status && status !== "all") {
-    query = query.eq("status", status);
+  type DepositCard = {
+    id: string;
+    game_name: string;
+    payment_method: Parameters<typeof getDepositMethod>[0];
+    status: RequestStatus;
+    amount: number | null;
+    proof_url: string;
+    admin_notes: string | null;
+    created_at: string;
+    user: { full_name?: string; email?: string } | null;
+  };
+  let deposits: DepositCard[] = [];
+  if (network && !platform) {
+    const db = adminDb();
+    const { data: owned } = scope.parentIds.length
+      ? await db.from("profiles").select("id").in("parent_agent_id", scope.parentIds).limit(1000)
+      : { data: [] as { id: string }[] };
+    const ids = ((owned ?? []) as { id: string }[]).map((row) => row.id);
+    if (ids.length) {
+      let query = db
+        .from("deposit_requests")
+        .select("*, user:profiles!deposit_requests_user_id_fkey(full_name, email)")
+        .in("user_id", ids)
+        .order("created_at", { ascending: false })
+        .limit(100);
+      if (status && status !== "all") query = query.eq("status", status);
+      const result = await query;
+      deposits = (result.data ?? []) as typeof deposits;
+    }
+  } else {
+    const supabase = await createClient();
+    let query = supabase
+      .from("deposit_requests")
+      .select("*, user:profiles!deposit_requests_user_id_fkey(full_name, email)")
+      .order("created_at", { ascending: false })
+      .limit(100);
+    if (status && status !== "all") query = query.eq("status", status);
+    const result = await query;
+    deposits = (result.data ?? []) as typeof deposits;
   }
-
-  const { data: deposits } = await query;
 
   return (
     <div className="mx-auto max-w-7xl">
@@ -99,7 +137,7 @@ export default async function AdminDepositsPage({
                           <span className="text-emerald-400 font-semibold"> · ${Number(dep.amount).toFixed(2)}</span>
                         )}
                       </p>
-                      <DepositProofImage path={dep.proof_url} />
+                      <DepositProofImage path={dep.proof_url ?? ""} />
                       {dep.admin_notes && (
                         <p className="text-sm text-primary">Admin: {dep.admin_notes}</p>
                       )}

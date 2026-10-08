@@ -6,6 +6,8 @@ import { AdminPageHeader } from "@/components/admin/admin-page-header";
 import { GlassCard } from "@/components/shared/glass-card";
 import { adminDb } from "@/lib/actions/admin/core";
 import { profileDisplayName } from "@/lib/admin/spinora-profile";
+import { AgentHome } from "@/components/admin/agent-home";
+import { getAgentScope } from "@/lib/agents/scope";
 import { can, requireStaff } from "@/lib/data/admin";
 
 type FeedItem = {
@@ -33,6 +35,10 @@ function since(days: number) {
 }
 
 export default async function AdminOverviewPage() {
+  const scope = await getAgentScope();
+  if (scope && (scope.level === "store" || scope.level === "sub")) {
+    return <AgentHome scope={scope} />;
+  }
   const ctx = await requireStaff();
   const db = adminDb();
   const money = can(ctx, "requests.manage");
