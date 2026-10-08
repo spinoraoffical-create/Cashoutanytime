@@ -1,6 +1,12 @@
 -- New accounts are players. profiles.role never grants Super Admin.
 -- Staff access comes only from user_roles.
 
+ALTER TABLE public.profiles DROP CONSTRAINT IF EXISTS profiles_role_check;
+ALTER TABLE public.profiles
+  ADD CONSTRAINT profiles_role_check
+  CHECK (role IN ('customer', 'user', 'admin', 'super_admin'))
+  NOT VALID;
+
 ALTER TABLE public.profiles
   ALTER COLUMN role SET DEFAULT 'customer';
 
@@ -27,9 +33,9 @@ SECURITY DEFINER
 SET search_path = public
 AS $$
 DECLARE
-  desired_username citext;
+  desired_username text;
   suffix int := 0;
-  final_username citext;
+  final_username text;
   ref_code text;
   referrer public.profiles%rowtype;
   has_referrer boolean := false;
@@ -89,6 +95,76 @@ WHERE id NOT IN (
 )
 AND coalesce(role, '') IN ('admin', 'super_admin');
 
+-- This database never had the staff role tables. Create them before the grant.
+CREATE TABLE IF NOT EXISTS public.roles (
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  key text NOT NULL UNIQUE,
+  name text NOT NULL DEFAULT '',
+  description text NOT NULL DEFAULT '',
+  is_system boolean NOT NULL DEFAULT true,
+  created_at timestamptz NOT NULL DEFAULT now()
+);
+
+CREATE TABLE IF NOT EXISTS public.permissions (
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  key text NOT NULL UNIQUE,
+  name text NOT NULL DEFAULT '',
+  module text NOT NULL DEFAULT '',
+  description text NOT NULL DEFAULT '',
+  created_at timestamptz NOT NULL DEFAULT now()
+);
+
+CREATE TABLE IF NOT EXISTS public.role_permissions (
+  role_id uuid NOT NULL REFERENCES public.roles (id) ON DELETE CASCADE,
+  permission_id uuid NOT NULL REFERENCES public.permissions (id) ON DELETE CASCADE,
+  PRIMARY KEY (role_id, permission_id)
+);
+
+CREATE TABLE IF NOT EXISTS public.user_roles (
+  user_id uuid NOT NULL REFERENCES auth.users (id) ON DELETE CASCADE,
+  role_id uuid NOT NULL REFERENCES public.roles (id) ON DELETE CASCADE,
+  granted_by uuid REFERENCES auth.users (id) ON DELETE SET NULL,
+  granted_at timestamptz NOT NULL DEFAULT now(),
+  PRIMARY KEY (user_id, role_id)
+);
+
+INSERT INTO public.roles (key, name, description)
+VALUES
+  ('super_admin', 'Super Admin', 'Full platform control'),
+  ('admin', 'Admin', 'Operations'),
+  ('manager', 'Manager', 'Promotions and content'),
+  ('support_agent', 'Support Agent', 'Support inbox'),
+  ('moderator', 'Moderator', 'Community moderation')
+ON CONFLICT (key) DO NOTHING;
+
+ALTER TABLE public.user_roles ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.roles ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.permissions ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.role_permissions ENABLE ROW LEVEL SECURITY;
+
+DROP POLICY IF EXISTS user_roles_read_own ON public.user_roles;
+CREATE POLICY user_roles_read_own ON public.user_roles
+  FOR SELECT TO authenticated
+  USING (user_id = auth.uid());
+
+DROP POLICY IF EXISTS roles_read ON public.roles;
+CREATE POLICY roles_read ON public.roles
+  FOR SELECT TO authenticated
+  USING (true);
+
+DROP POLICY IF EXISTS permissions_read ON public.permissions;
+CREATE POLICY permissions_read ON public.permissions
+  FOR SELECT TO authenticated
+  USING (true);
+
+DROP POLICY IF EXISTS role_permissions_read ON public.role_permissions;
+CREATE POLICY role_permissions_read ON public.role_permissions
+  FOR SELECT TO authenticated
+  USING (true);
+
+GRANT SELECT ON public.user_roles, public.roles, public.permissions, public.role_permissions TO authenticated;
+GRANT ALL ON public.user_roles, public.roles, public.permissions, public.role_permissions TO service_role;
+
 INSERT INTO public.user_roles (user_id, role_id)
 SELECT u.id, r.id
 FROM auth.users u
@@ -103,3 +179,5 @@ WHERE ur.role_id = r.id
   AND ur.user_id NOT IN (
     SELECT id FROM auth.users WHERE lower(email) = 'spinoraoffical@gmail.com'
   );
+
+NOTIFY pgrst, 'reload schema';

@@ -3,7 +3,7 @@ import { createPaydoraDeposit, getPaydoraPaymentMethods, isRemovedCheckoutMethod
 import { rememberPaymentIntent } from "@/lib/payments/auto-settle";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
-import { checkRateLimit, clientIp, rateLimitUserMessage } from "@/lib/rate-limit";
+import { checkRateLimit, publicClientIp, rateLimitUserMessage } from "@/lib/rate-limit";
 import { playerPaymentError } from "@/lib/player-safe-error";
 import { responsibleBlock } from "@/lib/responsible/play-guard";
 
@@ -24,7 +24,7 @@ export async function POST(req: Request) {
     }
 
     const body = await req.json();
-    let paymentMethodId = String(body.paymentMethodId || "").trim();
+    const paymentMethodId = String(body.paymentMethodId || "").trim();
     const amount = Number(body.amount);
     const fingerprint = String(body.deviceFingerprint || "").trim();
     const gameSlug = String(body.gameSlug || "").trim();
@@ -44,21 +44,43 @@ export async function POST(req: Request) {
 
     const catalog = await getPaydoraPaymentMethods();
     const allowed = catalog.deposits.filter((method) => !isRemovedCheckoutMethod(method));
-    const chosen = allowed.find((method) => method.id === paymentMethodId) ?? allowed[0];
-    if (!chosen) {
+    const ordered = [
+      ...allowed.filter((method) => method.id === paymentMethodId),
+      ...allowed.filter((method) => method.id !== paymentMethodId),
+    ];
+    if (!ordered.length) {
       return NextResponse.json({ error: "Paydora checkout is not available right now." }, { status: 400 });
     }
-    paymentMethodId = chosen.id;
 
-    const ip = clientIp(req);
-    const deposit = await createPaydoraDeposit({
-      paymentMethodId,
-      amount,
-      userName: user.id,
-      customerIp: ip === "unknown" ? "127.0.0.1" : ip,
-      deviceFingerprint: fingerprint || `player_${user.id}`,
-      idempotencyKey: `dep_${user.id}_${Date.now()}`,
-    });
+    const ip = publicClientIp(req);
+    if (!ip) {
+      return NextResponse.json({ error: "Checkout could not start. Try again." }, { status: 400 });
+    }
+
+    let deposit: Awaited<ReturnType<typeof createPaydoraDeposit>> | null = null;
+    let lastError: unknown = null;
+    for (const method of ordered) {
+      try {
+        const created = await createPaydoraDeposit({
+          paymentMethodId: method.id,
+          amount,
+          userName: user.id,
+          customerIp: ip,
+          deviceFingerprint: fingerprint || `player_${user.id}`,
+          idempotencyKey: `dep_${user.id}_${method.id}_${Date.now()}`,
+        });
+        if (created?.id && created.paymentUrl) {
+          deposit = created;
+          break;
+        }
+        lastError = new Error("No checkout URL returned from payment server");
+      } catch (err) {
+        lastError = err;
+        const status = (err as { status?: number }).status || 0;
+        if (status === 401 || status === 403) throw err;
+      }
+    }
+    if (!deposit) throw lastError ?? new Error("Paydora checkout is not available right now.");
 
     const admin = createAdminClient();
     if (!admin || !deposit.id) {

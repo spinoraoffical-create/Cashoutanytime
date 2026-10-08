@@ -31,6 +31,38 @@ export function clientIp(request: Request): string {
   );
 }
 
+function isPublicIp(ip: string) {
+  if (!ip || ip === "unknown") return false;
+  const bare = ip.replace(/^::ffff:/i, "");
+  if (bare === "::1" || bare.startsWith("fe80:") || bare.startsWith("fc") || bare.startsWith("fd")) return false;
+  const match = bare.match(/^(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})$/);
+  if (!match) return bare.includes(":");
+  const a = Number(match[1]);
+  const b = Number(match[2]);
+  if ([a, b, Number(match[3]), Number(match[4])].some((n) => n > 255)) return false;
+  if (a === 10 || a === 127 || a === 0) return false;
+  if (a === 192 && b === 168) return false;
+  if (a === 172 && b >= 16 && b <= 31) return false;
+  if (a === 169 && b === 254) return false;
+  return true;
+}
+
+/** Paydora rejects loopback and private addresses. */
+export function publicClientIp(request: Request): string | null {
+  const header = [
+    request.headers.get("x-forwarded-for"),
+    request.headers.get("x-real-ip"),
+    request.headers.get("cf-connecting-ip"),
+  ]
+    .filter(Boolean)
+    .join(",");
+  for (const part of header.split(",")) {
+    const ip = part.trim();
+    if (isPublicIp(ip)) return ip.replace(/^::ffff:/i, "");
+  }
+  return null;
+}
+
 /** Money / mass-action paths deny the request if limiter infra is down. */
 const FAIL_CLOSED_ACTIONS = new Set<keyof typeof RATE_LIMITS>([
   "paydoraCreate",
