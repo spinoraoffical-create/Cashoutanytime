@@ -36,6 +36,7 @@ export function DollarPayDepositSection({
   onSuccess?: () => void;
   gamePicker?: ReactNode;
 }) {
+  const [methods, setMethods] = useState<PayMethod[]>([]);
   const [method, setMethod] = useState<PayMethod | null>(null);
   const [selectedAmount, setSelectedAmount] = useState("");
   const [loadingMethods, setLoadingMethods] = useState(true);
@@ -50,6 +51,7 @@ export function DollarPayDepositSection({
       .then((data) => {
         if (cancelled) return;
         const list: PayMethod[] = data.deposits || [];
+        setMethods(list);
         setMethod(list[0] ?? null);
         if (data.error) toast.error(friendlyPlayerError(data.error, DEPOSITS_UNAVAILABLE));
       })
@@ -151,6 +153,25 @@ export function DollarPayDepositSection({
         <p className="text-sm text-[#b9b3c6]">Paydora checkout is not available right now.</p>
       ) : (
         <>
+          <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
+            {methods.map((item) => (
+              <button
+                key={item.id}
+                type="button"
+                onClick={() => {
+                  setMethod(item);
+                  setSelectedAmount("");
+                }}
+                className={`h-11 rounded-xl border text-sm font-bold ${
+                  method?.id === item.id
+                    ? "border-[#ff6b89] bg-[#ff6b89] text-[#0f172a]"
+                    : "border-white/10 bg-[#160812] text-[#fcf9fb]"
+                }`}
+              >
+                {item.name}
+              </button>
+            ))}
+          </div>
           <div className="grid grid-cols-3 gap-2 sm:grid-cols-4">
             {amounts.map((amt) => (
               <button

@@ -37,18 +37,25 @@ export async function POST(req: Request) {
         if (!admin) throw new Error("Admin client unavailable");
         const { data: intent, error: intentError } = await admin
           .from("payment_intents")
-          .select("user_id, game_slug, game_name")
+          .select("user_id, game_slug, game_name, promo_code, base_amount")
           .eq("provider", "paydora")
           .eq("external_id", payload.data.depositId)
           .maybeSingle();
         if (intentError) throw new Error(intentError.message);
-        const saved = intent as { user_id?: string; game_slug?: string | null; game_name?: string | null } | null;
-        if (!saved?.game_slug) {
+        const saved = intent as {
+          user_id?: string;
+          game_slug?: string | null;
+          game_name?: string | null;
+          promo_code?: string | null;
+          base_amount?: number | null;
+        } | null;
+        const savedAmount = Number(saved?.base_amount);
+        if (!saved?.user_id || !saved.game_slug || !Number.isFinite(savedAmount) || savedAmount <= 0) {
           throw new Error("Payment intent or game is missing");
         }
         await creditPaydoraDeposit({
-          userId: saved.user_id || userId,
-          amount,
+          userId: saved.user_id,
+          amount: savedAmount,
           depositId: payload.data.depositId,
           referenceId: payload.data.referenceId,
           gameSlug: saved.game_slug,

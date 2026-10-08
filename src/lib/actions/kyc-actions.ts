@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
+import { authorize } from "@/lib/actions/admin/core";
 
 export interface KYCSubmissionRecord {
   id: string;
@@ -127,6 +128,11 @@ export async function getKYCSystemStatus(): Promise<{ ready: boolean; error?: st
 }
 
 export async function getAdminKYCSubmissions(): Promise<KYCSubmissionRecord[]> {
+  const gate = await authorize("kyc.manage");
+  if ("error" in gate) {
+    throw new Error(gate.error);
+  }
+
   const admin = createAdminClient();
   if (!admin) return [];
 
@@ -153,6 +159,9 @@ export async function updateKYCStatus(
   submissionIdOrUserId: string,
   newStatus: "approved" | "rejected"
 ): Promise<{ ok: boolean; error?: string }> {
+  const gate = await authorize("kyc.manage");
+  if ("error" in gate) return { ok: false, error: gate.error };
+
   const admin = createAdminClient();
   if (!admin) return { ok: false, error: "Server configuration error." };
 

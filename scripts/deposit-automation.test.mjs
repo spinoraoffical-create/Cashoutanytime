@@ -44,7 +44,10 @@ const gameDeposit = readFileSync(new URL("../src/components/games/game-deposit-s
 const requests = readFileSync(new URL("../src/app/admin/requests/page.tsx", import.meta.url), "utf8");
 assert.match(checkout, /Your wallet is credited when Paydora confirms the payment\./);
 assert.match(checkout, /Pay with Paydora/);
-assert.equal(/Cash App|Venmo|Chime|PayPal|screenshot|pay manually|nowpayments/i.test(checkout), false);
+assert.match(checkout, /methods\.map/);
+const paydora = readFileSync(new URL("../src/lib/payments/paydora.ts", import.meta.url), "utf8");
+assert.equal(/cashapp\|venmo\|chime/.test(paydora), false);
+assert.equal(/Venmo|PayPal|screenshot|pay manually|nowpayments/i.test(checkout), false);
 assert.equal(/screenshot|pay manually|qrImage|DEPOSIT_PAYMENT_METHODS/i.test(gameDeposit), false);
 assert.match(requests, /redirect\("\/admin\/deposits"\)/);
 assert.equal(existsSync(new URL("../src/app/api/payments/nowpayments/create/route.ts", import.meta.url)), false);

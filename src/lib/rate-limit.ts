@@ -63,10 +63,10 @@ export function publicClientIp(request: Request): string | null {
   return null;
 }
 
-/** Money / mass-action paths deny the request if limiter infra is down. */
+/** Game loads and broadcasts stay blocked if the limiter cannot be checked.
+ * Deposits still open Paydora checkout when the limiter function is missing.
+ */
 const FAIL_CLOSED_ACTIONS = new Set<keyof typeof RATE_LIMITS>([
-  "paydoraCreate",
-  "paydoraPayout",
   "gameLoad",
   "broadcast",
 ]);
@@ -78,9 +78,9 @@ export type RateLimitOutcome = {
 
 /**
  * Fixed-window rate limit via the check_rate_limit RPC (service role).
- * Fail-open: public/read/chat/auth so a DB blip does not lock members out.
- * Fail-closed: deposits, payouts, game loads, broadcasts — never move money
- * if the limiter cannot be evaluated.
+ * Fail-open when the limiter function is missing, including deposits, so a
+ * missing check_rate_limit function does not block Paydora checkout.
+ * A real limit (the function returns false) still blocks the request.
  */
 export async function checkRateLimit(
   action: keyof typeof RATE_LIMITS,
@@ -99,6 +99,7 @@ export async function checkRateLimit(
       p_window_seconds: rule.windowSeconds,
     });
     if (error) {
+      console.error("[rate-limit]", action, error.message);
       return failClosed ? { allowed: false, reason: "unavailable" } : { allowed: true };
     }
     if (data === true) return { allowed: true };

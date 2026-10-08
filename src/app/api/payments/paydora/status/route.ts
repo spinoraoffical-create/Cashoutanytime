@@ -1,9 +1,17 @@
 import { NextResponse } from "next/server";
 import { getPaydoraDeposit, isPaidDepositStatus } from "@/lib/payments/paydora";
 import { playerPaymentError } from "@/lib/player-safe-error";
-import { creditPaydoraDeposit } from "@/lib/payments/paydora-wallet";
+import { createAdminClient } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
 
+function paymentState(status: string): "paid" | "pending" | "failed" {
+  const value = status.toLowerCase();
+  if (isPaidDepositStatus(value)) return "paid";
+  if (["failed", "expired", "cancelled", "canceled", "refunded", "rejected"].includes(value)) return "failed";
+  return "pending";
+}
+
+/** Read-only. Wallet credit happens only in the Paydora webhook. */
 export async function GET(req: Request) {
   try {
     const supabase = await createClient();
@@ -15,10 +23,6 @@ export async function GET(req: Request) {
     const url = new URL(req.url);
     const depositId = url.searchParams.get("id")?.trim();
     if (!depositId) return NextResponse.json({ error: "Missing deposit id." }, { status: 400 });
-    const methodValue = url.searchParams.get("method");
-    const methodName = url.searchParams.get("methodName");
-    const gameName = url.searchParams.get("gameName");
-    const gameSlug = url.searchParams.get("gameSlug");
 
     const deposit = await getPaydoraDeposit(depositId);
     if (deposit.userName && deposit.userName !== user.id) {
@@ -26,22 +30,19 @@ export async function GET(req: Request) {
     }
 
     let credited = false;
-    if (isPaidDepositStatus(deposit.status)) {
-      const amount = Number(deposit.paidAmount ?? deposit.amount);
-      const result = await creditPaydoraDeposit({
-        userId: user.id,
-        amount,
-        depositId: deposit.id,
-        referenceId: deposit.referenceId,
-        methodValue,
-        methodName,
-        gameName,
-        gameSlug,
-      });
-      credited = Boolean(result.credited);
+    const admin = createAdminClient();
+    if (admin) {
+      const { data } = await admin
+        .from("deposit_bonus_ledger")
+        .select("wallet_credited")
+        .eq("deposit_key", deposit.id)
+        .eq("user_id", user.id)
+        .maybeSingle();
+      credited = Boolean((data as { wallet_credited?: boolean } | null)?.wallet_credited);
     }
 
     return NextResponse.json({
+      state: paymentState(deposit.status || "pending"),
       status: deposit.status,
       amount: deposit.amount,
       paidAmount: deposit.paidAmount,

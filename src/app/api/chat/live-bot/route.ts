@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { createAdminClient } from "@/lib/supabase/admin";
+import { createClient } from "@/lib/supabase/server";
 import { processAIChatQuery, getBotSenderProfileId, stripHtmlForDisplay } from "@/lib/ai/chatbot";
 import { getChatbotSettings } from "@/lib/ai/settings";
 import { clientIp, rateLimit } from "@/lib/api/rate-limit";
@@ -21,7 +22,11 @@ export async function POST(req: Request) {
     const requestHuman = body.requestHuman === true;
     const hasMedia = Boolean(body.hasMedia);
     const mediaName = String(body.mediaName || "").slice(0, 200);
-    const userId = body.userId ? String(body.userId) : undefined;
+    const supabase = await createClient();
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
+    const userId = user?.id ?? null;
 
     if (!message.trim() && !hasMedia) {
       return NextResponse.json({ error: "Message required" }, { status: 400 });
@@ -40,7 +45,7 @@ export async function POST(req: Request) {
       ? `[User uploaded media: ${mediaName || "file"}] ${message}`.trim()
       : message;
 
-    const aiResult = await processAIChatQuery(query, undefined, userId);
+    const aiResult = await processAIChatQuery(query, undefined, userId ?? undefined);
     let reply = stripHtmlForDisplay(aiResult.response);
 
     if (hasMedia && aiResult.confidenceScore > 0.7) {

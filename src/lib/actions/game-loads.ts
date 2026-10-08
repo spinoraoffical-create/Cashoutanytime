@@ -30,6 +30,33 @@ import { isJuwaApiConfigured } from "@/lib/game-automation/juwa-api";
 import { autoFulfillVegasRequest } from "@/lib/game-automation/vegas-service";
 import { isVegasApiConfigured } from "@/lib/game-automation/vegas-api";
 import { userFacingGameLoadError } from "@/lib/game-automation/user-facing-errors";
+import { usernameForOwner } from "@/lib/games/owned-account";
+
+async function ownedGameUsername(userId: string, gameSlug: string) {
+  const admin = createAdminClient();
+  if (!admin) return null;
+  const { data: game } = await admin.from("games").select("id").eq("slug", gameSlug).maybeSingle();
+  const gameId = (game as { id?: string } | null)?.id;
+  if (!gameId) return null;
+  const { data } = await admin
+    .from("game_accounts")
+    .select("game_username")
+    .eq("user_id", userId)
+    .eq("game_id", gameId)
+    .maybeSingle();
+  const match = usernameForOwner(
+    [
+      {
+        userId,
+        gameSlug,
+        username: (data as { game_username?: string | null } | null)?.game_username ?? "",
+      },
+    ],
+    userId,
+    gameSlug
+  );
+  return "username" in match ? match.username : null;
+}
 
 function playerGameError(message: string | null | undefined, loadType?: string | null): string {
   if (message?.trim()) console.error("[game-loads]", message);
@@ -274,9 +301,8 @@ export async function requestGameAccountCreate(input: {
   }
 
   // Fail jobs stuck in pending/processing (no-op if SQL migration not applied yet).
-  void supabase.rpc("fail_stale_game_loads", {
+  void supabase.rpc("fail_my_stale_game_load", {
     p_stale_minutes: 5,
-    p_user_id: user.id,
     p_game_slug: input.gameSlug,
   });
 
@@ -375,9 +401,8 @@ export async function requestGameCheckBalance(input: {
     return { error: GAME_API_UNAVAILABLE };
   }
 
-  if (!input.gameUsername?.trim()) {
-    return { error: "Create your game account first." };
-  }
+  const gameUsername = await ownedGameUsername(user.id, input.gameSlug);
+  if (!gameUsername) return { error: "Account not found" };
 
   if (API_CONFIGURED_GAMES.includes(input.gameSlug)) {
     const admin = createAdminClient();
@@ -407,14 +432,13 @@ export async function requestGameCheckBalance(input: {
   const { data: requestId, error } = await supabase.rpc("request_game_check_balance", {
     p_game_slug: input.gameSlug,
     p_game_name: input.gameName,
-    p_game_username: input.gameUsername.trim(),
   });
 
   if (error) return { error: playerGameError(error.message, "check_balance") };
 
   const fulfillResult = await fulfillOrFail(input.gameSlug, requestId as string, "check_balance", {
     userId: user.id,
-    gameUsername: input.gameUsername.trim(),
+    gameUsername,
   });
   if (!fulfillResult?.success) {
     revalidatePath(`/games/${input.gameSlug}`);
@@ -461,9 +485,8 @@ export async function requestGameLoad(input: {
     };
   }
 
-  if (!input.gameUsername?.trim()) {
-    return { error: "Create your game account first." };
-  }
+  const gameUsername = await ownedGameUsername(user.id, input.gameSlug);
+  if (!gameUsername) return { error: "Account not found" };
 
   if (input.walletType !== "current") {
     return { error: "Loads must use Total Deposit wallet." };
@@ -487,14 +510,13 @@ export async function requestGameLoad(input: {
     p_amount: amount,
     p_wallet_type: "current",
     p_load_type: "load",
-    p_game_username: input.gameUsername.trim(),
   });
 
   if (error) return { error: playerGameError(error.message, "load") };
 
   const fulfillResult = await fulfillOrFail(input.gameSlug, requestId as string, "load", {
     userId: user.id,
-    gameUsername: input.gameUsername.trim(),
+    gameUsername,
     amount,
   });
   if (!fulfillResult?.success) {
@@ -555,9 +577,8 @@ export async function requestGameRedeem(input: {
     }
   }
 
-  if (!input.gameUsername?.trim()) {
-    return { error: "Create your game account first." };
-  }
+  const gameUsername = await ownedGameUsername(user.id, input.gameSlug);
+  if (!gameUsername) return { error: "Account not found" };
 
   const walletType = "current" as const;
 
@@ -615,7 +636,6 @@ export async function requestGameRedeem(input: {
     p_game_slug: input.gameSlug,
     p_game_name: input.gameName,
     p_amount: redeemAll ? 0 : input.amount,
-    p_game_username: input.gameUsername.trim(),
     p_redeem_all: redeemAll,
   });
 
@@ -623,7 +643,7 @@ export async function requestGameRedeem(input: {
 
   const fulfillResult = await fulfillOrFail(input.gameSlug, requestId as string, "redeem", {
     userId: user.id,
-    gameUsername: input.gameUsername.trim(),
+    gameUsername,
     amount: redeemAll ? null : input.amount,
   });
   if (!fulfillResult?.success) {
@@ -819,9 +839,8 @@ export async function healStaleGameLoads(gameSlug: string, staleMinutes = 15) {
   } = await supabase.auth.getUser();
   if (!user) return { healed: 0 };
 
-  const { data, error } = await supabase.rpc("fail_stale_game_loads", {
+  const { data, error } = await supabase.rpc("fail_my_stale_game_load", {
     p_stale_minutes: staleMinutes,
-    p_user_id: user.id,
     p_game_slug: gameSlug,
   });
 

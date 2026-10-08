@@ -6,8 +6,8 @@ import crypto from "crypto";
  */
 
 export const PAYDORA_WALLET_AMOUNTS = [
-  "9.99", "14.99", "19.99", "24.99", "29.99", "39.99", "49.99", "59.99",
-  "99.99", "124.99", "149.99", "199.99",
+  "4.99", "9.99", "14.99", "19.99", "24.99", "29.99", "39.99", "49.99", "59.99",
+  "89.99", "99.99", "124.99", "149.99", "199.99", "249.99", "299.99", "399.99", "499.99",
 ];
 
 export const PAYDORA_CARD_AMOUNTS = [
@@ -17,7 +17,7 @@ export const PAYDORA_CARD_AMOUNTS = [
 ];
 
 export const PAYDORA_CHIME_AMOUNTS = [
-  "5", "7", "10", "15", "20", "25", "30", "31", "40", "50", "60", "100",
+  "20", "25", "30", "31", "40", "50", "60", "100",
   "125", "130", "150", "200", "300", "400", "500",
 ];
 
@@ -77,10 +77,18 @@ export function isPaydoraConfigured() {
   return Boolean(process.env.PAYDORA_API_KEY?.trim());
 }
 
-/** Local QR and handle brands are not offered. Checkout stays on Paydora. */
+/** Manual wallets stay off checkout. Card, Chime, and Cash App are Paydora methods. */
 export function isRemovedCheckoutMethod(method: { name?: string | null; value?: string | null }) {
   const text = `${method.name || ""} ${method.value || ""}`.toLowerCase();
-  return /cash\s*app|cashapp|venmo|chime|paypal|bitcoin|\bbtc\b|usdt|tether/.test(text);
+  return /venmo|paypal|bitcoin|\bbtc\b|usdt|tether/.test(text);
+}
+
+const CHECKOUT_METHOD_ORDER = ["card", "chime", "cashapp", "googlepay", "applepay"];
+
+export function checkoutMethodRank(method: { name?: string | null; value?: string | null }) {
+  const value = (method.value || "").toLowerCase().replace(/[\s_-]/g, "");
+  const index = CHECKOUT_METHOD_ORDER.findIndex((key) => value === key || value.includes(key));
+  return index === -1 ? CHECKOUT_METHOD_ORDER.length : index;
 }
 
 export function amountsForMethod(value: string): string[] {

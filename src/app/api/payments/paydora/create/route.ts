@@ -44,12 +44,9 @@ export async function POST(req: Request) {
 
     const catalog = await getPaydoraPaymentMethods();
     const allowed = catalog.deposits.filter((method) => !isRemovedCheckoutMethod(method));
-    const ordered = [
-      ...allowed.filter((method) => method.id === paymentMethodId),
-      ...allowed.filter((method) => method.id !== paymentMethodId),
-    ];
-    if (!ordered.length) {
-      return NextResponse.json({ error: "Paydora checkout is not available right now." }, { status: 400 });
+    const chosen = allowed.find((method) => method.id === paymentMethodId);
+    if (!chosen) {
+      return NextResponse.json({ error: "Choose Card, Chime, or Cash App." }, { status: 400 });
     }
 
     const ip = publicClientIp(req);
@@ -57,30 +54,17 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: "Checkout could not start. Try again." }, { status: 400 });
     }
 
-    let deposit: Awaited<ReturnType<typeof createPaydoraDeposit>> | null = null;
-    let lastError: unknown = null;
-    for (const method of ordered) {
-      try {
-        const created = await createPaydoraDeposit({
-          paymentMethodId: method.id,
-          amount,
-          userName: user.id,
-          customerIp: ip,
-          deviceFingerprint: fingerprint || `player_${user.id}`,
-          idempotencyKey: `dep_${user.id}_${method.id}_${Date.now()}`,
-        });
-        if (created?.id && created.paymentUrl) {
-          deposit = created;
-          break;
-        }
-        lastError = new Error("No checkout URL returned from payment server");
-      } catch (err) {
-        lastError = err;
-        const status = (err as { status?: number }).status || 0;
-        if (status === 401 || status === 403) throw err;
-      }
+    const deposit = await createPaydoraDeposit({
+      paymentMethodId: chosen.id,
+      amount,
+      userName: user.id,
+      customerIp: ip,
+      deviceFingerprint: fingerprint || `player_${user.id}`,
+      idempotencyKey: `dep_${user.id}_${chosen.id}_${Date.now()}`,
+    });
+    if (!deposit?.id || !deposit.paymentUrl) {
+      return NextResponse.json({ error: "No checkout URL returned from payment server" }, { status: 502 });
     }
-    if (!deposit) throw lastError ?? new Error("Paydora checkout is not available right now.");
 
     const admin = createAdminClient();
     if (!admin || !deposit.id) {

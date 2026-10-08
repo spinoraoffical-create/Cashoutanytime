@@ -33,6 +33,7 @@ const PLAYER_SAFE_ERROR_PATTERNS = [
   /^insufficient/i,
   /^you loaded from/i,
   /^not enough balance/i,
+  /^account not found/i,
   /^create your game account/i,
   /^a request is already/i,
   /^loads must use/i,

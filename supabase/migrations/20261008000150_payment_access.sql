@@ -78,3 +78,5 @@ BEGIN
     GRANT EXECUTE ON FUNCTION public.debit_paydora_payout(uuid, numeric, text) TO service_role;
   END IF;
 END $$;
+
+NOTIFY pgrst, 'reload schema';

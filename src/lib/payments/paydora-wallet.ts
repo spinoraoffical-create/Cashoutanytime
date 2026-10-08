@@ -334,51 +334,9 @@ export async function reversePaydoraDeposit(input: {
       finalCredit: amount,
     };
   }
-  if (!missingRpc) throw new Error(rpcError.message);
-
-  const marker = `refund:${input.depositId}`;
-  if (await alreadyApplied(admin, input.userId, marker)) return { reversed: false, duplicate: true };
-
-  const { data: profile } = await admin
-    .from("profiles")
-    .select("wallet_balance")
-    .eq("id", input.userId)
-    .maybeSingle();
-
-  const currentBalance = Number(profile?.wallet_balance || 0);
-  const newBalance = Math.max(0, Math.round((currentBalance - amount) * 100) / 100);
-
-  const { data: updated, error: updateError } = await admin
-    .from("profiles")
-    .update({ wallet_balance: newBalance })
-    .eq("id", input.userId)
-    .select("wallet_balance")
-    .single();
-
-  if (updateError) throw new Error(updateError.message);
-
-  if (Math.abs(Number(updated?.wallet_balance) - newBalance) > 0.009) {
-    throw new Error(
-      "Wallet balance did not update. Run supabase/paydora-system-wallet-credit.sql in Supabase."
-    );
-  }
-
-  const { error: txError } = await admin.from("wallet_transactions").insert({
-    user_id: input.userId,
-    amount,
-    wallet_type: "current",
-    transaction_type: "debit",
-    source: "deposit",
-    description: `Paydora refund $${amount.toFixed(2)} (${marker})`,
-    created_by: null,
-  });
-
-  if (txError) throw new Error(txError.message);
-
-  await admin
-    .from("deposit_requests")
-    .update({ status: "rejected", admin_notes: "Paydora refunded this deposit" })
-    .eq("proof_url", paydoraProofPath(input.depositId));
-
-  return { reversed: true, newBalance: Number(updated.wallet_balance) };
+  throw new PaymentIdentityError(
+    missingRpc
+      ? "reverse_paydora_deposit is missing. Apply the Paydora wallet SQL before reversing deposits."
+      : rpcError.message
+  );
 }

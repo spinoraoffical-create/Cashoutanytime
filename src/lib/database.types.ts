@@ -1016,7 +1016,6 @@ export type Database = {
           p_amount: number;
           p_wallet_type: string;
           p_load_type: string;
-          p_game_username?: string | null;
         };
         Returns: string;
       };
@@ -1025,7 +1024,6 @@ export type Database = {
           p_game_slug: string;
           p_game_name: string;
           p_amount: number;
-          p_game_username: string;
           p_redeem_all?: boolean;
         };
         Returns: string;
@@ -1035,11 +1033,15 @@ export type Database = {
         Returns: undefined;
       };
       request_game_check_balance: {
-        Args: { p_game_slug: string; p_game_name: string; p_game_username: string };
+        Args: { p_game_slug: string; p_game_name: string };
         Returns: string;
       };
       fail_stale_game_loads: {
         Args: { p_stale_minutes?: number; p_user_id?: string | null; p_game_slug?: string | null };
+        Returns: number;
+      };
+      fail_my_stale_game_load: {
+        Args: { p_stale_minutes?: number; p_game_slug?: string | null };
         Returns: number;
       };
       public_profiles_by_ids: {

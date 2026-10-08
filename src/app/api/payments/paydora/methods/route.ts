@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { amountsForMethod, getPaydoraPaymentMethods, isRemovedCheckoutMethod } from "@/lib/payments/paydora";
+import { amountsForMethod, checkoutMethodRank, getPaydoraPaymentMethods, isRemovedCheckoutMethod } from "@/lib/payments/paydora";
 import { playerPaymentError } from "@/lib/player-safe-error";
 
 export async function GET() {
@@ -8,6 +8,7 @@ export async function GET() {
     return NextResponse.json({
       deposits: methods.deposits
         .filter((m) => !isRemovedCheckoutMethod(m))
+        .sort((a, b) => checkoutMethodRank(a) - checkoutMethodRank(b))
         .map((m) => ({
           ...m,
           amounts: amountsForMethod(m.value),

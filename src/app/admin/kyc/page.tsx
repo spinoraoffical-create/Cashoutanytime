@@ -12,7 +12,7 @@ export const revalidate = 0;
 export const metadata: Metadata = { title: "KYC Review Center" };
 
 export default async function AdminKYCPage() {
-  await requirePermission("cms.manage");
+  await requirePermission("kyc.manage");
 
   const submissions = await getAdminKYCSubmissions();
   const system = await getKYCSystemStatus();
