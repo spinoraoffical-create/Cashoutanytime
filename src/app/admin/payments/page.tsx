@@ -51,7 +51,7 @@ export default async function AdminPaymentsPage() {
     <div className="mx-auto max-w-3xl">
       <AdminPageHeader
         title="Payment Methods"
-        description="Manage deposit options on the wallet page — handle/address, pay link and QR per method. Changes go live immediately."
+        description="Stored payment labels. Player checkout uses Paydora only, so these handles and QR codes are not shown on the deposit page."
       />
 
       <div className="mb-6">

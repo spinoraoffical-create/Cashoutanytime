@@ -89,7 +89,7 @@ export default async function AdminDepositsPage({
       <div className="mb-6 sm:mb-8">
         <h1 className="text-2xl sm:text-3xl font-bold">Deposit Requests</h1>
         <p className="text-muted-foreground text-sm sm:text-base">
-          Review payment screenshots and confirm deposits — confirming credits the user&apos;s Total Deposit wallet
+          Paydora credits the wallet when payment is confirmed. This list is the deposit record.
         </p>
       </div>
 

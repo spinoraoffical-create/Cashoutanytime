@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { readFileSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 import {
   bonusForPercent,
   creditOnce,
@@ -39,14 +39,22 @@ assert.equal(playerVisibleTo(["store", "sub-a"], "sub-a"), true);
 
 assert.throws(() => refundFinalCredit({ balance: 40, credits: new Map(), refunds: new Set() }, "missing"));
 
+const checkout = readFileSync(new URL("../src/components/payments/dollarpay-deposit-modal.tsx", import.meta.url), "utf8");
+const gameDeposit = readFileSync(new URL("../src/components/games/game-deposit-section.tsx", import.meta.url), "utf8");
+const requests = readFileSync(new URL("../src/app/admin/requests/page.tsx", import.meta.url), "utf8");
+assert.match(checkout, /Your wallet is credited when Paydora confirms the payment\./);
+assert.match(checkout, /Pay with Paydora/);
+assert.equal(/Cash App|Venmo|Chime|PayPal|screenshot|pay manually|nowpayments/i.test(checkout), false);
+assert.equal(/screenshot|pay manually|qrImage|DEPOSIT_PAYMENT_METHODS/i.test(gameDeposit), false);
+assert.match(requests, /redirect\("\/admin\/deposits"\)/);
+assert.equal(existsSync(new URL("../src/app/api/payments/nowpayments/create/route.ts", import.meta.url)), false);
+assert.equal(existsSync(new URL("../src/app/api/payments/nowpayments/webhook/route.ts", import.meta.url)), false);
+
 const wallet = readFileSync(new URL("../src/lib/payments/paydora-wallet.ts", import.meta.url), "utf8");
-const nowWebhook = readFileSync(new URL("../src/app/api/payments/nowpayments/webhook/route.ts", import.meta.url), "utf8");
 const paydoraWebhook = readFileSync(new URL("../src/app/api/payments/paydora/webhook/route.ts", import.meta.url), "utf8");
 assert.equal(wallet.includes("quote?.finalCredit ?? amount"), false);
 assert.equal(wallet.includes("crediting the paid amount only"), false);
 assert.equal(wallet.includes("final_credit"), true);
-assert.equal(nowWebhook.includes("nowpayments:${"), false);
-assert.equal(nowWebhook.includes("depositId: orderId"), true);
 assert.equal(paydoraWebhook.includes("Payment intent or game is missing"), true);
 
 console.log("deposit automation checks passed");

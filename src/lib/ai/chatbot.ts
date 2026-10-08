@@ -33,7 +33,7 @@ const PLATFORM_KNOWLEDGE = [
   {
     keywords: ["deposit", "add money", "reload", "payment", "chime", "cashapp", "usdt", "paypal"],
     answer:
-      "💳 <b>Deposit & Load Instructions:</b>\n1. Go to your Dashboard → Deposits.\n2. Select your payment method (USDT, Chime, Cash App, PayPal, Venmo, BTC).\n3. Submit your proof of payment.\n4. Credits will be loaded to your game account automatically!",
+      "💳 <b>Deposit & Load Instructions:</b>\n1. Go to your Dashboard → Wallet.\n2. Choose a game and an amount.\n3. Pay with Paydora.\n4. Your wallet is credited when Paydora confirms the payment.",
     confidence: 0.9,
   },
   {

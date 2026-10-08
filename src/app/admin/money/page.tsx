@@ -31,7 +31,7 @@ export default async function MoneyCenterPage() {
         {
           href: "/admin/deposits?status=pending",
           title: "Incoming deposits",
-          body: "Review payment proof, then approve or reject with an amount and a note.",
+            body: "Paydora credits the wallet when payment is confirmed.",
         },
         {
           href: "/admin/game-loads",
@@ -50,8 +50,8 @@ export default async function MoneyCenterPage() {
         },
         {
           href: "/admin/requests",
-          title: "Manual requests",
-          body: "Older contact-us deposit requests that are not in the payment queue.",
+          title: "Deposit records",
+          body: "Opens the deposit list. New deposits are confirmed by Paydora.",
         },
         {
           href: "/admin/failed-loads",

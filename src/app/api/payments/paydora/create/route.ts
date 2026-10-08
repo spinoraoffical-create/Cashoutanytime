@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { createPaydoraDeposit } from "@/lib/payments/paydora";
+import { createPaydoraDeposit, getPaydoraPaymentMethods, isRemovedCheckoutMethod } from "@/lib/payments/paydora";
 import { rememberPaymentIntent } from "@/lib/payments/auto-settle";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
@@ -24,16 +24,13 @@ export async function POST(req: Request) {
     }
 
     const body = await req.json();
-    const paymentMethodId = String(body.paymentMethodId || "").trim();
+    let paymentMethodId = String(body.paymentMethodId || "").trim();
     const amount = Number(body.amount);
     const fingerprint = String(body.deviceFingerprint || "").trim();
     const gameSlug = String(body.gameSlug || "").trim();
     const gameName = String(body.gameName || "").trim();
     const promoCode = String(body.promoCode || body.ref || "").trim();
 
-    if (!paymentMethodId) {
-      return NextResponse.json({ error: "Choose a payment method." }, { status: 400 });
-    }
     if (!Number.isFinite(amount) || amount <= 0) {
       return NextResponse.json({ error: "Choose a deposit amount." }, { status: 400 });
     }
@@ -44,6 +41,14 @@ export async function POST(req: Request) {
     if (blocked) {
       return NextResponse.json({ error: blocked }, { status: 403 });
     }
+
+    const catalog = await getPaydoraPaymentMethods();
+    const allowed = catalog.deposits.filter((method) => !isRemovedCheckoutMethod(method));
+    const chosen = allowed.find((method) => method.id === paymentMethodId) ?? allowed[0];
+    if (!chosen) {
+      return NextResponse.json({ error: "Paydora checkout is not available right now." }, { status: 400 });
+    }
+    paymentMethodId = chosen.id;
 
     const ip = clientIp(req);
     const deposit = await createPaydoraDeposit({
@@ -56,17 +61,18 @@ export async function POST(req: Request) {
     });
 
     const admin = createAdminClient();
-    if (admin && deposit.id) {
-      await rememberPaymentIntent(admin, {
-        provider: "paydora",
-        externalId: deposit.id,
-        userId: user.id,
-        gameSlug,
-        gameName,
-        promoCode,
-        baseAmount: amount,
-      });
+    if (!admin || !deposit.id) {
+      return NextResponse.json({ error: "Could not save this payment. Try again." }, { status: 500 });
     }
+    await rememberPaymentIntent(admin, {
+      provider: "paydora",
+      externalId: deposit.id,
+      userId: user.id,
+      gameSlug,
+      gameName,
+      promoCode,
+      baseAmount: amount,
+    });
 
     return NextResponse.json({
       success: true,

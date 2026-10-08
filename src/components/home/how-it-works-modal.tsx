@@ -46,7 +46,7 @@ export function HowItWorksGuide() {
           </div>
           <h3 className="text-base font-bold text-foreground">Request Deposit & Game Load</h3>
           <p className="text-xs text-muted-foreground mt-1.5 leading-relaxed">
-            Choose Cash App, USDT, PayPal, or Zelle. Send $10+ and enter your payment tag on your dashboard.
+            Choose an amount and a game, then pay with Paydora. Your wallet is credited when Paydora confirms the payment.
           </p>
         </div>
 

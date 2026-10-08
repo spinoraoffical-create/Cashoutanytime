@@ -77,6 +77,12 @@ export function isPaydoraConfigured() {
   return Boolean(process.env.PAYDORA_API_KEY?.trim());
 }
 
+/** Local QR and handle brands are not offered. Checkout stays on Paydora. */
+export function isRemovedCheckoutMethod(method: { name?: string | null; value?: string | null }) {
+  const text = `${method.name || ""} ${method.value || ""}`.toLowerCase();
+  return /cash\s*app|cashapp|venmo|chime|paypal|bitcoin|\bbtc\b|usdt|tether/.test(text);
+}
+
 export function amountsForMethod(value: string): string[] {
   const v = value.toLowerCase();
   if (v === "chime") return PAYDORA_CHIME_AMOUNTS;

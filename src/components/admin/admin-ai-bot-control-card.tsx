@@ -19,7 +19,7 @@ const FAQ_PRESETS: Array<{ q: string; append: string }> = [
   },
   {
     q: "Payment methods",
-    append: " We accept Cash App, Zelle, USDT, BTC, PayPal, and Venmo.",
+    append: " Deposits are paid with Paydora. Your wallet is credited when Paydora confirms the payment.",
   },
   {
     q: "Juwa login",
