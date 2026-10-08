@@ -36,16 +36,31 @@ export async function retryFailedLoadAction(requestId: string) {
     return { ok: false as const, error: "That player is outside your network." };
   }
 
+  const { data: game } = await db.from("games").select("id").eq("slug", row.game_slug).maybeSingle();
+  const gameId = (game as { id?: string } | null)?.id;
+  let username = row.game_username?.trim() || "";
+  if (!username && gameId) {
+    const { data: account } = await db
+      .from("game_accounts")
+      .select("game_username")
+      .eq("user_id", row.user_id)
+      .eq("game_id", gameId)
+      .maybeSingle();
+    username = (account as { game_username?: string | null } | null)?.game_username?.trim() || "";
+  }
+  if (!username) return { ok: false as const, error: "Account not found" };
+
   const { error } = await db.rpc("request_auto_game_load", {
     p_user_id: row.user_id,
     p_game_slug: row.game_slug,
     p_game_name: row.game_name,
     p_amount: row.amount,
-    p_game_username: row.game_username,
+    p_game_username: username,
     p_source_key: row.source_key,
   });
   if (error) return { ok: false as const, error: "Could not reserve the retry. The deposit was not credited again." };
 
+  await db.from("game_load_requests").update({ game_username: username }).eq("id", row.id);
   const result = await fulfillTrackedRequest(row.id);
   const depositKey = row.source_key.slice("auto:".length);
   await db

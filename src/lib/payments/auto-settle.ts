@@ -155,7 +155,6 @@ export async function quotePaidDeposit(
   }
 ): Promise<DepositQuote> {
   const provider = input.provider || "paydora";
-  const baseAmount = Math.round(input.baseAmount * 100) / 100;
 
   const { data: intent, error: intentError } = await admin
     .from("payment_intents")
@@ -169,12 +168,17 @@ export async function quotePaidDeposit(
     throw new PaymentIdentityError("Payment intent or game is missing");
   }
 
+  const savedBase = Number(row.base_amount);
+  if (!Number.isFinite(savedBase) || savedBase <= 0) {
+    throw new PaymentIdentityError("Payment intent or game is missing");
+  }
+
   if (row.final_credit != null) {
     return {
       gameSlug: row.game_slug,
       gameName: row.game_name,
       promoCode: row.promo_code,
-      baseAmount: Number(row.base_amount ?? baseAmount),
+      baseAmount: savedBase,
       bonusPercent: Number(row.bonus_percent ?? 0),
       bonusAmount: Number(row.bonus_amount ?? 0),
       finalCredit: Number(row.final_credit),
@@ -211,11 +215,11 @@ export async function quotePaidDeposit(
   if (!Number.isFinite(percent)) {
     throw new PaymentIdentityError("Apply supabase/migrations/20261008000130_auto_ops.sql before crediting deposits.");
   }
-  const priced = bonusForPercent(baseAmount, percent);
+  const priced = bonusForPercent(savedBase, percent);
   const quote: DepositQuote = {
     gameSlug,
     gameName: stored.name || row.game_name,
-    promoCode: row.promo_code || input.promoCode || null,
+    promoCode: row.promo_code,
     baseAmount: priced.base,
     bonusPercent: priced.percent,
     bonusAmount: priced.bonus,
@@ -382,45 +386,27 @@ async function loadGameOnce(
     username = (account as { game_username?: string } | null)?.game_username ?? null;
   }
   if (!username) {
-    username = `${input.quote.gameSlug.replace(/[^a-z0-9]/gi, "").slice(0, 6)}_${input.userId.slice(0, 8)}`;
-    const accountKey = `auto-account:${input.depositId}`;
-    const { data: existingAccountJob } = await admin
-      .from("game_load_requests")
-      .select("id, status, game_username")
-      .eq("source_key", accountKey)
-      .maybeSingle();
-    let accountRequestId = (existingAccountJob as { id?: string; game_username?: string | null; status?: string } | null)?.id;
-    if (!accountRequestId) {
-      const { data: inserted } = await admin
-        .from("game_load_requests")
-        .insert({
-          user_id: input.userId,
-          game_slug: input.quote.gameSlug,
-          game_name: input.quote.gameName || input.quote.gameSlug,
-          amount: 0,
-          wallet_type: "current",
-          load_type: "create_account",
-          game_username: username,
-          status: "pending",
-          source_key: accountKey,
-          admin_notes: "Automatic account create",
-        })
-        .select("id")
-        .maybeSingle();
-      accountRequestId = (inserted as { id?: string } | null)?.id;
-    }
-    if (accountRequestId) {
-      const created = await fulfillTrackedRequest(accountRequestId);
-      if (!created.success) {
-        await admin
-          .from("deposit_bonus_ledger")
-          .update({ game_load_status: "failed", game_load_error: created.error || "Could not create the game account." })
-          .eq("deposit_key", input.depositId);
-        return;
-      }
-      const { data: done } = await admin.from("game_load_requests").select("game_username").eq("id", accountRequestId).maybeSingle();
-      username = (done as { game_username?: string | null } | null)?.game_username || username;
-    }
+    const sourceKey = `auto:${input.depositId}`;
+    const { error: insertError } = await admin.from("game_load_requests").insert({
+      user_id: input.userId,
+      game_slug: input.quote.gameSlug,
+      game_name: input.quote.gameName || input.quote.gameSlug,
+      amount: input.quote.finalCredit,
+      wallet_type: "current",
+      load_type: "reload",
+      status: "failed",
+      source_key: sourceKey,
+      wallet_refunded: true,
+      error_message: "Account not found",
+      admin_notes: "No game account for this player. The wallet credit was not sent to a game.",
+    });
+    if (insertError && !/duplicate|unique/i.test(insertError.message)) throw migrationError(insertError);
+    await admin
+      .from("deposit_bonus_ledger")
+      .update({ game_load_status: "failed", game_load_error: "Account not found" })
+      .eq("deposit_key", input.depositId)
+      .in("game_load_status", ["pending", "failed"]);
+    return;
   }
 
   const sourceKey = `auto:${input.depositId}`;

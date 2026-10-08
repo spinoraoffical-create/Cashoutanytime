@@ -193,8 +193,14 @@ async function autoFulfillGameRequest(
     requestedPassword?: string | null;
   }
 ): Promise<{ success: boolean; error?: string } | null> {
+  const movingMoney =
+    loadType === "load" || loadType === "reload" || loadType === "redeem" || loadType === "check_balance";
+  const targetAccount = (
+    movingMoney ? input.gameUsername : input.requestedUsername || input.gameUsername
+  )?.trim();
+  if (!targetAccount) return { success: false, error: "Account not found" };
+
   if (gameSlug === "juwa" && isJuwaApiConfigured()) {
-    const targetAccount = input.gameUsername || input.requestedUsername || `juwa_${input.userId.slice(0, 8)}`;
     const mapType = loadType === "new_account" ? "create_account" : loadType === "reload" ? "load" : loadType;
     const res = await autoFulfillJuwaRequest({
       requestId,
@@ -207,7 +213,6 @@ async function autoFulfillGameRequest(
     return { success: res.success, error: res.success ? undefined : res.message };
   }
   if (gameSlug === "vegas-sweeps" && isVegasApiConfigured()) {
-    const targetAccount = input.gameUsername || input.requestedUsername || `vegas_${input.userId.slice(0, 8)}`;
     const mapType = loadType === "new_account" ? "create_account" : loadType === "reload" ? "load" : loadType;
     const res = await autoFulfillVegasRequest({
       requestId,
@@ -238,7 +243,6 @@ async function autoFulfillGameRequest(
     return autoFulfillMafiaRequest(requestId, loadType, input);
   }
   if (gameSlug === "orion-stars" && isOrionStarsApiConfigured()) {
-    const targetAccount = input.gameUsername || input.requestedUsername || `os_${input.userId.slice(0, 8)}`;
     const mapType = loadType === "new_account" ? "create_account" : loadType === "reload" ? "load" : loadType;
     const res = await autoFulfillOrionStarsRequest({
       requestId,
@@ -251,7 +255,6 @@ async function autoFulfillGameRequest(
     return { success: res.success, error: res.success ? undefined : res.message };
   }
   if (gameSlug === "milky-way" && isMilkyWayApiConfigured()) {
-    const targetAccount = input.gameUsername || input.requestedUsername || `mw_${input.userId.slice(0, 8)}`;
     const mapType = loadType === "new_account" ? "create_account" : loadType === "reload" ? "load" : loadType;
     const res = await autoFulfillMilkyWayRequest({
       requestId,
@@ -264,7 +267,6 @@ async function autoFulfillGameRequest(
     return { success: res.success, error: res.success ? undefined : res.message };
   }
   if (gameSlug === "fire-kirin" && isFireKirinApiConfigured()) {
-    const targetAccount = input.gameUsername || input.requestedUsername || `fk_${input.userId.slice(0, 8)}`;
     const mapType = loadType === "new_account" ? "create_account" : loadType === "reload" ? "load" : loadType;
     const res = await autoFulfillFireKirinRequest({
       requestId,

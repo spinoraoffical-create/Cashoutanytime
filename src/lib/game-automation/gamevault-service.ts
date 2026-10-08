@@ -18,7 +18,10 @@ export async function createGameVaultAccount(
   const api = client || getGameVaultApiClient();
   // Ensure username is strictly alphanumeric (Game Vault requirement)
   const cleanUsername = params.username.replace(/[^a-zA-Z0-9]/g, "");
-  const finalUsername = cleanUsername.length >= 4 ? cleanUsername : `GV${Math.floor(100000 + Math.random() * 900000)}`;
+  if (cleanUsername.length < 4) {
+    throw new Error("Account not found");
+  }
+  const finalUsername = cleanUsername;
 
   const password = params.password || "123123";
   const res = await api.addUser(finalUsername, password);
@@ -135,9 +138,10 @@ export async function autoFulfillGameVaultRequest(
 
   try {
     if (loadType === "create_account" || loadType === "new_account") {
-      const rawUser = input.requestedUsername || "";
+      const rawUser = input.requestedUsername?.trim() || "";
       const cleanUser = rawUser.replace(/[^a-zA-Z0-9]/g, "");
-      const username = cleanUser.length >= 4 ? cleanUser : `GV${Math.floor(100000 + Math.random() * 900000)}`;
+      if (cleanUser.length < 4) return { success: false, error: "Account not found" };
+      const username = cleanUser;
       const password = input.requestedPassword || `Pass${Math.floor(1000 + Math.random() * 9000)}`;
       const created = await createGameVaultAccount({ username, password });
 

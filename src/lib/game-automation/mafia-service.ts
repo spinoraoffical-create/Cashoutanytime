@@ -110,7 +110,8 @@ export async function autoFulfillMafiaRequest(
 
     // 1. Create account / New account
     if (loadType === "create_account" || loadType === "new_account") {
-      const username = input.requestedUsername || `Mafia_${Math.floor(100000 + Math.random() * 900000)}`;
+      const username = input.requestedUsername?.trim();
+      if (!username) return { success: false, error: "Account not found" };
       const password = input.requestedPassword || "123123";
 
       const created = await client.createAccount(username, password);

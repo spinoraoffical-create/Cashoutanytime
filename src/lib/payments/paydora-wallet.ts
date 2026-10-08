@@ -292,7 +292,7 @@ export async function reversePaydoraDeposit(input: {
   if (!admin) throw new Error("Admin client unavailable");
   const { data: ledger, error: ledgerError } = await admin
     .from("deposit_bonus_ledger")
-    .select("final_credit")
+    .select("user_id, final_credit")
     .eq("deposit_key", input.depositId)
     .maybeSingle();
   if (ledgerError) {
@@ -302,13 +302,14 @@ export async function reversePaydoraDeposit(input: {
         : ledgerError.message
     );
   }
-  const finalCredit = Number((ledger as { final_credit?: number } | null)?.final_credit);
-  if (!Number.isFinite(finalCredit) || finalCredit <= 0) {
+  const saved = ledger as { user_id?: string; final_credit?: number } | null;
+  const finalCredit = Number(saved?.final_credit);
+  if (!saved?.user_id || !Number.isFinite(finalCredit) || finalCredit <= 0) {
     throw new PaymentIdentityError("Bonus ledger final credit is missing");
   }
   const amount = Math.round(finalCredit * 100) / 100;
   const { data: rpcData, error: rpcError } = await admin.rpc("reverse_paydora_deposit", {
-    p_user_id: input.userId,
+    p_user_id: saved.user_id,
     p_amount: amount,
     p_payment_id: input.depositId,
   });
@@ -320,7 +321,7 @@ export async function reversePaydoraDeposit(input: {
     const row = (rpcData ?? {}) as { reversed?: boolean; duplicate?: boolean; new_balance?: number };
     if (row.reversed) {
       await writeAudit({
-        actorId: input.userId,
+        actorId: saved.user_id,
         action: "deposit.refund",
         entityType: "deposit_request",
         entityId: input.depositId,
