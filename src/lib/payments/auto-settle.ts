@@ -4,7 +4,7 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { writeAudit } from "@/lib/actions/admin/core";
 import { fulfillTrackedRequest } from "@/lib/actions/game-loads";
 import { assignPlayerToAgentByCode } from "@/lib/agents/assign";
-import { GAME_BONUS_RULES } from "@/lib/games";
+import { bonusForPercent, depositKind } from "@/lib/payments/bonus-math";
 import { isJuwaApiConfigured } from "@/lib/game-automation/juwa-api";
 import { isVegasApiConfigured } from "@/lib/game-automation/vegas-api";
 import { isCashMachineApiConfigured } from "@/lib/game-automation/cashmachine-service";
@@ -30,8 +30,23 @@ export type DepositQuote = {
   kind: "first" | "reload";
 };
 
+export class PaymentIdentityError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = "PaymentIdentityError";
+  }
+}
+
 function missingTable(error: { message?: string } | null) {
-  return /schema cache|does not exist|payment_intents|deposit_bonus_ledger/i.test(error?.message ?? "");
+  return /schema cache|does not exist|payment_intents|deposit_bonus_ledger|source_key/i.test(error?.message ?? "");
+}
+
+function migrationError(error: { message?: string }) {
+  return new PaymentIdentityError(
+    missingTable(error)
+      ? "Apply supabase/migrations/20261008000130_auto_ops.sql before crediting deposits."
+      : error.message || "Payment intent lookup failed"
+  );
 }
 
 function apiReady(slug: string) {
@@ -85,7 +100,7 @@ export async function rememberPaymentIntent(
   if (input.gameName) row.game_name = input.gameName;
   if (input.promoCode) row.promo_code = input.promoCode;
   const { error } = await admin.from("payment_intents").upsert(row, { onConflict: "provider,external_id" });
-  if (error && !missingTable(error)) console.error("[payment-intent]", error.message);
+  if (error) throw migrationError(error);
 }
 
 async function lockQuote(admin: Admin, provider: string, externalId: string, quote: DepositQuote) {
@@ -104,10 +119,7 @@ async function lockQuote(admin: Admin, provider: string, externalId: string, quo
     .is("final_credit", null)
     .select("bonus_percent, bonus_amount, final_credit, deposit_kind, game_slug, game_name, promo_code, base_amount")
     .maybeSingle();
-  if (error) {
-    if (missingTable(error)) return null;
-    throw new Error(error.message);
-  }
+  if (error) throw migrationError(error);
   if (data) return data as QuoteRow;
   const { data: existing, error: readError } = await admin
     .from("payment_intents")
@@ -115,10 +127,7 @@ async function lockQuote(admin: Admin, provider: string, externalId: string, quo
     .eq("provider", provider)
     .eq("external_id", externalId)
     .maybeSingle();
-  if (readError) {
-    if (missingTable(readError)) return null;
-    throw new Error(readError.message);
-  }
+  if (readError) throw migrationError(readError);
   return (existing as QuoteRow | null) ?? null;
 }
 
@@ -147,24 +156,20 @@ export async function quotePaidDeposit(
 ): Promise<DepositQuote> {
   const provider = input.provider || "paydora";
   const baseAmount = Math.round(input.baseAmount * 100) / 100;
-  await rememberPaymentIntent(admin, {
-    provider,
-    externalId: input.depositId,
-    userId: input.userId,
-    gameSlug: input.gameSlug,
-    gameName: input.gameName,
-    promoCode: input.promoCode,
-    baseAmount,
-  });
 
-  const { data: intent } = await admin
+  const { data: intent, error: intentError } = await admin
     .from("payment_intents")
     .select("game_slug, game_name, promo_code, final_credit, bonus_percent, bonus_amount, deposit_kind, base_amount")
     .eq("provider", provider)
     .eq("external_id", input.depositId)
     .maybeSingle();
+  if (intentError) throw migrationError(intentError);
   const row = intent as QuoteRow | null;
-  if (row?.final_credit != null) {
+  if (!row?.game_slug) {
+    throw new PaymentIdentityError("Payment intent or game is missing");
+  }
+
+  if (row.final_credit != null) {
     return {
       gameSlug: row.game_slug,
       gameName: row.game_name,
@@ -177,59 +182,60 @@ export async function quotePaidDeposit(
     };
   }
 
-  const gameSlug = input.gameSlug || row?.game_slug || null;
-  let percent = 0;
-  let kind: "first" | "reload" = "reload";
-  let gameName = input.gameName || row?.game_name || null;
-  if (gameSlug) {
-    const { count } = await admin
-      .from("deposit_bonus_ledger")
-      .select("id", { count: "exact", head: true })
-      .eq("user_id", input.userId)
-      .eq("game_slug", gameSlug)
-      .eq("wallet_credited", true);
-    kind = (count ?? 0) === 0 ? "first" : "reload";
-    const { data: game, error } = await admin
-      .from("games")
-      .select("name, first_deposit_bonus_percent, reload_bonus_percent")
-      .eq("slug", gameSlug)
-      .maybeSingle();
-    if (!error && game) {
-      const stored = game as { name?: string; first_deposit_bonus_percent?: number; reload_bonus_percent?: number };
-      gameName = stored.name || gameName;
-      percent = Number(kind === "first" ? stored.first_deposit_bonus_percent : stored.reload_bonus_percent);
-      if (!Number.isFinite(percent)) {
-        percent = kind === "first" ? GAME_BONUS_RULES.firstTimeBonus : GAME_BONUS_RULES.regularBonus;
-      }
-    } else {
-      percent = kind === "first" ? GAME_BONUS_RULES.firstTimeBonus : GAME_BONUS_RULES.regularBonus;
-    }
+  const gameSlug = row.game_slug;
+  const { count, error: countError } = await admin
+    .from("deposit_bonus_ledger")
+    .select("id", { count: "exact", head: true })
+    .eq("user_id", input.userId)
+    .eq("game_slug", gameSlug)
+    .eq("wallet_credited", true);
+  if (countError) throw migrationError(countError);
+  const { count: lockedFirst, error: lockedError } = await admin
+    .from("payment_intents")
+    .select("id", { count: "exact", head: true })
+    .eq("user_id", input.userId)
+    .eq("game_slug", gameSlug)
+    .eq("deposit_kind", "first")
+    .not("final_credit", "is", null);
+  if (lockedError) throw migrationError(lockedError);
+  const kind = depositKind((count ?? 0) + (lockedFirst ?? 0));
+  const { data: game, error: gameError } = await admin
+    .from("games")
+    .select("name, first_deposit_bonus_percent, reload_bonus_percent")
+    .eq("slug", gameSlug)
+    .maybeSingle();
+  if (gameError) throw migrationError(gameError);
+  if (!game) throw new PaymentIdentityError("Payment intent or game is missing");
+  const stored = game as { name?: string; first_deposit_bonus_percent?: number; reload_bonus_percent?: number };
+  const percent = Number(kind === "first" ? stored.first_deposit_bonus_percent : stored.reload_bonus_percent);
+  if (!Number.isFinite(percent)) {
+    throw new PaymentIdentityError("Apply supabase/migrations/20261008000130_auto_ops.sql before crediting deposits.");
   }
-  const bonusAmount = Math.round(baseAmount * percent) / 100;
+  const priced = bonusForPercent(baseAmount, percent);
   const quote: DepositQuote = {
     gameSlug,
-    gameName,
-    promoCode: input.promoCode || row?.promo_code || null,
-    baseAmount,
-    bonusPercent: percent,
-    bonusAmount,
-    finalCredit: Math.round((baseAmount + bonusAmount) * 100) / 100,
+    gameName: stored.name || row.game_name,
+    promoCode: row.promo_code || input.promoCode || null,
+    baseAmount: priced.base,
+    bonusPercent: priced.percent,
+    bonusAmount: priced.bonus,
+    finalCredit: priced.finalCredit,
     kind,
   };
   const locked = await lockQuote(admin, provider, input.depositId, quote);
-  if (locked?.final_credit != null) {
-    return {
-      gameSlug: locked.game_slug,
-      gameName: locked.game_name,
-      promoCode: locked.promo_code,
-      baseAmount: Number(locked.base_amount ?? baseAmount),
-      bonusPercent: Number(locked.bonus_percent ?? 0),
-      bonusAmount: Number(locked.bonus_amount ?? 0),
-      finalCredit: Number(locked.final_credit),
-      kind: locked.deposit_kind === "first" ? "first" : "reload",
-    };
+  if (locked?.final_credit == null || !locked.game_slug) {
+    throw new PaymentIdentityError("Payment intent or game is missing");
   }
-  return quote;
+  return {
+    gameSlug: locked.game_slug,
+    gameName: locked.game_name,
+    promoCode: locked.promo_code,
+    baseAmount: Number(locked.base_amount ?? priced.base),
+    bonusPercent: Number(locked.bonus_percent ?? 0),
+    bonusAmount: Number(locked.bonus_amount ?? 0),
+    finalCredit: Number(locked.final_credit),
+    kind: locked.deposit_kind === "first" ? "first" : "reload",
+  };
 }
 
 async function markWebhook(admin: Admin, depositId: string, status: "processed" | "failed", error?: string) {
@@ -270,11 +276,7 @@ export async function settleDepositSideEffects(
     },
     { onConflict: "deposit_key", ignoreDuplicates: true }
   );
-  if (ledgerError && missingTable(ledgerError)) {
-    console.error("[auto-settle] deposit_bonus_ledger is missing. Apply 20261008000130_auto_ops.sql.");
-    await markWebhook(admin, key, "failed", ledgerError.message);
-    return;
-  }
+  if (ledgerError) throw migrationError(ledgerError);
 
   if (input.quote.promoCode) {
     const { data: profile } = await admin.from("profiles").select("parent_agent_id").eq("id", input.userId).maybeSingle();
@@ -341,6 +343,21 @@ async function loadGameOnce(
     return;
   }
   if (!apiReady(input.quote.gameSlug)) {
+    const sourceKey = `auto:${input.depositId}`;
+    const { error: insertError } = await admin.from("game_load_requests").insert({
+      user_id: input.userId,
+      game_slug: input.quote.gameSlug,
+      game_name: input.quote.gameName || input.quote.gameSlug,
+      amount: input.quote.finalCredit,
+      wallet_type: "current",
+      load_type: "reload",
+      status: "failed",
+      source_key: sourceKey,
+      wallet_refunded: true,
+      error_message: "Game API credentials are not configured.",
+      admin_notes: "Automatic deposit load was not sent. The wallet credit stays until retry.",
+    });
+    if (insertError && !/duplicate|unique/i.test(insertError.message)) throw migrationError(insertError);
     await admin
       .from("deposit_bonus_ledger")
       .update({

@@ -37,6 +37,9 @@ export async function POST(req: Request) {
     if (!Number.isFinite(amount) || amount <= 0) {
       return NextResponse.json({ error: "Choose a deposit amount." }, { status: 400 });
     }
+    if (!gameSlug) {
+      return NextResponse.json({ error: "Choose a game before paying." }, { status: 400 });
+    }
     const blocked = await responsibleBlock(amount);
     if (blocked) {
       return NextResponse.json({ error: blocked }, { status: 403 });

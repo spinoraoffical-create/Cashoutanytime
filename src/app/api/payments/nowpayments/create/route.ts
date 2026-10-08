@@ -1,5 +1,7 @@
 import { NextResponse } from "next/server";
 import { createNowPaymentInvoice } from "@/lib/payments/nowpayments";
+import { rememberPaymentIntent } from "@/lib/payments/auto-settle";
+import { createAdminClient } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
 import { checkRateLimit, rateLimitUserMessage } from "@/lib/rate-limit";
 import { playerPaymentError } from "@/lib/player-safe-error";
@@ -20,12 +22,29 @@ export async function POST(req: Request) {
     const body = await req.json();
     const amount = Number(body.amount);
     const currency = typeof body.currency === "string" ? body.currency : "usdttrc20";
+    const gameSlug = String(body.gameSlug || "").trim();
+    const gameName = String(body.gameName || "").trim();
+    const promoCode = String(body.promoCode || body.ref || "").trim();
     if (!Number.isFinite(amount) || amount < 5) {
       return NextResponse.json({ error: "Minimum deposit is $5" }, { status: 400 });
+    }
+    if (!gameSlug) {
+      return NextResponse.json({ error: "Choose a game before paying." }, { status: 400 });
     }
 
     const origin = new URL(req.url).origin;
     const orderId = `dep_${user.id}_${Date.now()}`;
+    const admin = createAdminClient();
+    if (!admin) return NextResponse.json({ error: "Payments are not available right now." }, { status: 500 });
+    await rememberPaymentIntent(admin, {
+      provider: "nowpayments",
+      externalId: orderId,
+      userId: user.id,
+      gameSlug,
+      gameName,
+      promoCode,
+      baseAmount: amount,
+    });
     const invoice = await createNowPaymentInvoice({
       amount,
       currency: "usd",

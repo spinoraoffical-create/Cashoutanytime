@@ -1,5 +1,6 @@
+import { writeAudit } from "@/lib/actions/admin/core";
 import { createAdminClient } from "@/lib/supabase/admin";
-import { quotePaidDeposit, settleDepositSideEffects } from "@/lib/payments/auto-settle";
+import { PaymentIdentityError, quotePaidDeposit, settleDepositSideEffects } from "@/lib/payments/auto-settle";
 
 const ALLOWED_METHODS = new Set(["paypal", "chime", "cashapp", "bitcoin", "usdt", "venmo"]);
 
@@ -96,78 +97,13 @@ async function ensureDepositRequest(
   if (error) throw new Error(error.message);
 }
 
-async function applyWalletCredit(
-  admin: NonNullable<ReturnType<typeof createAdminClient>>,
-  input: {
-    userId: string;
-    amount: number;
-    source: string;
-    description: string;
-  }
-) {
-  const { error: rpcError } = await admin.rpc("credit_system_wallet", {
-    p_user_id: input.userId,
-    p_amount: input.amount,
-    p_source: input.source,
-    p_description: input.description,
-  });
-
-  if (!rpcError) {
-    const { data: profile } = await admin
-      .from("profiles")
-      .select("wallet_balance")
-      .eq("id", input.userId)
-      .maybeSingle();
-    return Number(profile?.wallet_balance || 0);
-  }
-
-  const missingRpc =
-    rpcError.code === "42883" ||
-    rpcError.message.includes("Could not find the function") ||
-    rpcError.message.includes("credit_system_wallet");
-
-  if (!missingRpc) {
-    throw new Error(rpcError.message);
-  }
-
-  // Fallback after protect_wallet_columns allows service_role
-  const { data: profile } = await admin
-    .from("profiles")
-    .select("wallet_balance")
-    .eq("id", input.userId)
-    .maybeSingle();
-
-  const currentBalance = Number(profile?.wallet_balance || 0);
-  const newBalance = Math.round((currentBalance + input.amount) * 100) / 100;
-
-  const { data: updated, error: updateError } = await admin
-    .from("profiles")
-    .update({ wallet_balance: newBalance })
-    .eq("id", input.userId)
-    .select("wallet_balance")
-    .single();
-
-  if (updateError) throw new Error(updateError.message);
-
-  if (Math.abs(Number(updated?.wallet_balance) - newBalance) > 0.009) {
-    throw new Error(
-      "Wallet balance did not update. Run supabase/paydora-system-wallet-credit.sql in Supabase."
-    );
-  }
-
-  const { error: txError } = await admin.from("wallet_transactions").insert({
-    user_id: input.userId,
-    amount: input.amount,
-    wallet_type: "current",
-    transaction_type: "credit",
-    source: input.source,
-    description: input.description,
-    created_by: null,
-  });
-
-  if (txError) throw new Error(txError.message);
-  return Number(updated.wallet_balance);
-}
+type CreditResult = {
+  credited: boolean;
+  duplicate?: boolean;
+  newBalance?: number;
+  finalCredit?: number;
+  paid?: number;
+};
 
 export async function creditPaydoraDeposit(input: {
   userId: string;
@@ -178,21 +114,38 @@ export async function creditPaydoraDeposit(input: {
   methodName?: string | null;
   gameName?: string | null;
   gameSlug?: string | null;
-}) {
+  provider?: string;
+  /** Failed payout refund. Credits the reserved amount and does not apply a game bonus. */
+  payoutVoid?: boolean;
+}): Promise<CreditResult> {
   const admin = createAdminClient();
   if (!admin) throw new Error("Admin client unavailable");
   if (!input.userId || input.amount <= 0 || !input.depositId) return { credited: false };
 
   const amount = Math.round(input.amount * 100) / 100;
   const marker = input.depositId;
+  const provider = input.provider || "paydora";
+
+  if (input.payoutVoid) {
+    return creditMarkedAmount(admin, {
+      ...input,
+      amount,
+      marker,
+      creditAmount: amount,
+      description: `Payout refund $${amount.toFixed(2)} (${marker})`,
+    });
+  }
 
   if (await alreadyApplied(admin, input.userId, marker)) {
     await ensureDepositRequest(admin, { ...input, amount });
-    const { data: ledger } = await admin
+    const { data: ledger, error: ledgerError } = await admin
       .from("deposit_bonus_ledger")
       .select("base_amount, bonus_percent, bonus_amount, final_credit, deposit_kind, game_slug")
       .eq("deposit_key", marker)
       .maybeSingle();
+    if (ledgerError && !/schema cache|does not exist/i.test(ledgerError.message)) {
+      throw new PaymentIdentityError(ledgerError.message);
+    }
     const saved = ledger as {
       base_amount: number;
       bonus_percent: number;
@@ -201,14 +154,12 @@ export async function creditPaydoraDeposit(input: {
       deposit_kind: "first" | "reload";
       game_slug: string | null;
     } | null;
-    const { data: intent } = await admin
-      .from("payment_intents")
-      .select("final_credit")
-      .eq("provider", "paydora")
-      .eq("external_id", marker)
-      .maybeSingle();
-    const savedQuote = saved
-      ? {
+    if (saved?.game_slug && saved.final_credit != null) {
+      await settleDepositSideEffects(admin, {
+        userId: input.userId,
+        depositId: marker,
+        walletCredited: true,
+        quote: {
           gameSlug: saved.game_slug,
           gameName: input.gameName ?? null,
           promoCode: null,
@@ -216,115 +167,120 @@ export async function creditPaydoraDeposit(input: {
           bonusPercent: Number(saved.bonus_percent),
           bonusAmount: Number(saved.bonus_amount),
           finalCredit: Number(saved.final_credit),
-          kind: saved.deposit_kind === "first" ? "first" as const : "reload" as const,
-        }
-      : (intent as { final_credit?: number | null } | null)?.final_credit != null
-        ? await quotePaidDeposit(admin, {
-            userId: input.userId,
-            depositId: marker,
-            baseAmount: amount,
-            gameSlug: input.gameSlug,
-            gameName: input.gameName,
-          }).catch(() => null)
-        : null;
-    if (savedQuote) {
+          kind: saved.deposit_kind === "first" ? "first" : "reload",
+        },
+      });
+      return { credited: false, duplicate: true, finalCredit: Number(saved.final_credit), paid: amount };
+    }
+    try {
+      const quote = await quotePaidDeposit(admin, {
+        provider,
+        userId: input.userId,
+        depositId: marker,
+        baseAmount: amount,
+      });
       await settleDepositSideEffects(admin, {
         userId: input.userId,
         depositId: marker,
         walletCredited: true,
-        quote: savedQuote,
+        quote,
       });
+      return { credited: false, duplicate: true, finalCredit: quote.finalCredit, paid: amount };
+    } catch (err) {
+      if (err instanceof PaymentIdentityError && /missing/i.test(err.message)) {
+        return { credited: false, duplicate: true, paid: amount };
+      }
+      throw err;
     }
-    return { credited: false, duplicate: true };
   }
 
-  let quote = null;
-  try {
-    quote = await quotePaidDeposit(admin, {
-      userId: input.userId,
-      depositId: marker,
-      baseAmount: amount,
-      gameSlug: input.gameSlug,
-      gameName: input.gameName,
-    });
-  } catch (err) {
-    console.error("[auto-settle] quote failed, crediting the paid amount only", err);
+  const quote = await quotePaidDeposit(admin, {
+    provider,
+    userId: input.userId,
+    depositId: marker,
+    baseAmount: amount,
+    promoCode: null,
+  });
+  if (!quote.gameSlug || !(quote.finalCredit > 0)) {
+    throw new PaymentIdentityError("Payment intent or game is missing");
   }
-  const creditAmount = quote?.finalCredit ?? amount;
 
   const methodName = input.methodName?.trim() || "Paydora";
-  const description = quote && quote.bonusAmount > 0
+  const description = quote.bonusAmount > 0
     ? `Deposit $${amount.toFixed(2)} + ${quote.bonusPercent}% bonus via ${methodName} (${marker})`
     : `Deposit confirmed — $${amount.toFixed(2)} via ${methodName} (${input.referenceId || "order"} ${marker})`;
 
-  const { data: rpcData, error: rpcError } = await admin.rpc("credit_paydora_deposit", {
-    p_user_id: input.userId,
-    p_amount: creditAmount,
-    p_payment_id: marker,
-    p_order_id: input.referenceId ?? null,
-    p_description: description,
-  });
-
-  const missingRpc =
-    rpcError?.code === "42883" ||
-    Boolean(rpcError?.message?.includes("Could not find the function")) ||
-    Boolean(rpcError?.message?.includes("credit_paydora_deposit"));
-
-  if (!rpcError) {
-    const row = (rpcData ?? {}) as { credited?: boolean; duplicate?: boolean; new_balance?: number };
-    await ensureDepositRequest(admin, { ...input, amount });
-    if (quote && (row.credited || row.duplicate)) {
-      await settleDepositSideEffects(admin, {
-        userId: input.userId,
-        depositId: marker,
-        quote,
-        walletCredited: true,
-      });
-    } else if (row.credited) {
-      await admin.from("notifications").insert({
-        user_id: input.userId,
-        title: "Deposit confirmed",
-        message: `$${amount.toFixed(2)} has been added to your wallet via ${methodName}.`,
-        type: "success",
-        is_read: false,
-      });
-    }
-    return {
-      credited: Boolean(row.credited),
-      duplicate: Boolean(row.duplicate),
-      newBalance: Number(row.new_balance ?? 0),
-    };
-  }
-
-  if (!missingRpc) throw new Error(rpcError.message);
-
-  const newBalance = await applyWalletCredit(admin, {
-    userId: input.userId,
-    amount: creditAmount,
-    source: "deposit",
+  const credited = await creditMarkedAmount(admin, {
+    ...input,
+    amount,
+    marker,
+    creditAmount: quote.finalCredit,
     description,
   });
+  await settleDepositSideEffects(admin, {
+    userId: input.userId,
+    depositId: marker,
+    quote,
+    walletCredited: true,
+  });
+  await writeAudit({
+    actorId: input.userId,
+    action: "deposit.credit",
+    entityType: "deposit_request",
+    entityId: marker,
+    after: {
+      paid: amount,
+      bonusPercent: quote.bonusPercent,
+      bonus: quote.bonusAmount,
+      finalCredit: quote.finalCredit,
+      game: quote.gameSlug,
+    },
+  });
+  return { ...credited, finalCredit: quote.finalCredit, paid: amount };
+}
 
-  await ensureDepositRequest(admin, { ...input, amount });
+async function creditMarkedAmount(
+  admin: NonNullable<ReturnType<typeof createAdminClient>>,
+  input: {
+    userId: string;
+    amount: number;
+    depositId: string;
+    referenceId?: string | null;
+    methodValue?: string | null;
+    methodName?: string | null;
+    gameName?: string | null;
+    gameSlug?: string | null;
+    marker: string;
+    creditAmount: number;
+    description: string;
+  }
+) {
+  const { data: rpcData, error: rpcError } = await admin.rpc("credit_paydora_deposit", {
+    p_user_id: input.userId,
+    p_amount: input.creditAmount,
+    p_payment_id: input.marker,
+    p_order_id: input.referenceId ?? null,
+    p_description: input.description,
+  });
 
-  if (quote) {
-    await settleDepositSideEffects(admin, {
-      userId: input.userId,
-      depositId: marker,
-      quote,
-      walletCredited: true,
-    });
-  } else {
-    await admin.from("notifications").insert({
-      user_id: input.userId,
-      title: "Deposit confirmed",
-      message: `$${amount.toFixed(2)} has been added to your wallet via ${methodName}.`,
-      type: "success",
-      is_read: false,
-    });
+  if (rpcError) {
+    const missingRpc =
+      rpcError.code === "42883" ||
+      rpcError.message.includes("Could not find the function") ||
+      rpcError.message.includes("credit_paydora_deposit");
+    if (missingRpc) {
+      throw new PaymentIdentityError("credit_paydora_deposit is missing. Apply the Paydora wallet SQL before crediting.");
+    }
+    throw new Error(rpcError.message);
   }
 
-  return { credited: true, newBalance };
+  const row = (rpcData ?? {}) as { credited?: boolean; duplicate?: boolean; new_balance?: number };
+  await ensureDepositRequest(admin, { ...input, amount: input.amount });
+  return {
+    credited: Boolean(row.credited),
+    duplicate: Boolean(row.duplicate),
+    newBalance: Number(row.new_balance ?? 0),
+  };
 }
 
 export async function reversePaydoraDeposit(input: {
@@ -334,7 +290,23 @@ export async function reversePaydoraDeposit(input: {
 }) {
   const admin = createAdminClient();
   if (!admin) throw new Error("Admin client unavailable");
-  const amount = Math.round(input.amount * 100) / 100;
+  const { data: ledger, error: ledgerError } = await admin
+    .from("deposit_bonus_ledger")
+    .select("final_credit")
+    .eq("deposit_key", input.depositId)
+    .maybeSingle();
+  if (ledgerError) {
+    throw new PaymentIdentityError(
+      /schema cache|does not exist/i.test(ledgerError.message)
+        ? "Apply supabase/migrations/20261008000130_auto_ops.sql before reversing deposits."
+        : ledgerError.message
+    );
+  }
+  const finalCredit = Number((ledger as { final_credit?: number } | null)?.final_credit);
+  if (!Number.isFinite(finalCredit) || finalCredit <= 0) {
+    throw new PaymentIdentityError("Bonus ledger final credit is missing");
+  }
+  const amount = Math.round(finalCredit * 100) / 100;
   const { data: rpcData, error: rpcError } = await admin.rpc("reverse_paydora_deposit", {
     p_user_id: input.userId,
     p_amount: amount,
@@ -346,10 +318,20 @@ export async function reversePaydoraDeposit(input: {
     Boolean(rpcError?.message?.includes("reverse_paydora_deposit"));
   if (!rpcError) {
     const row = (rpcData ?? {}) as { reversed?: boolean; duplicate?: boolean; new_balance?: number };
+    if (row.reversed) {
+      await writeAudit({
+        actorId: input.userId,
+        action: "deposit.refund",
+        entityType: "deposit_request",
+        entityId: input.depositId,
+        after: { finalCredit: amount },
+      });
+    }
     return {
       reversed: Boolean(row.reversed),
       duplicate: Boolean(row.duplicate),
       newBalance: Number(row.new_balance ?? 0),
+      finalCredit: amount,
     };
   }
   if (!missingRpc) throw new Error(rpcError.message);

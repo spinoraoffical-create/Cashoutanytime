@@ -136,6 +136,7 @@ export async function POST(req: Request) {
         amount,
         depositId: `payout-void:${idempotencyKey}`,
         methodName: "Payout refund",
+        payoutVoid: true,
       });
       throw err;
     }

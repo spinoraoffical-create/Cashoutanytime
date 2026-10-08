@@ -22,7 +22,11 @@ export async function assignPlayerToAgentByCode(playerId: string, rawCode: strin
       .maybeSingle();
     if (profile?.parent_agent_id) return;
 
-    await db.from("profiles").update({ parent_agent_id: agent.user_id }).eq("id", playerId);
+    await db
+      .from("profiles")
+      .update({ parent_agent_id: agent.user_id })
+      .eq("id", playerId)
+      .is("parent_agent_id", null);
   } catch {
     // The network table is optional until the migration is applied.
   }

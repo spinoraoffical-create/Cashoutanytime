@@ -5,6 +5,7 @@ import {
   type PaydoraWebhookEnvelope,
 } from "@/lib/payments/paydora";
 import { creditPaydoraDeposit, reversePaydoraDeposit } from "@/lib/payments/paydora-wallet";
+import { createAdminClient } from "@/lib/supabase/admin";
 
 export async function POST(req: Request) {
   const raw = Buffer.from(await req.arrayBuffer());
@@ -32,11 +33,27 @@ export async function POST(req: Request) {
 
     if (payload.event === "deposit.paid" && payload.data?.depositId && userId && amount > 0) {
       if (isPaidDepositStatus(payload.data.status || "paid") || payload.event === "deposit.paid") {
+        const admin = createAdminClient();
+        if (!admin) throw new Error("Admin client unavailable");
+        const { data: intent, error: intentError } = await admin
+          .from("payment_intents")
+          .select("user_id, game_slug, game_name")
+          .eq("provider", "paydora")
+          .eq("external_id", payload.data.depositId)
+          .maybeSingle();
+        if (intentError) throw new Error(intentError.message);
+        const saved = intent as { user_id?: string; game_slug?: string | null; game_name?: string | null } | null;
+        if (!saved?.game_slug) {
+          throw new Error("Payment intent or game is missing");
+        }
         await creditPaydoraDeposit({
-          userId,
+          userId: saved.user_id || userId,
           amount,
           depositId: payload.data.depositId,
           referenceId: payload.data.referenceId,
+          gameSlug: saved.game_slug,
+          gameName: saved.game_name,
+          provider: "paydora",
         });
       }
     }

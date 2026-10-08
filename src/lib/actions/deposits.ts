@@ -7,6 +7,9 @@ import { notifyAdminOfDeposit } from "@/lib/telegram/notify-admin-deposit";
 import { createNotification } from "@/lib/actions/notifications";
 import { adminDb, writeAudit } from "@/lib/actions/admin/core";
 import { getAgentScope, playerInScope } from "@/lib/agents/scope";
+import { rememberPaymentIntent } from "@/lib/payments/auto-settle";
+import { creditPaydoraDeposit } from "@/lib/payments/paydora-wallet";
+import { createAdminClient } from "@/lib/supabase/admin";
 import type { RequestStatus } from "@/types/database";
 
 export interface DepositRequestRow {
@@ -132,7 +135,7 @@ export async function updateDepositStatus(
   const reader = legacyAdmin ? supabase : adminDb();
   const { data: existing, error: selectError } = await reader
     .from("deposit_requests")
-    .select("user_id, game_name, payment_method, amount, status, wallet_credited")
+    .select("user_id, game_slug, game_name, payment_method, amount, status, wallet_credited")
     .eq("id", depositId)
     .single();
 
@@ -169,28 +172,73 @@ export async function updateDepositStatus(
 
     const method = getDepositMethod(existing.payment_method as DepositPaymentMethodId);
     const methodLabel = method?.label ?? existing.payment_method;
+    const admin = createAdminClient();
+    if (!admin) return { error: "Admin client unavailable" };
 
-    const { error: rpcError } = await supabase.rpc("complete_deposit_request", {
-      p_deposit_id: depositId,
-      p_amount: amount,
-      p_admin_notes: adminNotes?.trim() ?? null,
-    });
-
-    if (rpcError) {
-      if (rpcError.code === "42883" || rpcError.message.includes("Could not find the function")) {
-        return {
-          error: "Deposit wallet credit not set up. Run supabase/deposit-wallet-credit.sql in Supabase.",
-        };
-      }
-      return { error: rpcError.message };
+    let gameSlug = (existing.game_slug as string | null) || null;
+    if (!gameSlug && existing.game_name) {
+      const { data: game } = await admin
+        .from("games")
+        .select("slug")
+        .ilike("name", existing.game_name)
+        .maybeSingle();
+      gameSlug = (game as { slug?: string } | null)?.slug ?? null;
+    }
+    if (!gameSlug) {
+      return { error: "This deposit has no game, so it was not credited." };
     }
 
-    await createNotification(
-      existing.user_id,
-      "Deposit confirmed! 💰",
-      `$${amount.toFixed(2)} has been added to your Total Deposit wallet (${existing.game_name} · ${methodLabel}).`,
-      "success"
-    );
+    try {
+      await rememberPaymentIntent(admin, {
+        provider: "manual",
+        externalId: depositId,
+        userId: existing.user_id,
+        gameSlug,
+        gameName: existing.game_name,
+        baseAmount: amount,
+      });
+      const credited = await creditPaydoraDeposit({
+        userId: existing.user_id,
+        amount,
+        depositId,
+        methodValue: existing.payment_method,
+        methodName: methodLabel,
+        gameName: existing.game_name,
+        gameSlug,
+        provider: "manual",
+      });
+      if (credited.finalCredit == null) {
+        return { error: "This payment has no bonus quote, so it was not credited." };
+      }
+      const finalCredit = credited.finalCredit;
+      const note = `Paid $${amount.toFixed(2)}. Credited $${finalCredit.toFixed(2)} with the game bonus.`;
+      await admin
+        .from("deposit_requests")
+        .update({
+          status: "completed",
+          wallet_credited: true,
+          reviewed_by: user.id,
+          reviewed_at: new Date().toISOString(),
+          admin_notes: adminNotes?.trim() ? `${adminNotes.trim()} · ${note}` : note,
+        })
+        .eq("id", depositId);
+
+      await writeAudit({
+        actorId: user.id,
+        action: "deposit.complete",
+        entityType: "deposit_request",
+        entityId: depositId,
+        after: { status, userId: existing.user_id, paid: amount, finalCredit, game: gameSlug },
+      });
+      revalidatePath("/admin/deposits");
+      revalidatePath("/dashboard/deposits");
+      revalidatePath("/dashboard");
+      revalidatePath("/admin/transactions");
+      revalidatePath("/admin/failed-loads");
+      return { success: true, paid: amount, finalCredit };
+    } catch (err) {
+      return { error: err instanceof Error ? err.message : "Could not credit this deposit." };
+    }
   } else {
     if (network && scope && !(await playerInScope(scope, existing.user_id))) {
       return { error: "That player is outside your network." };
@@ -222,7 +270,7 @@ export async function updateDepositStatus(
 
   await writeAudit({
     actorId: user.id,
-    action: status === "completed" ? "deposit.complete" : "deposit.update",
+    action: "deposit.update",
     entityType: "deposit_request",
     entityId: depositId,
     after: { status, userId: existing.user_id },

@@ -26,7 +26,7 @@ export function DepositActions({ depositId, currentStatus, amount }: DepositActi
     if (status === "completed") {
       const parsed = parseFloat(creditAmount);
       if (!parsed || parsed <= 0 || Number.isNaN(parsed)) {
-        toast.error("Enter the deposit amount to credit their Total Deposit wallet.");
+        toast.error("Enter the amount the player paid.");
         return;
       }
     }
@@ -42,7 +42,10 @@ export function DepositActions({ depositId, currentStatus, amount }: DepositActi
     );
     setLoading(false);
     if (result.error) toast.error(result.error);
-    else if (status === "completed") toast.success(`Credited $${parsedAmount!.toFixed(2)} to Total Deposit`);
+    else if (status === "completed") {
+      const finalCredit = result.finalCredit ?? parsedAmount!;
+      toast.success(`Paid $${parsedAmount!.toFixed(2)}. Credited $${finalCredit.toFixed(2)} with the game bonus.`);
+    }
     else toast.success(`Deposit ${status}`);
     router.refresh();
   }
@@ -57,7 +60,7 @@ export function DepositActions({ depositId, currentStatus, amount }: DepositActi
         type="number"
         min="0.01"
         step="0.01"
-        placeholder="Amount to credit ($)"
+        placeholder="Amount the player paid ($)"
         value={creditAmount}
         onChange={(e) => setCreditAmount(e.target.value)}
       />
