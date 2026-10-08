@@ -56,7 +56,7 @@ async function readStoredMarketing(userId: string): Promise<StoredMarketing> {
       whatsapp_marketing?: boolean | null;
     };
     return {
-      emailPromotions: row.email_promotions !== false,
+      emailPromotions: row.email_promotions === true,
       smsMarketing: row.sms_marketing === true,
       whatsappMarketing: row.whatsapp_marketing === true,
       phoneColumns: true,
@@ -71,7 +71,7 @@ async function readStoredMarketing(userId: string): Promise<StoredMarketing> {
   if (!basic.error && basic.data) {
     const row = basic.data as { email_promotions?: boolean | null };
     return {
-      emailPromotions: row.email_promotions !== false,
+      emailPromotions: row.email_promotions === true,
       smsMarketing: false,
       whatsappMarketing: false,
       phoneColumns: false,
@@ -88,7 +88,7 @@ export async function getAccountPrefs(): Promise<AccountPrefs> {
   const metaPromo = raw.promoNotices !== false;
   const stored = await readStoredMarketing(user.id);
 
-  if (metaPromo === false && stored.emailPromotions !== false) {
+  if (metaPromo === false && stored.emailPromotions === true) {
     const admin = getSupabaseServiceRoleKey() ? createAdminClient() : null;
     if (admin) {
       await admin.from("notification_preferences").upsert(
@@ -98,8 +98,7 @@ export async function getAccountPrefs(): Promise<AccountPrefs> {
     }
   }
 
-  const promoNotices =
-    stored.emailPromotions == null ? metaPromo : stored.emailPromotions && metaPromo;
+  const promoNotices = metaPromo === false ? false : stored.emailPromotions === true;
 
   const reminder = Number(raw.breakReminderMin ?? 30);
   const active = (current: unknown, pending: unknown, at: unknown) => {
@@ -141,7 +140,7 @@ export async function saveAccountPrefs(next: Partial<AccountPrefs>): Promise<{ o
   if (touchesMarketing) {
     const stored = await readStoredMarketing(user.id);
     const promoNotices =
-      next.promoNotices !== undefined ? next.promoNotices !== false : stored.emailPromotions !== false;
+      next.promoNotices !== undefined ? next.promoNotices === true : stored.emailPromotions === true;
     const smsMarketing =
       next.smsMarketing !== undefined ? next.smsMarketing === true : stored.smsMarketing;
     const whatsappMarketing =

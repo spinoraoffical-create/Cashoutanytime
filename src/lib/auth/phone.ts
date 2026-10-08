@@ -69,6 +69,13 @@ export function parseInternationalPhone(
   return parsed.format("E.164");
 }
 
+/** US signup mobile: exactly 10 digits, stored as E.164. */
+export function parseTenDigitMobile(input: string): string | null {
+  const digits = input.replace(/\D/g, "");
+  if (!/^\d{10}$/.test(digits)) return null;
+  return parseValidInternationalPhone(`+1${digits}`, "US");
+}
+
 /** Signup / profile save — strict libphonenumber validation */
 export function parseValidInternationalPhone(
   input: string,

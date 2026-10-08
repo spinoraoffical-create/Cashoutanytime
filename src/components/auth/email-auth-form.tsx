@@ -9,8 +9,8 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { toast } from "sonner";
-import { DEFAULT_COUNTRY_ISO, PhoneNumberInput, phoneFromParts } from "@/components/auth/phone-number-input";
-import { INVALID_PHONE_MESSAGE } from "@/lib/auth/phone";
+import { parseTenDigitMobile } from "@/lib/auth/phone";
+import { signupReady } from "@/lib/offers/audience";
 import { buildAuthCallbackUrl, getEmailAuthOrigin } from "@/lib/auth/callback-url";
 import { normalizeEmail, formatAuthErrorMessage } from "@/lib/auth/identifier";
 import {
@@ -25,6 +25,7 @@ interface EmailAuthFormProps {
   mode: "login" | "register";
   redirect?: string;
   referralCodeFromUrl?: string | null;
+  agentCode?: string | null;
 }
 
 function EmailConfirmationNotice({
@@ -72,15 +73,19 @@ function EmailConfirmationNotice({
   );
 }
 
-export function EmailAuthForm({ mode, redirect = "/", referralCodeFromUrl }: EmailAuthFormProps) {
+export function EmailAuthForm({ mode, redirect = "/", referralCodeFromUrl, agentCode }: EmailAuthFormProps) {
   const router = useRouter();
-  const [fullName, setFullName] = useState("");
+  const [firstName, setFirstName] = useState("");
+  const [lastName, setLastName] = useState("");
   const [email, setEmail] = useState("");
-  const [countryIso, setCountryIso] = useState(DEFAULT_COUNTRY_ISO);
-  const [phoneLocal, setPhoneLocal] = useState("");
+  const [mobile, setMobile] = useState("");
+  const [dateOfBirth, setDateOfBirth] = useState("");
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
   const [referralCode, setReferralCode] = useState(referralCodeFromUrl || "");
+  const [acceptedTerms, setAcceptedTerms] = useState(false);
+  const [acceptedOffers, setAcceptedOffers] = useState(false);
+  const [smsLoginCodes, setSmsLoginCodes] = useState(false);
   const [loading, setLoading] = useState(false);
   const [awaitingConfirmation, setAwaitingConfirmation] = useState(false);
   const [pendingEmail, setPendingEmail] = useState("");
@@ -125,9 +130,28 @@ export function EmailAuthForm({ mode, redirect = "/", referralCodeFromUrl }: Ema
       return;
     }
 
-    const phone = phoneFromParts(countryIso, phoneLocal);
+    if (!signupReady(acceptedTerms, acceptedOffers)) {
+      toast.error("Tick Terms and Privacy and the offers box before signing up.");
+      setLoading(false);
+      return;
+    }
+
+    const phone = parseTenDigitMobile(mobile);
     if (!phone) {
-      toast.error(INVALID_PHONE_MESSAGE);
+      toast.error("Enter a valid 10-digit mobile number.");
+      setLoading(false);
+      return;
+    }
+
+    const fullName = `${firstName.trim()} ${lastName.trim()}`.trim();
+    if (!firstName.trim() || !lastName.trim()) {
+      toast.error("Enter your first and last name.");
+      setLoading(false);
+      return;
+    }
+
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(dateOfBirth) || dateOfBirth >= new Date().toISOString().slice(0, 10)) {
+      toast.error("Enter your date of birth.");
       setLoading(false);
       return;
     }
@@ -163,7 +187,8 @@ export function EmailAuthForm({ mode, redirect = "/", referralCodeFromUrl }: Ema
     const emailRedirectTo = buildAuthCallbackUrl(
       getEmailAuthOrigin(window.location.origin),
       redirect,
-      referralCode.trim() || referralCodeFromUrl || undefined
+      referralCode.trim() || referralCodeFromUrl || undefined,
+      agentCode
     );
 
     const { data, error } = await supabase.auth.signUp({
@@ -172,9 +197,13 @@ export function EmailAuthForm({ mode, redirect = "/", referralCodeFromUrl }: Ema
       options: {
         emailRedirectTo,
         data: {
-          full_name: fullName.trim(),
+          full_name: fullName,
           phone,
+          date_of_birth: dateOfBirth,
           referral_code: referralCode.trim() || referralCodeFromUrl || undefined,
+          agent_code: agentCode || undefined,
+          offers_consent: true,
+          sms_login_codes: smsLoginCodes,
           auth_method: "email",
         },
       },
@@ -209,22 +238,30 @@ export function EmailAuthForm({ mode, redirect = "/", referralCodeFromUrl }: Ema
       toast.success("Account created! Check your email and click the link to verify.");
       void finalizeRegistrationAfterSignUp({
         userId: data.user.id,
-        fullName: fullName.trim(),
+        fullName,
         email: normalizedEmail,
         phone,
+        dateOfBirth,
+        agentCode,
+        offersConsent: true,
+        smsLoginCodes,
       });
       return;
     }
 
     let saved = await finalizeRegistrationAfterSignUp({
       userId: data.user.id,
-      fullName: fullName.trim(),
+      fullName,
       email: normalizedEmail,
       phone,
+      dateOfBirth,
+      agentCode,
+      offersConsent: true,
+      smsLoginCodes,
     });
 
     // Browser session fallback if server-side save failed
-    if (!saved.ok && data.session) {
+    if (!saved.ok && data.session && /phone/i.test(saved.error ?? "")) {
       const { data: updated, error: profileError } = await supabase
         .from("profiles")
         .update({
@@ -262,15 +299,15 @@ export function EmailAuthForm({ mode, redirect = "/", referralCodeFromUrl }: Ema
   return (
     <form onSubmit={handleSubmit} className="space-y-4">
       {mode === "register" && (
-        <div className="space-y-2">
-          <Label htmlFor="name">Full Name</Label>
-          <Input
-            id="name"
-            value={fullName}
-            onChange={(e) => setFullName(e.target.value)}
-            required
-            placeholder="John Doe"
-          />
+        <div className="grid gap-3 sm:grid-cols-2">
+          <div className="space-y-2">
+            <Label htmlFor="firstName">First name</Label>
+            <Input id="firstName" value={firstName} onChange={(e) => setFirstName(e.target.value)} required placeholder="First name" />
+          </div>
+          <div className="space-y-2">
+            <Label htmlFor="lastName">Last name</Label>
+            <Input id="lastName" value={lastName} onChange={(e) => setLastName(e.target.value)} required placeholder="Last name" />
+          </div>
         </div>
       )}
       <div className="space-y-2">
@@ -286,18 +323,24 @@ export function EmailAuthForm({ mode, redirect = "/", referralCodeFromUrl }: Ema
       </div>
       {mode === "register" && (
         <div className="space-y-2">
-          <Label htmlFor="phone">Phone Number</Label>
-          <PhoneNumberInput
-            id="phone"
-            countryIso={countryIso}
-            onCountryIsoChange={setCountryIso}
-            localNumber={phoneLocal}
-            onLocalNumberChange={setPhoneLocal}
+          <Label htmlFor="mobile">Mobile</Label>
+          <Input
+            id="mobile"
+            inputMode="numeric"
+            autoComplete="tel"
+            maxLength={10}
+            pattern="[0-9]{10}"
+            value={mobile}
+            onChange={(e) => setMobile(e.target.value.replace(/\D/g, "").slice(0, 10))}
             required
+            placeholder="10-digit mobile"
           />
-          <p className="text-xs text-muted-foreground">
-            Select your country, then enter your number without the country code.
-          </p>
+        </div>
+      )}
+      {mode === "register" && (
+        <div className="space-y-2">
+          <Label htmlFor="dob">Date of birth</Label>
+          <Input id="dob" type="date" value={dateOfBirth} onChange={(e) => setDateOfBirth(e.target.value)} required />
         </div>
       )}
       <div className="space-y-2">
@@ -336,7 +379,7 @@ export function EmailAuthForm({ mode, redirect = "/", referralCodeFromUrl }: Ema
           />
         </div>
       )}
-      {mode === "register" && (
+      {mode === "register" && !agentCode && (
         <div className="space-y-2">
           <Label htmlFor="referral">Referral Code (optional)</Label>
           <Input
@@ -348,18 +391,56 @@ export function EmailAuthForm({ mode, redirect = "/", referralCodeFromUrl }: Ema
           />
         </div>
       )}
-      <Button type="submit" className="w-full" disabled={loading}>
+      {mode === "register" && (
+        <div className="space-y-3 text-sm text-muted-foreground">
+          <label className="flex items-start gap-2">
+            <input
+              type="checkbox"
+              className="mt-1"
+              checked={acceptedTerms}
+              onChange={(e) => setAcceptedTerms(e.target.checked)}
+            />
+            <span>
+              I agree to the <Link href="/terms" className="text-primary hover:underline">Terms</Link> and{" "}
+              <Link href="/privacy" className="text-primary hover:underline">Privacy</Link>.
+            </span>
+          </label>
+          <label className="flex items-start gap-2">
+            <input
+              type="checkbox"
+              className="mt-1"
+              checked={smsLoginCodes}
+              onChange={(e) => setSmsLoginCodes(e.target.checked)}
+            />
+            <span>Send a one-time SMS code when I sign in. This is not marketing consent.</span>
+          </label>
+          <label className="flex items-start gap-2">
+            <input
+              type="checkbox"
+              className="mt-1"
+              checked={acceptedOffers}
+              onChange={(e) => setAcceptedOffers(e.target.checked)}
+            />
+            <span>I agree to receive bonus offers and promotions by email and SMS. I can unsubscribe or reply STOP later.</span>
+          </label>
+        </div>
+      )}
+      <Button
+        type="submit"
+        className="w-full"
+        disabled={mode === "register" ? !signupReady(acceptedTerms, acceptedOffers) || loading : loading}
+      >
         {loading
           ? mode === "login"
             ? "Signing in..."
             : "Creating account..."
           : mode === "login"
             ? "Sign In"
-            : "Create Account"}
+            : "Sign Up"}
       </Button>
       {mode === "register" && (
         <p className="text-xs text-muted-foreground text-center">
-          After Create Account, check your inbox and click the confirmation link to sign in.
+          After Sign Up, check your inbox and click the confirmation link to sign in.
         </p>
       )}
       {mode === "login" && (

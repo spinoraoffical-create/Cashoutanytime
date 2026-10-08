@@ -1,6 +1,7 @@
 import "server-only";
 
 import { adminDb } from "@/lib/actions/admin/core";
+import { keptParent } from "@/lib/offers/audience";
 
 /** Attach a new player to the sub-creator or store creator who owns this code. */
 export async function assignPlayerToAgentByCode(playerId: string, rawCode: string | null | undefined) {
@@ -20,7 +21,7 @@ export async function assignPlayerToAgentByCode(playerId: string, rawCode: strin
       .select("parent_agent_id")
       .eq("id", playerId)
       .maybeSingle();
-    if (profile?.parent_agent_id) return;
+    if (keptParent(profile?.parent_agent_id, agent.user_id) !== agent.user_id) return;
 
     await db
       .from("profiles")

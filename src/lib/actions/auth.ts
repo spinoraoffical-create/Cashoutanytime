@@ -479,21 +479,81 @@ export async function registerWithEmail(input: {
   return { ok: true, email: normalizedEmail };
 }
 
-/** Save phone/profile after client-side signUp (keeps PKCE cookies in the browser) */
+/** Save phone/profile after client-side signUp (keeps PKCE cookies in the browser). */
 export async function finalizeRegistrationAfterSignUp(input: {
   userId: string;
   fullName: string;
   email: string;
   phone: string;
+  dateOfBirth?: string;
+  agentCode?: string | null;
+  offersConsent?: boolean;
+  smsLoginCodes?: boolean;
 }): Promise<{ ok: boolean; error?: string }> {
+  if (input.offersConsent !== true) {
+    return { ok: false, error: "Agree to bonus offers by email and SMS before creating an account." };
+  }
   const e164 = parseValidInternationalPhone(input.phone);
   if (!e164) return { ok: false, error: INVALID_PHONE_MESSAGE };
 
-  return persistContactOnProfile(input.userId, {
+  const saved = await persistContactOnProfile(input.userId, {
     phone: e164,
     fullName: input.fullName.trim(),
     email: normalizeEmail(input.email),
   });
+  if (!saved.ok) return saved;
+
+  const admin = createAdminClient();
+  if (!admin) return { ok: false, error: "Account created but preferences were not saved." };
+
+  if (input.dateOfBirth) {
+    const { error: dobError } = await admin
+      .from("profiles")
+      .update({ date_of_birth: input.dateOfBirth })
+      .eq("id", input.userId);
+    if (dobError && !/date_of_birth|schema cache|column/i.test(dobError.message)) {
+      return { ok: false, error: dobError.message };
+    }
+  }
+
+  const prefs = await admin.from("notification_preferences").upsert(
+    {
+      user_id: input.userId,
+      email_promotions: true,
+      sms_marketing: true,
+      sms_login_codes: input.smsLoginCodes === true,
+    },
+    { onConflict: "user_id" }
+  );
+  if (prefs.error) {
+    const emailOnly = await admin.from("notification_preferences").upsert(
+      { user_id: input.userId, email_promotions: true },
+      { onConflict: "user_id" }
+    );
+    if (emailOnly.error) return { ok: false, error: "Account created but offer preferences were not saved." };
+    return { ok: false, error: "Apply supabase/migrations/20261008000170_signup_offers.sql before signup can save SMS consent." };
+  }
+
+  const { data: authUser } = await admin.auth.admin.getUserById(input.userId);
+  const existingMeta = authUser?.user?.user_metadata ?? {};
+  await admin.auth.admin.updateUserById(input.userId, {
+    user_metadata: {
+      ...existingMeta,
+      full_name: input.fullName.trim(),
+      phone: e164,
+      date_of_birth: input.dateOfBirth ?? null,
+      agent_code: input.agentCode?.trim() || null,
+      offers_consent: true,
+      sms_login_codes: input.smsLoginCodes === true,
+    },
+  });
+
+  if (input.agentCode?.trim()) {
+    const { assignPlayerToAgentByCode } = await import("@/lib/agents/assign");
+    await assignPlayerToAgentByCode(input.userId, input.agentCode);
+  }
+
+  return { ok: true };
 }
 
 /** Save phone, name, and email on profiles after signup */

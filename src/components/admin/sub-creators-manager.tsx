@@ -328,7 +328,7 @@ function EditForm({
     >
       <p className="font-semibold sm:col-span-2">Edit {row.name}</p>
       <p className="text-sm text-muted-foreground sm:col-span-2">
-        Referral link: /register?ref={row.promoCode} · Estimated commission {row.commissionBps / 100}% · Players {row.playerCount}
+        Signup link: /r/{row.promoCode} · Estimated commission {row.commissionBps / 100}% · Players {row.playerCount}
       </p>
       <Input name="phone" defaultValue={row.phone} placeholder="Phone" />
       <select name="roleLabel" defaultValue={row.roleLabel} className="h-9 rounded-md border border-border bg-background px-2 text-sm">

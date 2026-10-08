@@ -37,13 +37,17 @@ export function getAuthCallbackUrlWithRef(redirect = "/", referralCode?: string 
 export function buildAuthCallbackUrl(
   origin: string,
   redirect = "/",
-  referralCode?: string | null
+  referralCode?: string | null,
+  agentCode?: string | null
 ): string {
   const base = getEmailAuthOrigin(origin);
   const url = new URL("/auth/callback", base);
   url.searchParams.set("redirect", redirect.startsWith("/") ? redirect : "/");
   if (referralCode?.trim()) {
     url.searchParams.set("ref", referralCode.trim());
+  }
+  if (agentCode?.trim()) {
+    url.searchParams.set("agent", agentCode.trim());
   }
   return url.toString();
 }

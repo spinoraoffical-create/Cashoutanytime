@@ -19,7 +19,14 @@ const TOOLS = [
 
 export default async function GrowthPage() {
   const ctx = await requireStaff();
-  const tools = TOOLS.filter((tool) => can(ctx, tool.permission));
+  const tools = TOOLS.filter((tool) => can(ctx, tool.permission)).map(({ href, title, body }) => ({ href, title, body }));
+  if (ctx.isSuperAdmin || ctx.roles.includes("sub_creator") || ctx.roles.includes("store_creator")) {
+    tools.push({
+      href: "/admin/offers",
+      title: "Offers",
+      body: "Send one email and one SMS to players who agreed to offers.",
+    });
+  }
   if (tools.length === 0) redirect("/admin");
 
   return (

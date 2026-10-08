@@ -47,7 +47,7 @@ export default function AuthLayout({ children }: { children: React.ReactNode }) 
         </div>
       </aside>
 
-      <main className="flex items-center justify-center bg-[#f4f1f6] px-4 py-8 text-zinc-900 lg:px-10">
+      <main className="flex items-center justify-center overflow-y-auto bg-[#f4f1f6] px-4 py-8 text-zinc-900 lg:px-10">
         <div className="auth-panel w-full max-w-md rounded-[28px] bg-white p-6 shadow-2xl sm:p-8">
           {children}
           <p className="mt-6 text-center text-[11px] text-zinc-500">

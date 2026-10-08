@@ -120,6 +120,12 @@ export const ADMIN_NAV: AdminNavSection[] = [
     ],
     children: [
       { href: "/admin/promotions", label: "Promotions", permission: "promotions.manage" },
+      {
+        href: "/admin/offers",
+        label: "Offers",
+        permission: null,
+        roleAny: ["super_admin", "store_creator", "sub_creator"],
+      },
       { href: "/admin/referrals", label: "Referrals", permission: "referrals.manage" },
       { href: "/admin/vip", label: "VIP tiers", permission: "vip.manage" },
       { href: "/admin/rewards", label: "Rewards", permission: "rewards.manage" },

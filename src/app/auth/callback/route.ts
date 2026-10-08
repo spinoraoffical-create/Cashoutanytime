@@ -22,6 +22,7 @@ export async function GET(request: NextRequest) {
   const type = (rawType === "email" ? "signup" : rawType) as EmailOtpType | null;
   const redirect = resolveRedirect(request, type);
   const referralCode = searchParams.get("ref");
+  const agentCode = searchParams.get("agent");
 
   const cookieStore = await cookies();
   const destUrl = new URL(redirect, origin);
@@ -120,7 +121,15 @@ export async function GET(request: NextRequest) {
         }
       }
       const { assignPlayerToAgentByCode } = await import("@/lib/agents/assign");
-      await assignPlayerToAgentByCode(user.id, referralCode);
+      await assignPlayerToAgentByCode(user.id, agentCode || referralCode);
+    }
+  } else if (agentCode?.trim()) {
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
+    if (user) {
+      const { assignPlayerToAgentByCode } = await import("@/lib/agents/assign");
+      await assignPlayerToAgentByCode(user.id, agentCode);
     }
   }
 
