@@ -28,6 +28,7 @@ export function MobileBottomNav() {
     return () => subscription.unsubscribe();
   }, []);
 
+  if (pathname.startsWith("/admin")) return null;
   if (!mounted || isLoggedIn) return null;
   if (pathname.startsWith("/login") || pathname.startsWith("/register")) return null;
 

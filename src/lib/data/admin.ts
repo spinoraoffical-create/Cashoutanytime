@@ -188,42 +188,27 @@ export async function requirePermission(permission: string): Promise<StaffContex
   return ctx;
 }
 
-/** All admin modules + the permission each requires, for nav + access checks. */
+/** Fraud flags and audit logs. Super Admin only. */
+export async function requireSuperAdmin(): Promise<StaffContext> {
+  const ctx = await requireStaff();
+  if (!ctx.isSuperAdmin) redirect("/admin");
+  return ctx;
+}
+
+/**
+ * Primary admin sections. The sidebar reads `visibleAdminNav()` in
+ * `@/lib/admin/nav`, which also hides tools by role.
+ */
 export const ADMIN_MODULES = [
-  { href: "/admin", label: "Overview", icon: "LayoutDashboard", permission: null, group: "Insights" },
-  { href: "/admin/analytics", label: "Analytics", icon: "ChartColumn", permission: "analytics.read", group: "Insights" },
-  { href: "/admin/users", label: "Users", icon: "Users", permission: "users.manage", group: "People" },
-  { href: "/admin/crm", label: "CRM", icon: "Contact2", permission: "users.manage", group: "People" },
-  { href: "/admin/roles", label: "Roles & Permissions", icon: "ShieldCheck", permission: "users.roles", group: "People" },
-  { href: "/admin/referrals", label: "Referrals", icon: "UserPlus", permission: "referrals.manage", group: "People" },
-  { href: "/admin/promotions", label: "Promotions", icon: "BadgePercent", permission: "promotions.manage", group: "Economy" },
-  { href: "/admin/rewards", label: "Rewards", icon: "Gift", permission: "rewards.manage", group: "Economy" },
-  { href: "/admin/achievements", label: "Achievements", icon: "Trophy", permission: "achievements.manage", group: "Economy" },
-  { href: "/admin/vip", label: "VIP Tiers", icon: "Crown", permission: "vip.manage", group: "Economy" },
-  { href: "/admin/leaderboards", label: "Leaderboards", icon: "Swords", permission: "leaderboards.manage", group: "Economy" },
-  { href: "/admin/cms", label: "CMS", icon: "FileText", permission: "cms.manage", group: "Content" },
-  { href: "/admin/games", label: "Games", icon: "Gamepad2", permission: "cms.manage", group: "Content" },
-  { href: "/admin/geo", label: "Geo Pages", icon: "MapPin", permission: "cms.manage", group: "Content" },
-  { href: "/admin/reviews", label: "Reviews", icon: "Star", permission: "cms.manage", group: "Content" },
-  { href: "/admin/notifications", label: "Broadcasts", icon: "Megaphone", permission: "notifications.broadcast", group: "Content" },
-  { href: "/admin/newsletters", label: "Newsletters", icon: "Mail", permission: "newsletters.manage", group: "Content" },
-  { href: "/admin/marketing", label: "Marketing", icon: "Smartphone", permission: "cms.manage", group: "Content" },
-  { href: "/admin/ai-blog", label: "AI Auto Blog", icon: "Sparkles", permission: "cms.manage", group: "AI Automation" },
-  { href: "/admin/telegram", label: "Telegram Bot", icon: "Send", permission: "cms.manage", group: "AI Automation" },
-  { href: "/admin/ai-bot", label: "AI Chatbot", icon: "Bot", permission: "support.manage", group: "AI Automation" },
-  { href: "/admin/analyzer", label: "AI Self-Analyzer", icon: "Activity", permission: "analytics.read", group: "AI Automation" },
-  { href: "/admin/requests", label: "Deposit Requests", icon: "Inbox", permission: "requests.manage", group: "Operations" },
-  { href: "/admin/payments", label: "Payment Methods", icon: "Wallet", permission: "cms.manage", group: "Operations" },
-  { href: "/admin/payouts", label: "Cash-out Payouts", icon: "Banknote", permission: "requests.manage", group: "Operations" },
-  { href: "/admin/support", label: "Support Tickets", icon: "LifeBuoy", permission: "support.manage", group: "Operations" },
-  { href: "/admin/chat", label: "Live Chat", icon: "MessageSquare", permission: "support.manage", group: "Operations" },
-  { href: "/admin/deposits", label: "Deposits", icon: "Wallet", permission: "requests.manage", group: "Operations" },
-  { href: "/admin/game-loads", label: "Wallet Loads", icon: "Banknote", permission: "requests.manage", group: "Operations" },
-  { href: "/admin/transactions", label: "Transactions", icon: "History", permission: "requests.manage", group: "Operations" },
-  { href: "/admin/bonus-transactions", label: "Bonus History", icon: "Gift", permission: "rewards.manage", group: "Operations" },
-  { href: "/admin/fraud", label: "Fraud / Flags", icon: "ShieldAlert", permission: "users.manage", group: "Operations" },
-  { href: "/admin/audit", label: "Audit Logs", icon: "ScrollText", permission: "audit.read", group: "Operations" },
-  { href: "/admin/settings", label: "Settings", icon: "Settings", permission: "settings.manage", group: "Operations" },
+  { href: "/admin", label: "Dashboard", icon: "LayoutDashboard", permission: null, group: "Main" },
+  { href: "/admin/money", label: "Money Center", icon: "Wallet", permission: "requests.manage", group: "Main" },
+  { href: "/admin/users", label: "Players", icon: "Users", permission: "users.manage", group: "Main" },
+  { href: "/admin/support", label: "Support", icon: "LifeBuoy", permission: "support.manage", group: "Main" },
+  { href: "/admin/growth", label: "Growth", icon: "Gift", permission: "promotions.manage", group: "Main" },
+  { href: "/admin/content", label: "Content", icon: "FileText", permission: "cms.manage", group: "Main" },
+  { href: "/admin/automation", label: "Automation", icon: "Bot", permission: "cms.manage", group: "Main" },
+  { href: "/admin/settings", label: "Settings", icon: "Settings", permission: "settings.manage", group: "Main" },
+  { href: "/admin/security", label: "Security", icon: "ShieldAlert", permission: "audit.read", group: "Main" },
 ] as const;
 
 export type PermissionRow = Permission;

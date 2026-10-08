@@ -38,6 +38,7 @@ export function AdminFraudList({ users }: AdminFraudListProps) {
   }, [users, query]);
 
   async function handleClear(userId: string) {
+    if (!window.confirm("Clear fraud flags and restore this player? This is written to the audit log.")) return;
     setLoadingId(userId);
     const result = await clearUserFraudFlags(userId);
     setLoadingId(null);
@@ -50,6 +51,7 @@ export function AdminFraudList({ users }: AdminFraudListProps) {
   }
 
   async function handleBlockFreeplay(userId: string) {
+    if (!window.confirm("Block freeplay for this player? This is written to the audit log.")) return;
     setLoadingId(userId);
     const result = await blockUserFreeplay(userId);
     setLoadingId(null);

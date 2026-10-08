@@ -1,7 +1,9 @@
 import { getFlaggedFraudUsers } from "@/lib/actions/admin-fraud";
 import { AdminFraudList } from "@/components/admin/admin-fraud-list";
+import { requireSuperAdmin } from "@/lib/data/admin";
 
 export default async function AdminFraudPage() {
+  await requireSuperAdmin();
   const { users, error } = await getFlaggedFraudUsers();
 
   return (

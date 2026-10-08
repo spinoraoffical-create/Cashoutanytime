@@ -2,6 +2,7 @@
 
 import * as React from "react";
 
+import { AdminSectionTabs } from "@/components/admin/admin-section-tabs";
 import { AdminSidebar, type AdminNavItem } from "@/components/admin/admin-sidebar";
 import { AdminTopbar } from "@/components/admin/admin-topbar";
 import { Badge } from "@/components/ui/badge";
@@ -56,6 +57,7 @@ export function AdminChrome({
       <div className="flex min-w-0 flex-1 flex-col">
         <AdminTopbar items={items} email={email} topRole={topRole} badges={badges} />
         <main id="admin-content" className="flex-1 px-3 py-4 pb-[max(1rem,env(safe-area-inset-bottom))] sm:px-6 sm:py-6 lg:px-8">
+          <AdminSectionTabs items={items} badges={badges} />
           {children}
         </main>
       </div>

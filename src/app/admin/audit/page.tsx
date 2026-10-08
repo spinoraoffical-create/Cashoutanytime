@@ -17,7 +17,7 @@ import {
 } from "@/components/ui/table";
 import { profileDisplayName } from "@/lib/admin/spinora-profile";
 import { adminDb } from "@/lib/actions/admin/core";
-import { requirePermission } from "@/lib/data/admin";
+import { requireSuperAdmin } from "@/lib/data/admin";
 import { ScrollText } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -30,7 +30,7 @@ export default async function AdminAuditPage({
 }: {
   searchParams: Promise<{ page?: string }>;
 }) {
-  await requirePermission("audit.read");
+  await requireSuperAdmin();
   const params = await searchParams;
   const page = Math.max(1, Number(params.page) || 1);
   const from = (page - 1) * PAGE_SIZE;

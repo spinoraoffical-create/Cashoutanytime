@@ -1,8 +1,9 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import { writeAudit } from "@/lib/actions/admin/core";
+import { getStaffContext } from "@/lib/data/admin";
 import { createAdminClient } from "@/lib/supabase/admin";
-import { createClient } from "@/lib/supabase/server";
 
 export interface AdminFraudRow {
   user_id: string;
@@ -21,16 +22,9 @@ export interface AdminFraudRow {
 }
 
 async function requireAdmin() {
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  if (!user) return { error: "Not authenticated" as const };
-
-  const { data: profile } = await supabase.from("profiles").select("role").eq("id", user.id).single();
-  if (profile?.role !== "admin") return { error: "Unauthorized" as const };
-
-  return { error: null, userId: user.id };
+  const ctx = await getStaffContext();
+  if (!ctx?.isSuperAdmin) return { error: "Unauthorized" as const };
+  return { error: null, userId: ctx.userId };
 }
 
 function parseFlags(raw: unknown): string[] {
@@ -159,6 +153,14 @@ export async function clearUserFraudFlags(userId: string): Promise<{ success?: b
     })
     .then(() => {}, () => {});
 
+  await writeAudit({
+    actorId: auth.userId,
+    action: "fraud.clear",
+    entityType: "profile",
+    entityId: userId,
+    after: { cleared: true },
+  });
+
   revalidatePath("/admin/fraud");
   revalidatePath("/admin/users");
   return { success: true };
@@ -187,6 +189,14 @@ export async function blockUserFreeplay(userId: string): Promise<{ success?: boo
     );
 
   if (error) return { error: error.message };
+
+  await writeAudit({
+    actorId: auth.userId,
+    action: "fraud.block_freeplay",
+    entityType: "profile",
+    entityId: userId,
+    after: { rewards_blocked: true },
+  });
 
   revalidatePath("/admin/fraud");
   return { success: true };
