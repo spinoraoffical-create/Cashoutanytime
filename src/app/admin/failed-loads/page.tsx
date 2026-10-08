@@ -25,6 +25,16 @@ export default async function FailedLoadsPage() {
     userIds = ((owned ?? []) as { id: string }[]).map((row) => row.id);
   }
 
+  type LoadRow = {
+    id: string;
+    user_id: string;
+    game_name: string;
+    amount: number;
+    status: string;
+    error_message: string | null;
+    source_key: string | null;
+    created_at: string;
+  };
   let query = db
     .from("game_load_requests")
     .select("id, user_id, game_name, amount, status, error_message, source_key, created_at")
@@ -32,8 +42,10 @@ export default async function FailedLoadsPage() {
     .order("created_at", { ascending: false })
     .limit(100);
   if (userIds) query = userIds.length ? query.in("user_id", userIds) : query.eq("user_id", "00000000-0000-0000-0000-000000000000");
-  let { data, error } = await query;
-  if (error && /source_key|column|schema cache/i.test(error.message)) {
+  const loaded = await query;
+  let rows = (loaded.data ?? []) as LoadRow[];
+  let error = loaded.error;
+  if (loaded.error && /source_key|column|schema cache/i.test(loaded.error.message)) {
     let fallback = db
       .from("game_load_requests")
       .select("id, user_id, game_name, amount, status, error_message, created_at")
@@ -42,17 +54,9 @@ export default async function FailedLoadsPage() {
       .limit(100);
     if (userIds) fallback = userIds.length ? fallback.in("user_id", userIds) : fallback.eq("user_id", "00000000-0000-0000-0000-000000000000");
     const retry = await fallback;
-    data = retry.data;
+    rows = ((retry.data ?? []) as Omit<LoadRow, "source_key">[]).map((row) => ({ ...row, source_key: null }));
     error = retry.error;
   }
-  const rows = (data ?? []) as {
-    id: string;
-    game_name: string;
-    amount: number;
-    error_message: string | null;
-    source_key: string | null;
-    created_at: string;
-  }[];
 
   return (
     <div className="mx-auto max-w-5xl">
