@@ -3,7 +3,6 @@
 import { useState, useEffect, useRef, useCallback, useMemo, type RefObject } from "react";
 import { useSearchParams } from "next/navigation";
 import { Card } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { createClient } from "@/lib/supabase/client";
 import { uploadChatAttachment } from "@/lib/chat/attachments";
@@ -32,7 +31,7 @@ import { useDashboardProfile } from "@/lib/dashboard/dashboard-profile-context";
 import { appendMessage, mergeMessagesById } from "@/lib/chat/merge-messages";
 import { subscribeToConversationInserts, subscribeToMessageInserts } from "@/lib/chat/subscribe-messages";
 import { toast } from "sonner";
-import { ArrowLeft, Headphones, MessageCircle } from "lucide-react";
+import { ArrowLeft, MessageCircle } from "lucide-react";
 import { SupportAiStarter } from "@/components/chat/support-ai-starter";
 import type { Message } from "@/types/database";
 
@@ -51,6 +50,7 @@ interface UserChatPanelProps {
   scrollRef: RefObject<HTMLDivElement | null>;
   onScrollMessages?: () => void;
   botSenderId: string | null;
+  supportLayout?: boolean;
 }
 
 function UserChatPanel({
@@ -68,6 +68,7 @@ function UserChatPanel({
   scrollRef,
   onScrollMessages,
   botSenderId,
+  supportLayout = false,
 }: UserChatPanelProps) {
   const closeViaBack = useMobileChatClose();
 
@@ -114,24 +115,20 @@ function UserChatPanel({
             <ArrowLeft className="h-4 w-4" />
           </Button>
         )}
-        <div className="w-10 h-10 rounded-full bg-gradient-to-br from-purple-600 to-orange-500 flex items-center justify-center shrink-0">
-          <Headphones className="h-5 w-5 text-white" />
-        </div>
         <div className="flex-1 min-w-0">
           <h2 className="font-semibold text-white truncate">
-            {humanRequested ? "Human support" : selectedConversation.title}
+            {humanRequested || supportLayout ? "Human support" : selectedConversation.title}
           </h2>
           <p className="text-xs text-muted-foreground truncate">
             {humanRequested
               ? "Human support requested · updates stay here"
-              : "Automated assistant answers first"}
+              : "An automated assistant answers first. Ask for a person at any time."}
           </p>
+          <a href="/help" className="text-xs font-bold text-[#ff6b89]">
+            Frequently asked questions
+          </a>
         </div>
-        {humanRequested ? (
-          <Badge className="bg-emerald-500/20 text-emerald-300 border-emerald-500/30 shrink-0">
-            Live
-          </Badge>
-        ) : (
+        {humanRequested ? null : (
           <Button
             type="button"
             variant="outline"
@@ -166,7 +163,7 @@ function UserChatPanel({
         onSend={onSend}
         loading={loading}
         disabled={!selectedId}
-        placeholder={humanRequested ? "Message human support…" : "Message support…"}
+        placeholder={humanRequested || supportLayout ? "Message human support…" : "Message support…"}
         attachLabel="Attach image"
         showSendLabel
         className="bg-[#121212] border-white/10 shrink-0"
@@ -177,8 +174,10 @@ function UserChatPanel({
 
 export function UserMessagesInbox({
   initialData,
+  variant = "inbox",
 }: {
   initialData?: UserMessagesInboxInitialData;
+  variant?: "inbox" | "thread";
 } = {}) {
   const dashboardProfile = useDashboardProfile();
   const searchParams = useSearchParams();
@@ -507,6 +506,7 @@ export function UserMessagesInbox({
     scrollRef,
     onScrollMessages,
     botSenderId,
+    supportLayout: variant === "thread",
   };
 
   if (initLoading) {
@@ -531,6 +531,14 @@ export function UserMessagesInbox({
     return (
       <Card className={`${CHAT_INBOX_CARD_CLASS} min-h-[28rem]`}>
         <SupportAiStarter userId={userId} onConversationStarted={() => void init()} />
+      </Card>
+    );
+  }
+
+  if (variant === "thread") {
+    return (
+      <Card className={CHAT_INBOX_CARD_CLASS}>
+        <UserChatPanel {...chatPanelProps} />
       </Card>
     );
   }

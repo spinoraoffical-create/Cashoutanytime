@@ -4,7 +4,6 @@ import { OrganizationSchema, WebsiteSchema, HomeGamesItemListSchema, HomeFaqSche
 import { homeMetadata } from "@/lib/seo/metadata";
 import { ClientProviders } from "@/components/providers/client-providers";
 import { MobileBottomNav } from "@/components/layout/mobile-bottom-nav";
-import { LiveCasinoChatWidget } from "@/components/chat/live-casino-chat-widget";
 import "./globals.css";
 
 const inter = Inter({
@@ -37,7 +36,6 @@ export default async function RootLayout({ children }: { children: React.ReactNo
       <body className={inter.className} suppressHydrationWarning>
         <ClientProviders>
           {children}
-          <LiveCasinoChatWidget />
           <MobileBottomNav />
         </ClientProviders>
       </body>

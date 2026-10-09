@@ -54,7 +54,7 @@ const LINK_ITEMS: {
   { id: "vip", label: "VIP CLUB", icon: Crown, href: "/dashboard/vip" },
   { id: "missions", label: "MISSIONS", icon: Target, href: "/dashboard" },
   { id: "leaderboard", label: "LEADERBOARD", icon: Trophy, href: "/leaderboard" },
-  { id: "support", label: "SUPPORT", icon: Headphones, href: "/dashboard/messages" },
+  { id: "support", label: "SUPPORT", icon: Headphones, href: "/support" },
 ];
 
 interface LobbySidebarProps {

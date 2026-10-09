@@ -157,14 +157,14 @@ export function SupportThread({
               const showWallet = !isOwn && isAssistant && messageMentionsWallet(message.content);
               return (
                 <div key={message.id} className={cn("flex", isOwn ? "justify-end" : "justify-start")}>
-                  <div
-                    className={cn(
-                      "max-w-[85%] rounded-2xl px-4 py-2.5 text-sm shadow-sm break-words",
-                      isOwn
-                        ? "gradient-bg text-white rounded-br-md"
-                        : "bg-[#1e1e1e] text-foreground border border-white/5 rounded-bl-md"
-                    )}
-                  >
+                <div
+                  className={cn(
+                    "max-w-[85%] break-words text-sm",
+                    isOwn
+                      ? "rounded-full bg-white/10 px-4 py-2 text-white"
+                      : "rounded-2xl border border-white/5 bg-[#1e1e1e] px-4 py-2.5 text-foreground"
+                  )}
+                >
                     {label && <p className="mb-1 text-[10px] font-semibold text-orange-400">{label}</p>}
                     <ChatMessageContent message={message} />
                     {showWallet && (

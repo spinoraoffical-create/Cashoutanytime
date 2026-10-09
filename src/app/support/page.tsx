@@ -18,7 +18,7 @@ const TOPICS = [
 
 export default async function SupportPage() {
   const [user, dbFaqs] = await Promise.all([getAuthUser(), getPublishedFaqs()]);
-  const chatHref = user ? "/dashboard/messages" : "/login?redirect=/dashboard/messages";
+  const chatHref = user ? "/support/chat" : "/login?redirect=/support/chat";
 
   const faqs = dbFaqs.map((f) => ({ q: f.question, a: f.answer, category: f.category || "general" }));
 
@@ -39,7 +39,7 @@ export default async function SupportPage() {
             </Link>
           </Button>
           <Button asChild variant="outline" className="flex-1 rounded-full">
-            <a href="mailto:support@spinoracasinos.com">Contact support</a>
+            <Link href="/help">Frequently asked questions</Link>
           </Button>
         </div>
 
