@@ -39,6 +39,7 @@ export function GameLandingClient({
   const [reloadToken, setReloadToken] = useState(0);
 
   async function handleCreateAccount() {
+    if (!walletLoadEnabled) return;
     if (game.upcoming) {
       toast.info(UPCOMING_GAME_MESSAGE);
       return;
@@ -130,7 +131,7 @@ export function GameLandingClient({
     if (accountStatus === "loading") return;
     autoCreateAttempted.current = true;
 
-    if (walletLoadEnabled && accountStatus === "has") return;
+    if (!walletLoadEnabled || accountStatus === "has") return;
 
     void handleCreateAccount();
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -170,7 +171,7 @@ export function GameLandingClient({
         </section>
       ) : null}
 
-      {!game.upcoming && hasAccount && resolvedAccount ? (
+      {!game.upcoming && walletLoadEnabled && hasAccount && resolvedAccount ? (
         <GameWalletLoadSection
           mode="owned"
           game={game}
@@ -179,7 +180,7 @@ export function GameLandingClient({
         />
       ) : null}
 
-      {!game.upcoming && !hasAccount ? (
+      {!game.upcoming && walletLoadEnabled && !hasAccount ? (
         <section className="overflow-hidden rounded-2xl border border-white/10 bg-[#24152e]">
           <div className="p-4">
             <h2 className="text-lg font-black">Start with {game.name}</h2>

@@ -14,7 +14,7 @@ export async function finishGameLoad(input: {
 
   const { data } = await admin
     .from("game_load_requests")
-    .select("load_type, amount, game_username, game_password")
+    .select("load_type, amount, game_username, game_password, game_slug")
     .eq("id", input.requestId)
     .maybeSingle();
   const row = data as {
@@ -22,8 +22,37 @@ export async function finishGameLoad(input: {
     amount?: number | null;
     game_username?: string | null;
     game_password?: string | null;
+    game_slug?: string | null;
   } | null;
   const loadType = row?.load_type;
+  const creating = loadType === "create_account" || loadType === "new_account";
+
+  if (input.success && creating) {
+    const slug = row?.game_slug?.trim() || "";
+    const { data: game } = slug
+      ? await admin.from("games").select("id").ilike("slug", slug).maybeSingle()
+      : { data: null };
+    if (!(game as { id?: string } | null)?.id) {
+      const message = slug ? `No games row for ${slug}.` : "No games row for this slug.";
+      await admin
+        .from("game_load_requests")
+        .update({
+          game_username: null,
+          game_password: null,
+          updated_at: new Date().toISOString(),
+        })
+        .eq("id", input.requestId);
+      const { error } = await admin.rpc("complete_game_load", {
+        p_request_id: input.requestId,
+        p_success: false,
+        p_game_username: null,
+        p_game_password: null,
+        p_error_message: message,
+        p_redeemed_amount: null,
+      });
+      return { ok: false as const, error: error?.message || message };
+    }
+  }
   const movedMoney = loadType === "load" || loadType === "reload" || loadType === "redeem";
 
   if (input.success && movedMoney) {

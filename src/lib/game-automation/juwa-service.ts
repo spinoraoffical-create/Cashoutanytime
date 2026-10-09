@@ -69,13 +69,7 @@ export async function autoFulfillJuwaRequest(
     }
 
     if (loadType === "check_balance") {
-      let userId: string;
-      try {
-        userId = await client.getUserID(cleanAccount);
-      } catch (e) {
-        userId = cleanAccount;
-      }
-
+      const userId = await client.getUserID(cleanAccount);
       const bal = await client.getPlayerBalance(userId);
 
       if (admin && requestId) {
@@ -103,15 +97,7 @@ export async function autoFulfillJuwaRequest(
         throw new Error("Invalid deposit amount for Juwa load");
       }
 
-      let userId: string;
-      try {
-        userId = await client.getUserID(cleanAccount);
-      } catch (err) {
-        const passToUse = password?.trim() || `Pass_${Math.floor(1000 + Math.random() * 9000)}`;
-        const newUser = await client.addUser(cleanAccount, passToUse);
-        userId = newUser.userId;
-      }
-
+      const userId = await client.getUserID(cleanAccount);
       const res = await client.recharge(userId, amount, requestId);
       const newBal = parseFloat(res.data?.user_balance || String(amount));
 
@@ -139,13 +125,7 @@ export async function autoFulfillJuwaRequest(
         throw new Error("Invalid redeem amount for Juwa");
       }
 
-      let userId: string;
-      try {
-        userId = await client.getUserID(cleanAccount);
-      } catch (e) {
-        userId = cleanAccount;
-      }
-
+      const userId = await client.getUserID(cleanAccount);
       const res = await client.withdraw(userId, amount, requestId);
       const newBal = parseFloat(res.data?.user_balance || "0");
 

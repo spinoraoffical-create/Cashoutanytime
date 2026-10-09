@@ -34,11 +34,6 @@ export interface AutoFulfillFireKirinResult {
 
 const ACCOUNT_PATTERN = /^[A-Za-z0-9]{6,32}$/;
 
-function accountMissing(err: unknown): boolean {
-  const message = err instanceof Error ? err.message : String(err);
-  return /not exist|not found|no such|does not exist|unregistered|invalid user|account.*exist/i.test(message);
-}
-
 export function fireKirinLoginName(raw: string): string {
   let name = raw.replace(/[^A-Za-z0-9]/g, "").slice(0, 20);
   if (name.length < 6) {
@@ -226,7 +221,7 @@ async function autoFulfillFireKirinNow(
       }
       const { createFireKirinPlayerOnStore } = await import("./firekirin-store");
       await createFireKirinPlayerOnStore(cleanAccount, passToUse);
-      await saveFireKirinLogin(requestId, cleanAccount, passToUse, true);
+      await saveFireKirinLogin(requestId, cleanAccount, passToUse, false);
       return {
         success: true,
         message: `Fire Kirin account created: ${cleanAccount}`,
@@ -277,19 +272,8 @@ async function autoFulfillFireKirinNow(
       if (!isWholeDollar(amount)) {
         throw new Error("Fire Kirin recharge amount must be a whole dollar.");
       }
-      const account = await ensureFireKirinAccount(client, session, cleanAccount, password, requestId);
+      const account = await ensureFireKirinAccount(client, session, cleanAccount, password);
       const res = await client.rechargePlayer(account.account, amount, session, transactionId);
-      if (admin && requestId) {
-        await admin
-          .from("game_load_requests")
-          .update({
-            status: "completed",
-            game_username: account.account,
-            completed_at: new Date().toISOString(),
-            updated_at: new Date().toISOString(),
-          })
-          .eq("id", requestId);
-      }
       return {
         success: true,
         message: `Fire Kirin recharged $${res.amount.toFixed(2)} to ${account.account}`,
@@ -390,16 +374,8 @@ async function ensureFireKirinAccount(
   client: FireKirinApiClient,
   session: FireKirinSession,
   account: string,
-  password: string | undefined,
-  requestId: string | undefined
+  password: string | undefined
 ) {
-  try {
-    await client.queryInfo(account, session);
-    return { account, pass: password };
-  } catch (err) {
-    if (!accountMissing(err)) throw err;
-    const created = await openFireKirinAccount(client, session, account, password);
-    await saveFireKirinLogin(requestId, created.account, created.pass, false);
-    return { account: created.account, pass: created.pass };
-  }
+  await client.queryInfo(account, session);
+  return { account, pass: password };
 }

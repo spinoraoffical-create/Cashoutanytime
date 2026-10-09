@@ -29,20 +29,10 @@ export function marketingGamesToCards(catalog: MarketingGame[]): Game[] {
   return dedupeGamesForDisplay(mapped);
 }
 
-/** Static catalog + DB-only games — one card per title, static metadata wins. */
+/** Home and /play cards. A game appears only when its games.is_active row is true. */
 export function buildLobbyCatalog(dbCatalog: MarketingGame[] = []): Game[] {
-  const bySlug = new Map<string, Game>();
-
-  for (const game of GAMES) {
-    bySlug.set(canonicalGameSlug(game.slug), game);
-  }
-
-  for (const game of marketingGamesToCards(dbCatalog)) {
-    const key = canonicalGameSlug(game.slug);
-    if (!bySlug.has(key)) bySlug.set(key, game);
-  }
-
-  return dedupeGamesForDisplay([...bySlug.values()]);
+  if (!dbCatalog.length) return [];
+  return marketingGamesToCards(dbCatalog);
 }
 
 /** Prefer canonical static display name for grid labels. */

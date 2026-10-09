@@ -88,7 +88,7 @@ export async function autoFulfillCashFrenzyRequest(
         })
         .eq("id", requestId);
 
-      return { success: true };
+      return { success: true, username: created.account, password: created.password };
     }
 
     if (loadType === "check_balance") {

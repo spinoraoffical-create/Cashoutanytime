@@ -68,13 +68,7 @@ export async function autoFulfillVegasRequest(
     }
 
     if (loadType === "check_balance") {
-      let userId: string;
-      try {
-        userId = await client.getUserID(cleanAccount);
-      } catch {
-        userId = cleanAccount;
-      }
-
+      const userId = await client.getUserID(cleanAccount);
       const bal = await client.getUserBalance(userId);
 
       if (admin && requestId) {
@@ -102,15 +96,7 @@ export async function autoFulfillVegasRequest(
         throw new Error("Invalid deposit amount for Vegas load");
       }
 
-      let userId: string;
-      try {
-        userId = await client.getUserID(cleanAccount);
-      } catch {
-        const passToUse = password?.trim() || `Pass_${Math.floor(1000 + Math.random() * 9000)}`;
-        const newUser = await client.addUser(cleanAccount, passToUse);
-        userId = newUser.userId;
-      }
-
+      const userId = await client.getUserID(cleanAccount);
       const res = await client.recharge(userId, amount, requestId);
       const newBal = parseFloat(res.data?.user_balance || String(amount));
 
@@ -138,13 +124,7 @@ export async function autoFulfillVegasRequest(
         throw new Error("Invalid redeem amount for Vegas");
       }
 
-      let userId: string;
-      try {
-        userId = await client.getUserID(cleanAccount);
-      } catch {
-        userId = cleanAccount;
-      }
-
+      const userId = await client.getUserID(cleanAccount);
       const res = await client.withdraw(userId, amount, requestId);
       const newBal = parseFloat(res.data?.user_balance || "0");
 

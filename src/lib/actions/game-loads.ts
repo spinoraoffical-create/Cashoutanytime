@@ -28,7 +28,7 @@ import { autoFulfillOrionStarsRequest } from "@/lib/game-automation/orionstars-s
 import { isOrionStarsApiConfigured } from "@/lib/game-automation/orionstars-api";
 import { autoFulfillMilkyWayRequest } from "@/lib/game-automation/milkyway-service";
 import { isMilkyWayApiConfigured } from "@/lib/game-automation/milkyway-api";
-import { autoFulfillFireKirinRequest, provisionFireKirinAccount } from "@/lib/game-automation/firekirin-service";
+import { autoFulfillFireKirinRequest } from "@/lib/game-automation/firekirin-service";
 import { autoFulfillVblinkRequest, isVblinkApiConfigured } from "@/lib/game-automation/vblink-service";
 import { isFireKirinApiConfigured } from "@/lib/game-automation/firekirin-api";
 import { autoFulfillJuwaRequest } from "@/lib/game-automation/juwa-service";
@@ -39,30 +39,69 @@ import { userFacingGameLoadError } from "@/lib/game-automation/user-facing-error
 import { usernameForOwner } from "@/lib/games/owned-account";
 import { finishGameLoad } from "@/lib/game-automation/finish-game-load";
 
-async function ownedGameUsername(userId: string, gameSlug: string) {
+async function savedGameLogin(userId: string, gameSlug: string) {
   const admin = createAdminClient();
   if (!admin) return null;
-  const { data: game } = await admin.from("games").select("id").eq("slug", gameSlug).maybeSingle();
+
+  const { data: game } = await admin.from("games").select("id").ilike("slug", gameSlug).maybeSingle();
   const gameId = (game as { id?: string } | null)?.id;
-  if (!gameId) return null;
-  const { data } = await admin
-    .from("game_accounts")
-    .select("game_username")
+  if (gameId) {
+    const { data } = await admin
+      .from("game_accounts")
+      .select("game_username, game_password")
+      .eq("user_id", userId)
+      .eq("game_id", gameId)
+      .maybeSingle();
+    const account = data as { game_username?: string | null; game_password?: string | null } | null;
+    const username = account?.game_username?.trim() || "";
+    if (username) return { username, password: account?.game_password ?? null };
+  }
+
+  const { data: created } = await admin
+    .from("game_load_requests")
+    .select("game_username, game_password")
     .eq("user_id", userId)
-    .eq("game_id", gameId)
+    .eq("game_slug", gameSlug)
+    .eq("status", "completed")
+    .in("load_type", ["create_account", "new_account"])
+    .not("game_username", "is", null)
+    .order("completed_at", { ascending: false })
+    .limit(1)
     .maybeSingle();
-  const match = usernameForOwner(
-    [
+  const request = created as { game_username?: string | null; game_password?: string | null } | null;
+  const username = request?.game_username?.trim() || "";
+  if (!username) return null;
+  if (gameId) {
+    await admin.from("game_accounts").upsert(
       {
-        userId,
-        gameSlug,
-        username: (data as { game_username?: string | null } | null)?.game_username ?? "",
+        user_id: userId,
+        game_id: gameId,
+        game_username: username,
+        game_password: request?.game_password ?? null,
+        updated_at: new Date().toISOString(),
       },
-    ],
+      { onConflict: "user_id,game_id" }
+    );
+  }
+  return { username, password: request?.game_password ?? null };
+}
+
+async function ownedGameUsername(userId: string, gameSlug: string) {
+  const saved = await savedGameLogin(userId, gameSlug);
+  if (!saved) return null;
+  const match = usernameForOwner(
+    [{ userId, gameSlug, username: saved.username }],
     userId,
     gameSlug
   );
   return "username" in match ? match.username : null;
+}
+
+export async function gameIsActive(gameSlug: string) {
+  const admin = createAdminClient();
+  if (!admin) return false;
+  const { data } = await admin.from("games").select("is_active").ilike("slug", gameSlug).maybeSingle();
+  return Boolean((data as { is_active?: boolean } | null)?.is_active);
 }
 
 async function generatedLoginForUser(
@@ -156,7 +195,17 @@ async function fulfillOrFail(
     const redeemed =
       result.redeemedAmount ??
       (result.success && (loadType === "redeem" || loadType === "check_balance") ? input.amount : null);
-    await finishGameLoad({
+    const creating = loadType === "create_account" || loadType === "new_account";
+    if (result.success && creating && !result.username?.trim()) {
+      const message = result.error || "Provider did not return a username.";
+      await finishGameLoad({
+        requestId,
+        success: false,
+        errorMessage: message,
+      });
+      return { success: false as const, error: message };
+    }
+    const finished = await finishGameLoad({
       requestId,
       success: result.success,
       errorMessage: result.success ? null : result.error,
@@ -164,6 +213,9 @@ async function fulfillOrFail(
       gamePassword: result.password,
       redeemedAmount: redeemed,
     });
+    if (!finished.ok) {
+      return { success: false as const, error: finished.error };
+    }
     return result.success
       ? { success: true as const }
       : { success: false as const, error: result.error || "Game load failed." };
@@ -416,7 +468,7 @@ export async function requestGameAccountCreate(input: {
   } = await supabase.auth.getUser();
   if (!user) return { error: "Not authenticated" };
 
-  if (!isWalletLoadEnabledForGame(input.gameSlug)) {
+  if (!isWalletLoadEnabledForGame(input.gameSlug) || !(await gameIsActive(input.gameSlug))) {
     return { error: "Wallet load is not enabled for this game yet." };
   }
   if (!isGameApiReady(input.gameSlug)) {
@@ -537,7 +589,7 @@ export async function requestGameCheckBalance(input: {
   } = await supabase.auth.getUser();
   if (!user) return { error: "Not authenticated" };
 
-  if (!isWalletLoadEnabledForGame(input.gameSlug)) {
+  if (!isWalletLoadEnabledForGame(input.gameSlug) || !(await gameIsActive(input.gameSlug))) {
     return { error: "Wallet load is not enabled for this game yet." };
   }
   if (!isGameApiReady(input.gameSlug)) {
@@ -619,7 +671,7 @@ export async function requestGameLoad(input: {
   const blocked = await responsibleBlock(input.amount);
   if (blocked) return { error: blocked };
 
-  if (!isWalletLoadEnabledForGame(input.gameSlug)) {
+  if (!isWalletLoadEnabledForGame(input.gameSlug) || !(await gameIsActive(input.gameSlug))) {
     return { error: "Wallet load is not enabled for this game yet." };
   }
   if (!isGameApiReady(input.gameSlug)) {
@@ -633,12 +685,7 @@ export async function requestGameLoad(input: {
     };
   }
 
-  let gameUsername = await ownedGameUsername(user.id, input.gameSlug);
-  if (!gameUsername && input.gameSlug === "fire-kirin") {
-    const opened = await provisionFireKirinAccount(user.id);
-    if ("error" in opened) return { error: opened.error };
-    gameUsername = opened.username;
-  }
+  const gameUsername = await ownedGameUsername(user.id, input.gameSlug);
   if (!gameUsername) return { error: "Account not found" };
 
   if (input.walletType !== "current") {
@@ -714,7 +761,7 @@ export async function requestGameRedeem(input: {
   } = await supabase.auth.getUser();
   if (!user) return { error: "Not authenticated" };
 
-  if (!isWalletLoadEnabledForGame(input.gameSlug)) {
+  if (!isWalletLoadEnabledForGame(input.gameSlug) || !(await gameIsActive(input.gameSlug))) {
     return { error: "Wallet load is not enabled for this game yet." };
   }
   if (!isGameApiReady(input.gameSlug)) {
@@ -973,19 +1020,9 @@ export async function getMyGameAccount(gameSlug: string) {
   } = await supabase.auth.getUser();
   if (!user) return null;
 
-  const { data } = await supabase
-    .from("game_load_requests")
-    .select("game_username, game_password, status, completed_at")
-    .eq("user_id", user.id)
-    .eq("game_slug", gameSlug)
-    .eq("status", "completed")
-    .in("load_type", ["create_account", "new_account"])
-    .not("game_username", "is", null)
-    .order("completed_at", { ascending: false })
-    .limit(1)
-    .maybeSingle();
-
-  return data;
+  const saved = await savedGameLogin(user.id, gameSlug);
+  if (!saved) return null;
+  return { game_username: saved.username, game_password: saved.password };
 }
 
 /** Fail pending/processing jobs older than N minutes (frees blocked Replace / Load clicks). */
