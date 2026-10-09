@@ -4,7 +4,7 @@ import { useLobbyProfile } from "@/components/home/lobby/use-lobby-profile";
 import { LobbyAppShell } from "@/components/home/lobby/lobby-app-shell";
 import { PublicHome } from "@/components/player/public-home";
 import { PlayerHome } from "@/components/player/player-home";
-import { GAMES, type Game } from "@/lib/games";
+import type { Game } from "@/lib/games";
 import type { PublicPromotion } from "@/lib/data/promotions-public";
 
 interface HomeLandingShellProps {
@@ -19,7 +19,7 @@ interface HomeLandingShellProps {
 
 export function HomeLandingShell({
   initialLoggedIn = false,
-  lobbyCatalog = GAMES,
+  lobbyCatalog = [],
   linkedGameSlugs = [],
   promotions = [],
   wallet = { balance: 0, cashout: 0, freeplay: 0 },

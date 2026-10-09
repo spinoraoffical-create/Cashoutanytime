@@ -4,7 +4,7 @@ import { createMetadata } from "@/lib/seo/metadata";
 import { getGameSeoDescription, getGameSeoKeywords, getGameSeoTitle } from "@/lib/seo/game-seo";
 import { BreadcrumbSchema, GamePageSchema } from "@/lib/seo/json-ld";
 import { SITE_URL } from "@/lib/constants";
-import { GAMES, getGameBySlug } from "@/lib/games";
+import { getGameBySlug } from "@/lib/games";
 import { isWalletLoadEnabledForGame } from "@/lib/game-automation/config";
 import { gameIsActive, getMyGameAccount } from "@/lib/actions/game-loads";
 
@@ -15,14 +15,10 @@ interface GamePageProps {
   searchParams: Promise<{ create?: string }>;
 }
 
-export function generateStaticParams() {
-  return GAMES.map((game) => ({ slug: game.slug }));
-}
-
 export async function generateMetadata({ params }: GamePageProps) {
   const { slug } = await params;
   const game = getGameBySlug(slug);
-  if (!game) return {};
+  if (!game || !(await gameIsActive(game.slug))) return { title: "Not found", robots: { index: false, follow: false } };
 
   return createMetadata({
     title: getGameSeoTitle(game),
@@ -39,8 +35,9 @@ export default async function GamePage({ params, searchParams }: GamePageProps) 
   const game = getGameBySlug(slug);
 
   if (!game) notFound();
+  if (!(await gameIsActive(game.slug))) notFound();
 
-  const walletLoadEnabled = isWalletLoadEnabledForGame(game.slug) && (await gameIsActive(game.slug));
+  const walletLoadEnabled = isWalletLoadEnabledForGame(game.slug);
   const initialGameAccount = walletLoadEnabled ? await getMyGameAccount(game.slug) : null;
 
   return (

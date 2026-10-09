@@ -413,47 +413,32 @@ export type MarketingGame = Pick<
   "id" | "slug" | "name" | "description" | "image_url" | "badge_text" | "is_featured" | "popularity" | "play_url" | "download_url"
 >;
 
-const FALLBACK_GAMES: MarketingGame[] = [
-  { id: "a1", slug: "fire-kirin",    name: "Fire Kirin",     description: "The ultimate fish table game — massive schools, legendary catches and jackpots that scale with every shot.",                       image_url: null, badge_text: "HOT",  is_featured: true,  popularity: 100, play_url: null, download_url: null },
-  { id: "a2", slug: "juwa",          name: "Juwa",           description: "High-speed fish hunting with multi-level boss battles, explosive bonus rounds and one of the highest payout rates in the lineup.", image_url: null, badge_text: "HOT",  is_featured: true,  popularity: 98,  play_url: null, download_url: null },
-  { id: "a3", slug: "orion-stars",   name: "Orion Stars",    description: "Constellation-themed fish table with stellar jackpots that light up the board. Smooth controls, deep multipliers.",               image_url: null, badge_text: null,   is_featured: true,  popularity: 95,  play_url: null, download_url: null },
-  { id: "a4", slug: "game-vault",    name: "Game Vault",     description: "An entire vault of premium sweepstakes games in one platform — slots, fish tables and arcade titles.",                            image_url: null, badge_text: "HOT",  is_featured: true,  popularity: 94,  play_url: null, download_url: null },
-  { id: "a5", slug: "vegas-sweeps",  name: "Vegas Sweeps",   description: "Authentic Vegas-style slots with real reels, classic bonus rounds and the neon-lit jackpots the Strip is famous for.",            image_url: null, badge_text: null,   is_featured: true,  popularity: 91,  play_url: null, download_url: null },
-  { id: "a6", slug: "milky-way",     name: "Milky Way",      description: "Space-themed fish table where galactic multipliers rain down during bonus storms.",                                                 image_url: null, badge_text: null,   is_featured: true,  popularity: 89,  play_url: null, download_url: null },
-  { id: "a7", slug: "panda-master",  name: "Panda Master",   description: "Bamboo forest fish action with powerful Panda Boss encounters and sudden multiplier bursts.",                                      image_url: null, badge_text: null,   is_featured: true,  popularity: 87,  play_url: null, download_url: null },
-  { id: "a8", slug: "cash-frenzy",   name: "Cash Frenzy",    description: "Non-stop slot action built for speed — rapid spins, free-spin chain reactions and a cash meter that climbs every round.",         image_url: null, badge_text: null,   is_featured: false, popularity: 85,  play_url: null, download_url: null },
-  { id: "a9", slug: "vblink",        name: "VBlink",         description: "Blink and you'll miss a payout — VBlink runs at breakneck speed with instant-reload bonus rounds.",                               image_url: null, badge_text: "NEW",  is_featured: false, popularity: 82,  play_url: null, download_url: null },
-  { id: "b1", slug: "mafia",         name: "Mafia",          description: "Run the underworld: arcade-style fish table with street boss showdowns and crime syndicate jackpot pools.",                        image_url: null, badge_text: null,   is_featured: false, popularity: 80,  play_url: null, download_url: null },
-  { id: "b2", slug: "mr-all-in-one", name: "Mr. All In One", description: "Fish tables, slots and more inside a single platform — the all-in-one destination for players who want variety.",                  image_url: null, badge_text: null,   is_featured: false, popularity: 78,  play_url: null, download_url: null },
-  { id: "b3", slug: "cash-machine",  name: "Cash Machine",   description: "Steady paylines and a generous free-spin engine — the Cash Machine rewards consistent play with sweeps coin payouts.",             image_url: null, badge_text: null,   is_featured: false, popularity: 75,  play_url: null, download_url: null },
-];
-
 export const getGames = unstable_cache(
-  async (): Promise<MarketingGame[]> =>
-    withFallback(
-      (async () => {
-        const supabase = createStaticClient();
-        const { data, error } = await supabase
-          .from("games")
-          .select(
-            "id, slug, name, description, image_url, badge_text, is_featured, popularity, play_url, download_url"
-          )
-          .eq("is_active", true)
-          .order("popularity", { ascending: false });
-        if (error || !data?.length) return null;
-        const rows = data as MarketingGame[];
-        const seen = new Set<string>();
-        return rows.filter((g) => {
-          const key = g.slug.trim().toLowerCase();
-          if (!key || seen.has(key)) return false;
-          seen.add(key);
-          return true;
-        });
-      })(),
-      FALLBACK_GAMES
-    ),
-  ["marketing-games"],
-  { revalidate: 300 }
+  async (): Promise<MarketingGame[]> => {
+    try {
+      const supabase = createAdminClient() ?? createStaticClient();
+      const { data, error } = await supabase
+        .from("games")
+        .select(
+          "id, slug, name, description, image_url, badge_text, is_featured, popularity, play_url, download_url"
+        )
+        .eq("is_active", true)
+        .order("popularity", { ascending: false });
+      if (error || !data) return [];
+      const rows = data as MarketingGame[];
+      const seen = new Set<string>();
+      return rows.filter((g) => {
+        const key = g.slug.trim().toLowerCase();
+        if (!key || seen.has(key)) return false;
+        seen.add(key);
+        return true;
+      });
+    } catch {
+      return [];
+    }
+  },
+  ["marketing-games-active"],
+  { revalidate: 300, tags: ["marketing-games"] }
 );
 
 // ── Geo (state/city) pages — admin-managed, static fallback = GEO_STATES ────
@@ -551,10 +536,9 @@ export async function getGame(slug: string): Promise<MarketingGame | null> {
       .eq("is_active", true)
       .single();
     if (data) return data as MarketingGame;
-    // fallback to static list
-    return FALLBACK_GAMES.find((g) => g.slug === slug) ?? null;
+    return null;
   } catch {
-    return FALLBACK_GAMES.find((g) => g.slug === slug) ?? null;
+    return null;
   }
 }
 

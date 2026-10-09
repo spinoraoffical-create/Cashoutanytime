@@ -1,6 +1,6 @@
 import { SITE_NAME, SITE_URL, SITE_DESCRIPTION, SOCIAL_LINKS } from "@/lib/constants";
-import { GAMES } from "@/lib/games";
 import type { Game } from "@/lib/games";
+import { getGames } from "@/lib/data/marketing";
 import { getGamePageUrl } from "@/lib/seo/game-seo";
 import { HOME_FAQS } from "@/lib/seo/faq-data";
 
@@ -69,8 +69,8 @@ export function BreadcrumbSchema({ items }: { items: { name: string; url: string
   );
 }
 
-export function HomeGamesItemListSchema() {
-  const games = GAMES.filter((game) => !game.upcoming);
+export async function HomeGamesItemListSchema() {
+  const games = await getGames();
 
   return (
     <JsonLd
@@ -84,7 +84,7 @@ export function HomeGamesItemListSchema() {
           "@type": "ListItem",
           position: index + 1,
           name: game.name,
-          url: getGamePageUrl(game),
+          url: `${SITE_URL}/games/${game.slug}`,
         })),
       }}
     />

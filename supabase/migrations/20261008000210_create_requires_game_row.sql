@@ -169,3 +169,112 @@ $$;
 
 REVOKE ALL ON FUNCTION public.complete_game_load(UUID, BOOLEAN, TEXT, TEXT, TEXT, NUMERIC) FROM PUBLIC, anon, authenticated;
 GRANT EXECUTE ON FUNCTION public.complete_game_load(UUID, BOOLEAN, TEXT, TEXT, TEXT, NUMERIC) TO service_role;
+
+-- Replace is allowed when the player already has a saved game account, even if the
+-- old create request was not marked completed.
+CREATE OR REPLACE FUNCTION public.request_game_account_create(
+  p_game_slug TEXT,
+  p_game_name TEXT,
+  p_username TEXT DEFAULT NULL,
+  p_password TEXT DEFAULT NULL,
+  p_replace BOOLEAN DEFAULT FALSE
+)
+RETURNS UUID
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public
+AS $$
+DECLARE
+  v_user_id UUID := auth.uid();
+  v_request_id UUID;
+  v_username TEXT := NULLIF(trim(p_username), '');
+  v_password TEXT := NULLIF(p_password, '');
+  v_has_account BOOLEAN;
+BEGIN
+  IF v_user_id IS NULL THEN
+    RAISE EXCEPTION 'Not authenticated';
+  END IF;
+
+  PERFORM public.fail_stale_game_loads(15, v_user_id, p_game_slug);
+
+  IF EXISTS (
+    SELECT 1 FROM public.game_load_requests
+    WHERE user_id = v_user_id AND game_slug = p_game_slug
+      AND status IN ('pending', 'processing')
+  ) THEN
+    RAISE EXCEPTION 'A request is already in progress for this game. Cancel it under Recent activity, or wait for the bot.';
+  END IF;
+
+  SELECT EXISTS (
+    SELECT 1 FROM public.game_accounts ga
+    WHERE ga.user_id = v_user_id
+      AND ga.game_id = public.game_id_for_slug(p_game_slug)
+      AND NULLIF(btrim(ga.game_username), '') IS NOT NULL
+  ) OR EXISTS (
+    SELECT 1 FROM public.game_load_requests
+    WHERE user_id = v_user_id
+      AND game_slug = p_game_slug
+      AND status = 'completed'
+      AND load_type IN ('create_account', 'new_account')
+      AND game_username IS NOT NULL
+  ) INTO v_has_account;
+
+  IF v_has_account AND NOT COALESCE(p_replace, FALSE) THEN
+    RAISE EXCEPTION 'You already have a game account. Use Replace Account to get new login details.';
+  END IF;
+
+  IF NOT v_has_account AND COALESCE(p_replace, FALSE) THEN
+    RAISE EXCEPTION 'No account to replace yet. Create your first account instead.';
+  END IF;
+
+  IF v_username IS NOT NULL AND v_password IS NULL THEN
+    RAISE EXCEPTION 'Password required when choosing a custom username';
+  END IF;
+
+  INSERT INTO public.game_load_requests (
+    user_id, game_slug, game_name, amount, wallet_type, load_type, game_username, game_password, status, admin_notes
+  )
+  VALUES (
+    v_user_id, p_game_slug, p_game_name, 0, 'current', 'create_account', v_username, v_password, 'pending',
+    CASE WHEN COALESCE(p_replace, FALSE) THEN 'account_replace' ELSE NULL END
+  )
+  RETURNING id INTO v_request_id;
+
+  RETURN v_request_id;
+END;
+$$;
+
+REVOKE ALL ON FUNCTION public.request_game_account_create(TEXT, TEXT, TEXT, TEXT, BOOLEAN) FROM PUBLIC, anon;
+GRANT EXECUTE ON FUNCTION public.request_game_account_create(TEXT, TEXT, TEXT, TEXT, BOOLEAN) TO authenticated;
+
+-- Catalog titles that are not in admin yet stay off until Active is turned on.
+INSERT INTO public.games (slug, name, description, image_url, download_url, is_featured, is_active, popularity, category_id)
+SELECT v.slug, v.name, v.description, v.image_url, v.download_url, false, false, v.popularity, c.id
+FROM (
+  VALUES
+    ('orion-stars', 'Orion Stars', 'Constellation fish tables.', '/games/orion-stars.webp', 'https://orionstars.com/', 88, 'fishing'),
+    ('panda-master', 'Panda Master', 'Panda fish tables.', '/games/panda-master.webp', 'https://pandamaster.com/', 86, 'fishing'),
+    ('milky-way', 'Milky Way', 'Galaxy fish tables.', '/games/milky-way.webp', 'https://milkyway.com/', 84, 'fishing'),
+    ('vblink', 'VBlink', 'Fish and slots.', '/games/vblink.webp', 'https://vblink.com/', 83, 'fishing'),
+    ('ultrapanda', 'Ultra Panda', 'Fish and slots with the panda mascot.', '/games/ultrapanda.webp', 'https://www.ultrapanda.mobi/', 82, 'fishing'),
+    ('river-sweeps', 'River Sweeps', 'Vegas-style slots and tables.', '/games/river-sweeps.webp', 'https://www.riversweeps.com/', 80, 'slots'),
+    ('lucky-slots', 'Lucky Slots', 'Classic fruit reels and multipliers.', '/games/lucky-slots.webp', 'https://luckyslots.com/', 78, 'slots'),
+    ('high-stakes', 'High Stakes', 'Table games for casino play.', '/games/high-stakes.webp', 'https://highstakes.com/', 76, 'table-games'),
+    ('golden-dragon', 'Golden Dragon', 'Dragon fish-hunting boards.', '/games/golden-dragon.webp', 'https://goldendragon.com/', 74, 'fishing'),
+    ('blue-dragon', 'Blue Dragon', 'Ocean arcade fish tables.', '/games/blue-dragon.webp', 'https://bluedragon.com/', 72, 'fishing'),
+    ('dragon-master', 'Dragon Master', 'High-speed shooter arenas.', '/games/dragon-master.webp', 'https://dragonmaster.com/', 70, 'fishing'),
+    ('gameroom', 'Game Room', 'Slots, fish games, and keno.', '/games/gameroom.webp', 'https://www.gameroom777.com/m', 75, 'slots'),
+    ('ace-book', 'Ace Book', 'Card tables and book-style games.', '/games/ace-book.webp', 'https://acebook.com/', 68, 'table-games'),
+    ('galaxy-games', 'Galaxy Games', 'Space-themed slots.', '/games/galaxy-games.webp', 'https://galaxygames.com/', 66, 'slots'),
+    ('moolah', 'Moolah', 'Bonus wheels and slot reels.', '/games/moolah.webp', 'https://moolahslots.com/', 64, 'slots'),
+    ('vb-game', 'VB Game', 'Slots and fish tables.', '/games/vb-game.webp', 'https://vbgame.com/', 62, 'slots'),
+    ('mega-spin', 'Mega Spin', 'Large-format slots and bonus rounds.', '/games/mega-spin.webp', 'https://megaspin.com/', 60, 'slots'),
+    ('lucky-lion', 'Lucky Lion', 'Gold-lion slot reels.', '/games/lucky-lion.webp', 'https://luckylion.com/', 58, 'slots'),
+    ('pharaohs-treasure', 'Pharaoh''s Treasure', 'Egyptian slot reels.', '/games/pharaohs-treasure.webp', 'https://pharaohstreasure.com/', 56, 'slots'),
+    ('ocean-king', 'Ocean King', 'Underwater fish shooting.', '/games/ocean-king.webp', 'https://oceanking.com/', 54, 'fishing'),
+    ('fish-hunter', 'Fish Hunter', 'Cannon shooting fish tables.', '/games/fish-hunter.webp', 'https://fishhunter.com/', 52, 'fishing'),
+    ('monster-hunter', 'Monster Hunter', 'Sea-monster fish tables.', '/games/monster-hunter.webp', 'https://monsterhunter.com/', 50, 'fishing'),
+    ('buffalo-link', 'Buffalo Link', 'Stampede slot reels.', '/games/buffalo-link.webp', 'https://buffalolink.com/', 48, 'slots')
+) AS v(slug, name, description, image_url, download_url, popularity, category_key)
+JOIN public.game_categories c ON c.key = v.category_key
+WHERE NOT EXISTS (SELECT 1 FROM public.games g WHERE g.slug = v.slug);

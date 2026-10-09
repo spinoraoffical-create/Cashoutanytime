@@ -33,7 +33,7 @@ function RoomCard({ game }: { game: Game }) {
 }
 
 export function PublicHome({ games }: { games?: Game[] }) {
-  const rooms = (games?.length ? games : getGameRooms()).filter((g) => !g.upcoming);
+  const rooms = (games ?? getGameRooms()).filter((g) => !g.upcoming);
   const slots = rooms.filter((g) => /slot/i.test(g.category));
   const fish = rooms.filter((g) => /fish/i.test(g.category));
 

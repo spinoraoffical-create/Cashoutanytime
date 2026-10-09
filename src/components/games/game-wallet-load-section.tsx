@@ -400,6 +400,7 @@ export function GameWalletLoadSection({
         setCustomMode(false);
         setCustomUsername("");
         setCustomPassword("");
+        await refreshAccount();
       }
     } catch (err: any) {
       toast.error(

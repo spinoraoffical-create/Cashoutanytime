@@ -12,6 +12,7 @@ import { Badge } from "@/components/ui/badge";
 import { adminDb, authorize } from "@/lib/actions/admin/core";
 import { upsertGameAction } from "@/lib/actions/admin/cms";
 import { requirePermission } from "@/lib/data/admin";
+import { GAMES, canonicalGameSlug } from "@/lib/games";
 
 async function saveGameServerConfig(
   gameId: string,
@@ -49,9 +50,42 @@ const INITIALS_BG = [
   "from-ws-emerald/30 to-ws-emerald/10",
 ];
 
+async function ensureCatalogGames(db: ReturnType<typeof adminDb>) {
+  const { data: existing } = await db.from("games").select("slug, category_id");
+  const have = new Set((existing ?? []).map((row) => canonicalGameSlug(String(row.slug))));
+  const missing = GAMES.filter((game) => !have.has(canonicalGameSlug(game.slug)));
+  if (!missing.length) return;
+
+  const categoryFrom = (slug: string) =>
+    existing?.find((row) => row.slug === slug)?.category_id ?? null;
+  const fishing = categoryFrom("juwa") ?? categoryFrom("fire-kirin");
+  const slots = categoryFrom("game-vault") ?? categoryFrom("cash-frenzy") ?? categoryFrom("cashmachine");
+  const tables = categoryFrom("neon-poker-xl") ?? categoryFrom("high-stakes") ?? slots;
+  const categoryId = (category: string) =>
+    category.toLowerCase().includes("fish") ? fishing : category.toLowerCase().includes("table") ? tables : slots;
+
+  const rows = missing.flatMap((game) => {
+    const category_id = categoryId(game.category);
+    if (!category_id) return [];
+    return [{
+      slug: game.slug,
+      name: game.name,
+      description: game.bio,
+      image_url: game.image,
+      download_url: game.downloadUrl.startsWith("http") ? game.downloadUrl : null,
+      is_featured: false,
+      is_active: false,
+      popularity: Math.min(100, Math.round(game.players / 100)),
+      category_id,
+    }];
+  });
+  if (rows.length) await db.from("games").insert(rows);
+}
+
 export default async function AdminGamesPage() {
   await requirePermission("cms.manage");
   const db = adminDb();
+  await ensureCatalogGames(db);
 
   const baseColumns =
     "id, slug, name, description, image_url, badge_text, is_featured, is_active, play_url, download_url";

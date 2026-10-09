@@ -1,7 +1,7 @@
 "use server";
 
 import { randomUUID } from "crypto";
-import { revalidatePath } from "next/cache";
+import { revalidatePath, revalidateTag } from "next/cache";
 import { z } from "zod";
 
 import {
@@ -278,7 +278,9 @@ export async function upsertGameAction(
 
   revalidatePath("/admin/games");
   revalidatePath("/games");
+  revalidatePath("/play");
   revalidatePath("/");
+  revalidateTag("marketing-games");
   return { ok: true, message: "Game saved." };
 }
 

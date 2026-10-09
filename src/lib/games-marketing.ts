@@ -3,12 +3,13 @@ import type { MarketingGame } from "@/lib/data/marketing";
 
 /** Map CMS / marketing catalog rows to home GameCard shape. */
 export function marketingGamesToCards(catalog: MarketingGame[]): Game[] {
-  if (!catalog.length) return dedupeGamesForDisplay(GAMES);
+  if (!catalog.length) return [];
 
-  const mapped = catalog.map((g) => {
+  const mapped = catalog.flatMap((g) => {
     const local = GAMES.find((x) => canonicalGameSlug(x.slug) === canonicalGameSlug(g.slug));
-    const slug = local?.slug ?? g.slug;
-    return {
+    if (!local) return [];
+    const slug = local.slug;
+    return [{
       id: local?.id ?? g.id,
       name: local?.name ?? g.name,
       slug,
@@ -23,7 +24,7 @@ export function marketingGamesToCards(catalog: MarketingGame[]): Game[] {
       trending: (g.popularity ?? 0) > 90 || local?.trending,
       promotional: local?.promotional,
       upcoming: local?.upcoming,
-    };
+    }];
   });
 
   return dedupeGamesForDisplay(mapped);

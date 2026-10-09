@@ -1,8 +1,8 @@
 import type { MetadataRoute } from "next";
 import { SITE_URL, PUBLIC_ROUTES } from "@/lib/constants";
-import { GAMES } from "@/lib/games";
+import { getGameBySlug } from "@/lib/games";
 import { getGameSitemapPriority } from "@/lib/seo/game-seo";
-import { ALL_BLOG_SLUGS, allGeoCityParams, allGeoStateSlugs } from "@/lib/data/marketing";
+import { ALL_BLOG_SLUGS, allGeoCityParams, allGeoStateSlugs, getGames } from "@/lib/data/marketing";
 
 export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   const staticRoutes = PUBLIC_ROUTES.map((route) => ({
@@ -12,12 +12,16 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     priority: route.priority,
   }));
 
-  const gameRoutes = GAMES.filter((g) => !g.upcoming).map((game) => ({
-    url: `${SITE_URL}/games/${game.slug}`,
-    lastModified: new Date(),
-    changeFrequency: "weekly" as const,
-    priority: getGameSitemapPriority(game),
-  }));
+  const gameRoutes = (await getGames()).flatMap((row) => {
+    const game = getGameBySlug(row.slug);
+    if (!game || game.upcoming) return [];
+    return [{
+      url: `${SITE_URL}/games/${game.slug}`,
+      lastModified: new Date(),
+      changeFrequency: "weekly" as const,
+      priority: getGameSitemapPriority(game),
+    }];
+  });
 
   const blogRoutes: MetadataRoute.Sitemap = ALL_BLOG_SLUGS.map((slug) => ({
     url: `${SITE_URL}/blog/${slug}`,

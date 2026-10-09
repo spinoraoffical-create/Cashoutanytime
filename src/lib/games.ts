@@ -427,7 +427,8 @@ export type GameTab = "all" | "popular" | "trending" | "upcoming" | "promotional
 export type HomeGameTab = "trending" | "all" | "promotional";
 
 export function getGameBySlug(slug: string): Game | undefined {
-  return GAMES.find((g) => g.slug === slug);
+  const key = canonicalGameSlug(slug);
+  return GAMES.find((g) => canonicalGameSlug(g.slug) === key);
 }
 
 /** Keep first occurrence per slug — prevents duplicate cards in grids. */

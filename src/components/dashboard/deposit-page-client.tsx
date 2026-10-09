@@ -3,18 +3,21 @@
 import { useMemo, useState } from "react";
 import { Gamepad2 } from "lucide-react";
 import { DollarPayDepositSection } from "@/components/payments/dollarpay-deposit-modal";
-import { GAMES } from "@/lib/games";
 
-const PLAYABLE_GAMES = GAMES.filter((g) => !g.upcoming);
-
-export function DepositPageClient({ embedded = false }: { embedded?: boolean }) {
-  const defaultSlug = PLAYABLE_GAMES[0]?.slug ?? "game-vault";
+export function DepositPageClient({
+  embedded = false,
+  games = [],
+}: {
+  embedded?: boolean;
+  games?: { slug: string; name: string }[];
+}) {
+  const defaultSlug = games[0]?.slug ?? "";
   const [gameSlug, setGameSlug] = useState(defaultSlug);
   const [changing, setChanging] = useState(false);
 
   const game = useMemo(
-    () => PLAYABLE_GAMES.find((g) => g.slug === gameSlug) ?? PLAYABLE_GAMES[0],
-    [gameSlug]
+    () => games.find((g) => g.slug === gameSlug) ?? games[0],
+    [gameSlug, games]
   );
 
   if (!game) {
@@ -61,7 +64,7 @@ export function DepositPageClient({ embedded = false }: { embedded?: boolean }) 
                 }}
                 className="w-full rounded-xl border border-white/10 bg-[#160812] px-4 py-3 text-sm text-[#fcf9fb] outline-none"
               >
-                {PLAYABLE_GAMES.map((g) => (
+                {games.map((g) => (
                   <option key={g.slug} value={g.slug}>
                     {g.name}
                   </option>

@@ -13,6 +13,7 @@ import {
   validateCustomGameAccountCredentials,
 } from "@/lib/game-automation/account-username";
 import type { GameLoadWalletType } from "@/lib/game-automation/types";
+import { canonicalGameSlug } from "@/lib/games";
 import {
   depositRolloverBounds,
   DEPOSIT_LOAD_TYPES,
@@ -100,8 +101,9 @@ async function ownedGameUsername(userId: string, gameSlug: string) {
 export async function gameIsActive(gameSlug: string) {
   const admin = createAdminClient();
   if (!admin) return false;
-  const { data } = await admin.from("games").select("is_active").ilike("slug", gameSlug).maybeSingle();
-  return Boolean((data as { is_active?: boolean } | null)?.is_active);
+  const { data } = await admin.from("games").select("slug, is_active").eq("is_active", true);
+  const key = canonicalGameSlug(gameSlug);
+  return (data ?? []).some((row) => canonicalGameSlug(String(row.slug)) === key);
 }
 
 async function generatedLoginForUser(
@@ -519,8 +521,12 @@ export async function requestGameAccountCreate(input: {
     .in("status", ["pending", "processing"])
     .maybeSingle();
 
-  const stuckCreate = pending as { id: string; game_username: string | null } | null;
-  if (stuckCreate && !stuckCreate.game_username) {
+  const stuckCreate = pending as { id: string; load_type?: string; game_username: string | null } | null;
+  const replacingStuckCreate =
+    Boolean(stuckCreate) &&
+    (shouldReplace || !stuckCreate?.game_username) &&
+    (stuckCreate?.load_type === "create_account" || stuckCreate?.load_type === "new_account" || !stuckCreate?.game_username);
+  if (stuckCreate && replacingStuckCreate) {
     const admin = createAdminClient();
     if (admin) {
       await admin
