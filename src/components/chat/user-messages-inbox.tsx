@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect, useRef, useCallback, useMemo, type RefObject } from "react";
+import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -124,9 +125,9 @@ function UserChatPanel({
               ? "Human support requested · updates stay here"
               : "An automated assistant answers first. Ask for a person at any time."}
           </p>
-          <a href="/help" className="text-xs font-bold text-[#ff6b89]">
+          <Link href="/help" className="text-xs font-bold text-[#ff6b89]">
             Frequently asked questions
-          </a>
+          </Link>
         </div>
         {humanRequested ? null : (
           <Button
