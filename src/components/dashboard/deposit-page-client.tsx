@@ -25,7 +25,7 @@ export function DepositPageClient({
   }
 
   return (
-    <div id="add-money" className="space-y-4">
+    <div id={embedded ? undefined : "add-money"} className="space-y-4">
       {embedded ? null : (
         <div>
           <p className="text-[11px] font-black uppercase tracking-[0.16em] text-[#b9b3c6]">Money</p>

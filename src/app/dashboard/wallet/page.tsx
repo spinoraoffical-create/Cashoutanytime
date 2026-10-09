@@ -2,7 +2,10 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { ArrowDownLeft, ArrowUpRight, Wallet } from "lucide-react";
 
+import { DepositPageClient } from "@/components/dashboard/deposit-page-client";
 import { getWalletData } from "@/lib/data/dashboard";
+import { getGames } from "@/lib/data/marketing";
+import { buildLobbyCatalog } from "@/lib/games-marketing";
 import { getProfile } from "@/lib/supabase/session";
 import {
   formatTransactionAmount,
@@ -52,6 +55,10 @@ export default async function WalletPage() {
   const main = wallet.balance;
   const cash = wallet.cashout;
   const freeplay = wallet.freeplay;
+  const games = buildLobbyCatalog(await getGames()).map((game) => ({
+    slug: game.slug,
+    name: game.name,
+  }));
 
   return (
     <MotionPage className="space-y-5">
@@ -69,6 +76,14 @@ export default async function WalletPage() {
         freeplay={freeplay}
         name={(row?.full_name as string | undefined) || "Player"}
       />
+
+      <section id="add-money" className="hub-card scroll-mt-4 rounded-[24px] p-5">
+        <p className="text-[11px] font-black uppercase tracking-[0.16em] text-[#b9b3c6]">Add money</p>
+        <p className="mb-4 mt-1 text-sm text-[#b9b3c6]">
+          Choose a game, then pay with Paydora. The payment is added to this wallet.
+        </p>
+        <DepositPageClient embedded games={games} />
+      </section>
 
       <Link
         href="/dashboard/activity"
@@ -89,7 +104,7 @@ export default async function WalletPage() {
             <p className="text-sm font-medium">No transactions yet</p>
             <p className="text-xs text-muted-foreground">Add money to see receipts here.</p>
             <Button asChild size="sm" className="mt-2 rounded-full">
-              <Link href="/dashboard/deposit">Add money</Link>
+              <a href="#add-money">Add money</a>
             </Button>
           </div>
         ) : (

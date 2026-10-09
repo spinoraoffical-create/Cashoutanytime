@@ -106,12 +106,18 @@ export function WalletBalanceCard({
           </p>
         </details>
         <div className="grid grid-cols-3 gap-2 border-t border-white/10 pt-3">
-          <Link
+          <a
             href="#add-money"
+            onClick={(event) => {
+              const target = document.getElementById("add-money");
+              if (!target) return;
+              event.preventDefault();
+              target.scrollIntoView({ behavior: "smooth", block: "start" });
+            }}
             className="flex h-12 items-center justify-center gap-1 rounded-xl border border-[#ff6b89] text-sm font-bold text-[#ff8aa3]"
           >
             <Plus className="h-4 w-4" /> Add money
-          </Link>
+          </a>
           <Link
             href="/dashboard/withdraw"
             className="flex h-12 items-center justify-center gap-1 rounded-xl border border-white/10 text-sm font-bold"
