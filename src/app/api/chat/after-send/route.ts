@@ -1,10 +1,12 @@
 import { NextResponse } from "next/server";
+import type { SupabaseClient } from "@supabase/supabase-js";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { createNotification } from "@/lib/actions/notifications";
 import { notifyAdminOfCustomerMessage } from "@/lib/telegram/notify-admin-message";
 import { processAIChatQuery, getBotSenderProfileId, stripHtmlForDisplay } from "@/lib/ai/chatbot";
 import { asksForPerson, CHAT_FALLBACK_REPLY, CHAT_PERSON_REPLY } from "@/lib/ai/escalate";
+import { supportReferenceCode } from "@/lib/chat/support-thread";
 import { getChatbotSettings } from "@/lib/ai/settings";
 import { isTelegramConfigured, sendTelegramMessage, escapeTelegramHtml } from "@/lib/telegram/client";
 import { SITE_URL } from "@/lib/constants";
@@ -98,8 +100,25 @@ export async function POST(request: Request) {
     });
 
     const chatSettings = await getChatbotSettings();
+    const queue = await readHumanQueue(db, conversationId);
+    const wantsPerson = asksForPerson(content);
+    if (wantsPerson && !queue.queued && queue.columnsReady) {
+      await db
+        .from("conversations")
+        .update({
+          human_requested_at: new Date().toISOString(),
+          support_reference: supportReferenceCode(conversationId),
+          updated_at: new Date().toISOString(),
+        })
+        .eq("id", conversationId);
+    }
 
-    if (content.trim() && chatSettings.is_enabled && chatSettings.auto_reply_enabled) {
+    if (
+      !queue.queued &&
+      content.trim() &&
+      chatSettings.is_enabled &&
+      chatSettings.auto_reply_enabled
+    ) {
       try {
         const aiResult = await processAIChatQuery(content, conversationId, user.id);
         const botSenderId = await getBotSenderProfileId();
@@ -124,7 +143,7 @@ export async function POST(request: Request) {
         }
 
         if (
-          aiResult.shouldEscalateToHuman &&
+          (wantsPerson || aiResult.shouldEscalateToHuman) &&
           chatSettings.telegram_escalation_enabled &&
           isTelegramConfigured()
         ) {
@@ -155,4 +174,30 @@ export async function POST(request: Request) {
   }
 
   return NextResponse.json({ ok: true });
+}
+
+async function readHumanQueue(
+  db: SupabaseClient,
+  conversationId: string
+): Promise<{ queued: boolean; columnsReady: boolean }> {
+  const { data, error } = await db
+    .from("conversations")
+    .select("human_requested_at")
+    .eq("id", conversationId)
+    .limit(1);
+
+  if (error) {
+    const found = await db
+      .from("messages")
+      .select("content")
+      .eq("conversation_id", conversationId)
+      .ilike("content", "%will reply in this chat%")
+      .limit(1);
+    return { queued: Boolean(found.data?.length), columnsReady: false };
+  }
+
+  return {
+    queued: Boolean(data?.[0]?.human_requested_at),
+    columnsReady: true,
+  };
 }

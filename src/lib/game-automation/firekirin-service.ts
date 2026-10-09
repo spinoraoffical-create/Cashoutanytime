@@ -252,16 +252,11 @@ async function autoFulfillFireKirinNow(
     if (loadType === "check_balance") {
       const info = await client.queryInfo(cleanAccount, session);
       const userBalance = parseFireKirinUserBalance(info);
-      await closeFireKirinRequest({
-        requestId,
-        success: true,
-        gameUsername: cleanAccount,
-        redeemedAmount: userBalance,
-      });
       return {
         success: true,
         message: `Fire Kirin balance checked for ${cleanAccount}`,
         accountName: cleanAccount,
+        credentials: { username: cleanAccount },
         balance: userBalance,
         redeemedAmount: userBalance,
         rawResponse: info,

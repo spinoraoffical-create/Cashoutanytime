@@ -480,33 +480,15 @@ export function canonicalGameSlug(slug: string): string {
   return aliases[s] ?? s;
 }
 
-function normalizeGameName(name: string): string {
-  return name.toLowerCase().replace(/[^a-z0-9]/g, "");
-}
-
-/** Dedupe by slug, image path, and normalized name — last line of defense for grids. */
+/** Dedupe by slug only. Different games may share an image or a similar name. */
 export function dedupeGamesForDisplay(games: Game[]): Game[] {
   const seenSlug = new Set<string>();
-  const seenImage = new Set<string>();
-  const seenName = new Set<string>();
   const out: Game[] = [];
 
   for (const game of games) {
     const slugKey = canonicalGameSlug(game.slug);
-    const imageKey = game.image.trim().toLowerCase();
-    const nameKey = normalizeGameName(game.name);
-
-    if (
-      (slugKey && seenSlug.has(slugKey)) ||
-      (imageKey && seenImage.has(imageKey)) ||
-      (nameKey && seenName.has(nameKey))
-    ) {
-      continue;
-    }
-
-    if (slugKey) seenSlug.add(slugKey);
-    if (imageKey) seenImage.add(imageKey);
-    if (nameKey) seenName.add(nameKey);
+    if (!slugKey || seenSlug.has(slugKey)) continue;
+    seenSlug.add(slugKey);
     out.push(game);
   }
 

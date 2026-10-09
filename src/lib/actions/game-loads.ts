@@ -44,9 +44,13 @@ import { finishGameLoad } from "@/lib/game-automation/finish-game-load";
 async function savedGameLogin(userId: string, gameSlug: string) {
   const admin = createAdminClient();
   if (!admin) return null;
+  const key = canonicalGameSlug(gameSlug);
 
-  const { data: game } = await admin.from("games").select("id").ilike("slug", gameSlug).maybeSingle();
-  const gameId = (game as { id?: string } | null)?.id;
+  const { data: games } = await admin.from("games").select("id, slug");
+  const gameId =
+    (games as { id: string; slug: string }[] | null)?.find(
+      (row) => canonicalGameSlug(row.slug) === key
+    )?.id ?? null;
   if (gameId) {
     const { data } = await admin
       .from("game_accounts")
@@ -59,18 +63,18 @@ async function savedGameLogin(userId: string, gameSlug: string) {
     if (username) return { username, password: account?.game_password ?? null };
   }
 
-  const { data: created } = await admin
+  const { data: createdRows } = await admin
     .from("game_load_requests")
-    .select("game_username, game_password")
+    .select("game_slug, game_username, game_password, completed_at")
     .eq("user_id", userId)
-    .eq("game_slug", gameSlug)
     .eq("status", "completed")
     .in("load_type", ["create_account", "new_account"])
     .not("game_username", "is", null)
     .order("completed_at", { ascending: false })
-    .limit(1)
-    .maybeSingle();
-  const request = created as { game_username?: string | null; game_password?: string | null } | null;
+    .limit(40);
+  const request = (createdRows as { game_slug?: string; game_username?: string | null; game_password?: string | null }[] | null)?.find(
+    (row) => canonicalGameSlug(row.game_slug || "") === key
+  );
   const username = request?.game_username?.trim() || "";
   if (!username) return null;
   if (gameId) {
@@ -210,11 +214,15 @@ async function fulfillOrFail(
       });
       return { success: false as const, error: message };
     }
+    const balanceUsername =
+      loadType === "check_balance"
+        ? result.username?.trim() || input.gameUsername?.trim() || null
+        : result.username;
     const finished = await finishGameLoad({
       requestId,
       success: result.success,
       errorMessage: result.success ? null : result.error,
-      gameUsername: result.username,
+      gameUsername: balanceUsername,
       gamePassword: result.password,
       redeemedAmount: redeemed,
     });
@@ -270,7 +278,7 @@ export async function fulfillTrackedRequest(requestId: string) {
 
 const API_CONFIGURED_GAMES = ["cash-machine", "cash-frenzy", "gameroom", "game-vault", "mafia", "juwa", "vegas-sweeps", "mr-all-in-one", "orion-stars", "milky-way", "fire-kirin", "vblink"];
 
-const GAME_API_UNAVAILABLE = "This game is not connected yet. Try again later or contact support.";
+const GAME_API_UNAVAILABLE = "This game is not connected yet.";
 
 function isGameApiReady(slug: string): boolean {
   switch (slug) {

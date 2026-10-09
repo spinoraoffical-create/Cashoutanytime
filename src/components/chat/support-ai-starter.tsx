@@ -9,12 +9,11 @@ import { ensureUserConversation } from "@/lib/actions/messages";
 import { sendMessageClient } from "@/lib/chat/send-message-client";
 
 const TOPICS = [
-  { id: "payment", label: "Payment status", message: "I need help with my payment status." },
-  { id: "redeem", label: "Redeem help", message: "I need help redeeming." },
-  { id: "game", label: "Game problem", message: "I have a game problem." },
-  { id: "verify", label: "Verify account", message: "I need help verifying my account." },
-  { id: "rewards", label: "Rewards", message: "I have a question about rewards." },
-  { id: "account", label: "Account issue", message: "I have an account issue." },
+  { id: "adding-money", label: "Adding money", message: "I need help adding money." },
+  { id: "cash-outs", label: "Cash outs", message: "I need help with a cash out." },
+  { id: "games", label: "Games and balances", message: "I need help with a game balance." },
+  { id: "account", label: "Account and safety", message: "I need help with my account." },
+  { id: "rules", label: "Rules and responsible play", message: "I have a question about the rules." },
 ] as const;
 
 export function SupportAiStarter({
@@ -66,7 +65,7 @@ export function SupportAiStarter({
       <div>
         <h2 className="text-lg font-bold text-white">{SITE_NAME} support</h2>
         <p className="mt-1 text-sm text-muted-foreground">
-          Ask a question and we’ll reply here. A person can take over if you need one.
+          An automated assistant answers first and identifies itself. You can request a person at any time.
         </p>
       </div>
 

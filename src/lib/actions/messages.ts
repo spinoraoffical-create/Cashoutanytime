@@ -6,6 +6,7 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { getStaffContext } from "@/lib/data/admin";
 import { notifyAdminOfCustomerMessage } from "@/lib/telegram/notify-admin-message";
 import { messagePreview } from "@/lib/chat/message-preview";
+import { getBotSenderProfileId } from "@/lib/ai/chatbot";
 import type { Message } from "@/types/database";
 
 export interface ConversationPreview {
@@ -15,7 +16,21 @@ export interface ConversationPreview {
   lastMessage: string;
   lastMessageAt: string | null;
   unreadCount: number;
+  supportReference: string | null;
+  humanRequestedAt: string | null;
+  supportRating: number | null;
+  supportResolved: boolean | null;
 }
+
+type ConversationListRow = {
+  id: string;
+  admin_id: string | null;
+  updated_at: string;
+  support_reference?: string | null;
+  human_requested_at?: string | null;
+  support_rating?: number | null;
+  support_resolved?: boolean | null;
+};
 
 export async function getUserConversations(): Promise<ConversationPreview[]> {
   const supabase = await createClient();
@@ -24,12 +39,27 @@ export async function getUserConversations(): Promise<ConversationPreview[]> {
   } = await supabase.auth.getUser();
   if (!user) return [];
 
-  const { data: conversations } = await supabase
+  const withSupport = await supabase
     .from("conversations")
-    .select("id, admin_id, updated_at")
+    .select(
+      "id, admin_id, updated_at, support_reference, human_requested_at, support_rating, support_resolved"
+    )
     .eq("user_id", user.id)
     .eq("is_active", true)
     .order("updated_at", { ascending: false });
+
+  const conversations = (
+    withSupport.error
+      ? (
+          await supabase
+            .from("conversations")
+            .select("id, admin_id, updated_at")
+            .eq("user_id", user.id)
+            .eq("is_active", true)
+            .order("updated_at", { ascending: false })
+        ).data
+      : withSupport.data
+  ) as ConversationListRow[] | null;
 
   if (!conversations?.length) return [];
 
@@ -84,11 +114,15 @@ export async function getUserConversations(): Promise<ConversationPreview[]> {
 
     return {
       id: conv.id,
-      title: "Sweepstakes Hub Support",
-      subtitle: adminName,
+      title: conv.human_requested_at ? "Human support" : "Sweepstakes Hub Support",
+      subtitle: conv.human_requested_at ? "Human support requested · updates stay here" : adminName,
       lastMessage: last ? messagePreview(last) : "Start a conversation with our team",
       lastMessageAt: last?.created_at ?? conv.updated_at,
       unreadCount: unreadByConv.get(conv.id) ?? 0,
+      supportReference: conv.support_reference ?? null,
+      humanRequestedAt: conv.human_requested_at ?? null,
+      supportRating: conv.support_rating ?? null,
+      supportResolved: conv.support_resolved ?? null,
     };
   });
 }
@@ -278,6 +312,7 @@ export async function initUserMessagesInbox(): Promise<{
   conversations?: ConversationPreview[];
   messages?: Message[];
   selectedConversationId?: string;
+  botSenderId?: string | null;
 }> {
   const supabase = await createClient();
   const {
@@ -302,6 +337,10 @@ export async function initUserMessagesInbox(): Promise<{
             lastMessage: "Start a conversation with our team",
             lastMessageAt: conversation.updated_at,
             unreadCount: 0,
+            supportReference: null,
+            humanRequestedAt: null,
+            supportRating: null,
+            supportResolved: null,
           } satisfies ConversationPreview,
         ];
 
@@ -323,7 +362,51 @@ export async function initUserMessagesInbox(): Promise<{
     conversations: list,
     messages: messages ?? [],
     selectedConversationId,
+    botSenderId: await getBotSenderProfileId(),
   };
+}
+
+export async function getSupportBotSenderId() {
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) return null;
+  return getBotSenderProfileId();
+}
+
+/** Saves a 1–5 rating or resolved flag. Does not read or write wallet balances. */
+export async function saveSupportFeedback(
+  conversationId: string,
+  input: { rating?: number; resolved?: boolean }
+) {
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) return { error: "Not authenticated" };
+
+  const patch: { support_rating?: number; support_resolved?: boolean } = {};
+  if (input.rating != null) {
+    if (!Number.isInteger(input.rating) || input.rating < 1 || input.rating > 5) {
+      return { error: "Choose a rating from 1 to 5." };
+    }
+    patch.support_rating = input.rating;
+  }
+  if (typeof input.resolved === "boolean") patch.support_resolved = input.resolved;
+  if (!patch.support_rating && patch.support_resolved == null) return { error: "Nothing to save." };
+
+  const { data: owned } = await supabase
+    .from("conversations")
+    .select("id")
+    .eq("id", conversationId)
+    .eq("user_id", user.id)
+    .limit(1);
+  if (!owned?.length) return { error: "Unauthorized" };
+
+  const { error } = await supabase.from("conversations").update(patch).eq("id", conversationId).eq("user_id", user.id);
+  if (error) return { error: "Feedback could not be saved yet." };
+  return { ok: true as const };
 }
 
 export type UserMessagesInboxInitialData = Awaited<ReturnType<typeof initUserMessagesInbox>>;

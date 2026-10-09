@@ -13,6 +13,14 @@ import {
 
 const PERMISSION = "cms.manage";
 
+function revalidateGameCatalog() {
+  revalidatePath("/admin/games");
+  revalidatePath("/games");
+  revalidatePath("/play");
+  revalidatePath("/");
+  revalidateTag("marketing-games");
+}
+
 function revalidateContent() {
   revalidatePath("/admin/cms");
   revalidatePath("/faq");
@@ -264,6 +272,7 @@ export async function upsertGameAction(
     const { is_live: _live, first_deposit_bonus_percent: _first, reload_bonus_percent: _reload, bonus_text: _text, ...rest } = patch;
     const retry = await db.from("games").update(rest).eq("id", input.id);
     if (retry.error) return { ok: false, error: "Could not save the game." };
+    revalidateGameCatalog();
     return { ok: true, message: "Saved the game. Apply 20261008000130_auto_ops.sql before bonus percents will store." };
   }
   if (error) return { ok: false, error: "Could not save the game." };
@@ -276,11 +285,7 @@ export async function upsertGameAction(
     after: patch,
   });
 
-  revalidatePath("/admin/games");
-  revalidatePath("/games");
-  revalidatePath("/play");
-  revalidatePath("/");
-  revalidateTag("marketing-games");
+  revalidateGameCatalog();
   return { ok: true, message: "Game saved." };
 }
 

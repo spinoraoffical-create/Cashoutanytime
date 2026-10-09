@@ -9,10 +9,11 @@ import { MessageRealtimeStubProvider } from "@/lib/chat/message-realtime-stub";
 
 import { WelcomePromoModal } from "@/components/ui/welcome-promo-modal";
 
-const REALTIME_ROUTE_PREFIXES = ["/dashboard", "/admin", "/spin"];
+const REALTIME_ROUTE_PREFIXES = ["/play", "/games", "/dashboard", "/admin", "/spin"];
 
 function needsRealtimeImmediately(pathname: string | null): boolean {
   if (!pathname) return false;
+  if (pathname === "/") return true;
   return REALTIME_ROUTE_PREFIXES.some(
     (prefix) => pathname === prefix || pathname.startsWith(`${prefix}/`)
   );

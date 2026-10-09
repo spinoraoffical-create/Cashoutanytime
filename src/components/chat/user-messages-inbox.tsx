@@ -8,7 +8,7 @@ import { Button } from "@/components/ui/button";
 import { createClient } from "@/lib/supabase/client";
 import { uploadChatAttachment } from "@/lib/chat/attachments";
 import { ChatComposer } from "@/components/chat/chat-composer";
-import { ChatMessageContent } from "@/components/chat/chat-message-content";
+import { SupportThread, threadRequestedHuman, supportReferenceCode } from "@/components/chat/support-thread";
 import { MobileChatShell, useMobileChatClose } from "@/components/chat/mobile-chat-shell";
 import { UnreadBadge } from "@/components/ui/unread-badge";
 import {
@@ -46,9 +46,11 @@ interface UserChatPanelProps {
   input: string;
   onInputChange: (value: string) => void;
   onSend: (file: File | null) => Promise<boolean>;
+  onFollowUp: (text: string) => Promise<boolean>;
   loading: boolean;
   scrollRef: RefObject<HTMLDivElement | null>;
   onScrollMessages?: () => void;
+  botSenderId: string | null;
 }
 
 function UserChatPanel({
@@ -61,9 +63,11 @@ function UserChatPanel({
   input,
   onInputChange,
   onSend,
+  onFollowUp,
   loading,
   scrollRef,
   onScrollMessages,
+  botSenderId,
 }: UserChatPanelProps) {
   const closeViaBack = useMobileChatClose();
 
@@ -86,6 +90,16 @@ function UserChatPanel({
     );
   }
 
+  const humanRequested = threadRequestedHuman(
+    messages,
+    userId,
+    selectedConversation.humanRequestedAt
+  );
+  const reference = supportReferenceCode(
+    selectedConversation.id,
+    selectedConversation.supportReference
+  );
+
   return (
     <div className="flex flex-col flex-1 min-h-0 h-full overflow-hidden">
       <div className="p-3 sm:p-4 border-b border-white/10 flex items-center gap-2 sm:gap-3 bg-[#121212] shrink-0">
@@ -104,52 +118,47 @@ function UserChatPanel({
           <Headphones className="h-5 w-5 text-white" />
         </div>
         <div className="flex-1 min-w-0">
-          <h2 className="font-semibold text-white truncate">{selectedConversation.title}</h2>
-          <p className="text-xs text-muted-foreground truncate">{selectedConversation.subtitle}</p>
+          <h2 className="font-semibold text-white truncate">
+            {humanRequested ? "Human support" : selectedConversation.title}
+          </h2>
+          <p className="text-xs text-muted-foreground truncate">
+            {humanRequested
+              ? "Human support requested · updates stay here"
+              : "Automated assistant answers first"}
+          </p>
         </div>
-        <Badge className="bg-emerald-500/20 text-emerald-300 border-emerald-500/30 shrink-0">
-          Live
-        </Badge>
-      </div>
-
-      <div
-        ref={scrollRef}
-        onScroll={onScrollMessages}
-        className={`${CHAT_SCROLL_CLASS} p-3 sm:p-4 pb-4 space-y-3 bg-[#0f0f0f]`}
-      >
-        {messages.length === 0 ? (
-          <div className="text-center py-12">
-            <MessageCircle className="h-10 w-10 text-muted-foreground mx-auto mb-3" />
-            <p className="text-sm text-muted-foreground">
-              Say hello — our team typically replies in minutes.
-            </p>
-          </div>
+        {humanRequested ? (
+          <Badge className="bg-emerald-500/20 text-emerald-300 border-emerald-500/30 shrink-0">
+            Live
+          </Badge>
         ) : (
-          messages.map((msg) => {
-            const isOwn = msg.sender_id === userId;
-            return (
-              <div key={msg.id} className={cn("flex", isOwn ? "justify-end" : "justify-start")}>
-                <div
-                  className={cn(
-                    "max-w-[85%] rounded-2xl px-4 py-2.5 text-sm shadow-sm break-words",
-                    isOwn
-                      ? "gradient-bg text-white rounded-br-md"
-                      : "bg-[#1e1e1e] text-foreground border border-white/5 rounded-bl-md"
-                  )}
-                >
-                  {!isOwn && (
-                    <p className="text-[10px] font-semibold text-orange-400 mb-1">Support</p>
-                  )}
-                  <ChatMessageContent message={msg} />
-                  <p className="text-[10px] opacity-60 mt-1.5">
-                    {formatRelativeTime(msg.created_at)}
-                  </p>
-                </div>
-              </div>
-            );
-          })
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            className="shrink-0"
+            disabled={loading || !selectedId}
+            onClick={() => void onFollowUp("I need to speak with a person.")}
+          >
+            Request person
+          </Button>
         )}
       </div>
+
+      <SupportThread
+        conversationId={selectedConversation.id}
+        messages={messages}
+        userId={userId}
+        botSenderId={botSenderId}
+        humanRequested={humanRequested}
+        reference={reference}
+        initialRating={selectedConversation.supportRating}
+        initialResolved={selectedConversation.supportResolved}
+        scrollRef={scrollRef}
+        onScroll={onScrollMessages}
+        className={`${CHAT_SCROLL_CLASS} p-3 sm:p-4 pb-4 bg-[#0f0f0f]`}
+        onStillNeedHelp={() => void onFollowUp("I still need help. I need to speak with a person.")}
+      />
 
       <ChatComposer
         value={input}
@@ -157,7 +166,8 @@ function UserChatPanel({
         onSend={onSend}
         loading={loading}
         disabled={!selectedId}
-        placeholder="Type a message..."
+        placeholder={humanRequested ? "Message human support…" : "Message support…"}
+        attachLabel="Attach image"
         showSendLabel
         className="bg-[#121212] border-white/10 shrink-0"
       />
@@ -183,6 +193,9 @@ export function UserMessagesInbox({
   const [messages, setMessages] = useState<Message[]>(() => initialData?.messages ?? []);
   const [userId, setUserId] = useState<string | null>(
     () => initialData?.userId ?? profileUserId
+  );
+  const [botSenderId, setBotSenderId] = useState<string | null>(
+    () => initialData?.botSenderId ?? null
   );
   const [input, setInput] = useState("");
   const [loading, setLoading] = useState(false);
@@ -278,6 +291,7 @@ export function UserMessagesInbox({
       }
 
       setUserId(result.userId);
+      setBotSenderId(result.botSenderId ?? null);
       setConversations(result.conversations ?? []);
       if (result.selectedConversationId) {
         setSelectedId(result.selectedConversationId);
@@ -419,16 +433,14 @@ export function UserMessagesInbox({
     await openConversation(convId);
   }
 
-  async function handleSend(file: File | null): Promise<boolean> {
-    if ((!input.trim() && !file) || !selectedId) return false;
+  async function sendText(content: string, file: File | null, restoreInput: boolean): Promise<boolean> {
+    if ((!content.trim() && !file) || !selectedId) return false;
     if (!supabase) {
       toast.error("Chat is unavailable. Check your connection.");
       return false;
     }
 
     setLoading(true);
-    const content = input.trim();
-    setInput("");
 
     let attachment:
       | { url: string; type: "image" | "file"; name: string }
@@ -438,7 +450,7 @@ export function UserMessagesInbox({
       const uploadResult = await uploadChatAttachment(supabase, selectedId, file);
       if ("error" in uploadResult) {
         toast.error(uploadResult.error);
-        setInput(content);
+        if (restoreInput) setInput(content);
         setLoading(false);
         return false;
       }
@@ -455,7 +467,7 @@ export function UserMessagesInbox({
     if (result.error) {
       toast.error(result.error);
       if (!result.message) {
-        setInput(content);
+        if (restoreInput) setInput(content);
         setLoading(false);
         return false;
       }
@@ -467,7 +479,19 @@ export function UserMessagesInbox({
 
     setLoading(false);
     scheduleInboxSync();
+    if (selectedId) void loadMessages(selectedId, { syncSidebar: false });
     return true;
+  }
+
+  async function handleSend(file: File | null): Promise<boolean> {
+    const content = input.trim();
+    if (!content && !file) return false;
+    setInput("");
+    return sendText(content, file, true);
+  }
+
+  function handleFollowUp(text: string) {
+    return sendText(text, null, false);
   }
 
   const chatPanelProps = {
@@ -478,9 +502,11 @@ export function UserMessagesInbox({
     input,
     onInputChange: setInput,
     onSend: handleSend,
+    onFollowUp: handleFollowUp,
     loading,
     scrollRef,
     onScrollMessages,
+    botSenderId,
   };
 
   if (initLoading) {

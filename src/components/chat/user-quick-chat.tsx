@@ -2,11 +2,13 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
-import { Headphones, MessageCircle, Minimize2, X, ArrowLeft } from "lucide-react";
+import { Headphones, Minimize2, X, ArrowLeft } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { createClient } from "@/lib/supabase/client";
 import { ChatComposer } from "@/components/chat/chat-composer";
-import { ChatMessageContent } from "@/components/chat/chat-message-content";
+import { SupportThread, supportReferenceCode, threadRequestedHuman } from "@/components/chat/support-thread";
+import { uploadChatAttachment } from "@/lib/chat/attachments";
+import { getSupportBotSenderId, getUserConversations } from "@/lib/actions/messages";
 import { MobileChatShell, useMobileChatClose } from "@/components/chat/mobile-chat-shell";
 import { appendMessage, mergeMessagesById } from "@/lib/chat/merge-messages";
 import { subscribeToConversationInserts } from "@/lib/chat/subscribe-messages";
@@ -14,7 +16,6 @@ import { markConversationReadClient, sendMessageClient } from "@/lib/chat/send-m
 import { useChatAutoScroll } from "@/lib/chat/use-chat-auto-scroll";
 import { CHAT_SCROLL_CLASS } from "@/lib/chat/chat-layout";
 import { useMediaQuery } from "@/lib/hooks/use-media-query";
-import { formatRelativeTime } from "@/lib/utils";
 import { cn } from "@/lib/utils";
 import type { Message } from "@/types/database";
 import { toast } from "sonner";
@@ -42,6 +43,11 @@ function QuickChatPanel({
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState("");
   const [loading, setLoading] = useState(false);
+  const [botSenderId, setBotSenderId] = useState<string | null>(null);
+  const [humanRequestedAt, setHumanRequestedAt] = useState<string | null>(null);
+  const [supportReference, setSupportReference] = useState<string | null>(null);
+  const [supportRating, setSupportRating] = useState<number | null>(null);
+  const [supportResolved, setSupportResolved] = useState<boolean | null>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
 
   const loadMessages = useCallback(async () => {
@@ -57,7 +63,16 @@ function QuickChatPanel({
 
   useEffect(() => {
     void loadMessages();
-  }, [loadMessages]);
+    void getSupportBotSenderId().then(setBotSenderId);
+    void getUserConversations().then((list) => {
+      const match = list.find((item) => item.id === conversationId);
+      if (!match) return;
+      setHumanRequestedAt(match.humanRequestedAt);
+      setSupportReference(match.supportReference);
+      setSupportRating(match.supportRating);
+      setSupportResolved(match.supportResolved);
+    });
+  }, [loadMessages, conversationId]);
 
   useEffect(() => {
     if (!supabase || !conversationId || !userId) return;
@@ -98,10 +113,23 @@ function QuickChatPanel({
     const content = input.trim();
     setInput("");
 
+    let attachment: { url: string; type: "image" | "file"; name: string } | undefined;
+    if (file) {
+      const uploadResult = await uploadChatAttachment(supabase, conversationId, file);
+      if ("error" in uploadResult) {
+        toast.error(uploadResult.error);
+        setInput(content);
+        setLoading(false);
+        return false;
+      }
+      attachment = uploadResult.data;
+    }
+
     const result = await sendMessageClient(supabase, {
       conversationId,
       senderId: userId,
       content,
+      attachment,
       kind: "user",
     });
 
@@ -119,8 +147,27 @@ function QuickChatPanel({
     }
 
     setLoading(false);
+    void loadMessages();
     return true;
   }
+
+  async function handleFollowUp(text: string) {
+    if (!conversationId || !userId || !supabase || loading) return;
+    setLoading(true);
+    const result = await sendMessageClient(supabase, {
+      conversationId,
+      senderId: userId,
+      content: text,
+      kind: "user",
+    });
+    if (result.error) toast.error(result.error);
+    if (result.message) setMessages((prev) => appendMessage(prev, result.message!));
+    setLoading(false);
+    void loadMessages();
+  }
+
+  const humanRequested = threadRequestedHuman(messages, userId, humanRequestedAt);
+  const reference = supportReferenceCode(conversationId, supportReference);
 
   function handleClose() {
     if (closeViaBack) {
@@ -148,9 +195,23 @@ function QuickChatPanel({
           <Headphones className="h-4 w-4 text-white" />
         </div>
         <div className="flex-1 min-w-0">
-          <p className="text-sm font-semibold text-white truncate">Sweepstakes Hub Support</p>
-          <p className="text-[10px] text-emerald-300">Live chat</p>
+          <p className="text-sm font-semibold text-white truncate">
+            {humanRequested ? "Human support" : "Sweepstakes Hub Support"}
+          </p>
+          <p className="text-[10px] text-emerald-300">
+            {humanRequested ? "Human support requested · updates stay here" : "Automated assistant answers first"}
+          </p>
         </div>
+        {!humanRequested && (
+          <button
+            type="button"
+            disabled={loading}
+            onClick={() => void handleFollowUp("I need to speak with a person.")}
+            className="shrink-0 rounded-full border border-white/15 px-2 py-1 text-[10px] font-semibold text-white"
+          >
+            Request person
+          </button>
+        )}
         <Link
           href={`/dashboard/messages?conversation=${conversationId}`}
           className="text-[10px] font-medium text-orange-400 hover:text-orange-300 px-2 shrink-0"
@@ -167,44 +228,31 @@ function QuickChatPanel({
         </button>
       </div>
 
-      <div
-        ref={scrollRef}
+      <SupportThread
+        conversationId={conversationId}
+        messages={messages}
+        userId={userId}
+        botSenderId={botSenderId}
+        humanRequested={humanRequested}
+        reference={reference}
+        initialRating={supportRating}
+        initialResolved={supportResolved}
+        scrollRef={scrollRef}
         onScroll={onScrollMessages}
-        className={cn(CHAT_SCROLL_CLASS, "flex-1 min-h-0 p-3 space-y-2 bg-[#0f0f0f]")}
-      >
-        {messages.length === 0 ? (
-          <div className="text-center py-8">
-            <MessageCircle className="h-8 w-8 text-muted-foreground mx-auto mb-2" />
-            <p className="text-xs text-muted-foreground">Say hello — we reply fast.</p>
-          </div>
-        ) : (
-          messages.map((msg) => {
-            const isOwn = msg.sender_id === userId;
-            return (
-              <div key={msg.id} className={cn("flex", isOwn ? "justify-end" : "justify-start")}>
-                <div
-                  className={cn(
-                    "max-w-[85%] rounded-2xl px-3 py-2 text-xs break-words",
-                    isOwn
-                      ? "gradient-bg text-white rounded-br-md"
-                      : "bg-[#1e1e1e] border border-white/5 rounded-bl-md"
-                  )}
-                >
-                  <ChatMessageContent message={msg} />
-                  <p className="text-[9px] opacity-60 mt-1">{formatRelativeTime(msg.created_at)}</p>
-                </div>
-              </div>
-            );
-          })
-        )}
-      </div>
+        className={cn(CHAT_SCROLL_CLASS, "flex-1 min-h-0 p-3 bg-[#0f0f0f]")}
+        onStillNeedHelp={() =>
+          void handleFollowUp("I still need help. I need to speak with a person.")
+        }
+      />
 
       <ChatComposer
         value={input}
         onChange={setInput}
         onSend={handleSend}
         loading={loading}
-        placeholder="Reply..."
+        placeholder={humanRequested ? "Message human support…" : "Message support…"}
+        attachLabel="Attach image"
+        showSendLabel
         className="bg-[#121212] border-white/10 shrink-0 pb-[max(0.75rem,env(safe-area-inset-bottom))]"
       />
     </div>

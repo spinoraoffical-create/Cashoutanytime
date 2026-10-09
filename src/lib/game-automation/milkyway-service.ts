@@ -55,7 +55,7 @@ export async function autoFulfillMilkyWayRequest(
       if (admin && requestId) {
         await admin
           .from("game_load_requests")
-          .update({
+          .update({
             game_username: created.account,
             game_password: created.pass,
             completed_at: new Date().toISOString(),
@@ -87,7 +87,7 @@ export async function autoFulfillMilkyWayRequest(
       if (admin && requestId) {
         await admin
           .from("game_load_requests")
-          .update({
+          .update({
             amount: userBalance,
             admin_notes: `Balance: $${userBalance.toFixed(2)}`,
             completed_at: new Date().toISOString(),
@@ -100,6 +100,7 @@ export async function autoFulfillMilkyWayRequest(
         success: true,
         message: `Milky Way balance checked for ${cleanAccount}`,
         accountName: cleanAccount,
+        credentials: { username: cleanAccount },
         balance: userBalance,
         rawResponse: info,
       };
@@ -121,7 +122,7 @@ export async function autoFulfillMilkyWayRequest(
       if (admin && requestId) {
         await admin
           .from("game_load_requests")
-          .update({
+          .update({
             completed_at: new Date().toISOString(),
             updated_at: new Date().toISOString(),
           })
@@ -151,7 +152,7 @@ export async function autoFulfillMilkyWayRequest(
       if (admin && requestId) {
         await admin
           .from("game_load_requests")
-          .update({
+          .update({
             completed_at: new Date().toISOString(),
             updated_at: new Date().toISOString(),
           })
@@ -180,7 +181,7 @@ export async function autoFulfillMilkyWayRequest(
 
       await admin
         .from("game_load_requests")
-        .update({
+        .update({
           error_message: err.message || "Milky Way provider operation failed",
           updated_at: new Date().toISOString(),
         })

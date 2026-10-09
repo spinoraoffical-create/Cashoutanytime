@@ -273,7 +273,7 @@ export function MessageRealtimeProvider({ children }: { children: ReactNode }) {
         new CustomEvent<GameRequestEventDetail>(GAME_REQUEST_EVENT, { detail: eventDetail })
       );
 
-      const href = adminView ? "/admin/requests?status=pending" : "/dashboard/requests";
+      const href = adminView ? "/admin/game-loads" : "/dashboard/requests";
 
       let title = adminView ? "New game request" : "Game Account Ready!";
       let preview = adminView
@@ -546,7 +546,7 @@ export function MessageRealtimeProvider({ children }: { children: ReactNode }) {
         .channel(`game-req-admin-${userId}`)
         .on(
           "postgres_changes",
-          { event: "INSERT", schema: "public", table: "game_requests" },
+          { event: "INSERT", schema: "public", table: "game_load_requests" },
           (payload) => {
             const req = payload.new as GameRequest;
             if (req.user_id === userId) return;
@@ -563,7 +563,7 @@ export function MessageRealtimeProvider({ children }: { children: ReactNode }) {
           {
             event: "UPDATE",
             schema: "public",
-            table: "game_requests",
+            table: "game_load_requests",
             filter: `user_id=eq.${userId}`,
           },
           (payload) => {

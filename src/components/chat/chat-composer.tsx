@@ -18,6 +18,7 @@ interface ChatComposerProps {
   placeholder?: string;
   className?: string;
   showSendLabel?: boolean;
+  attachLabel?: string;
 }
 
 export function ChatComposer({
@@ -29,6 +30,7 @@ export function ChatComposer({
   placeholder = "Type a message...",
   className,
   showSendLabel = false,
+  attachLabel = "Attach file",
 }: ChatComposerProps) {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [pendingFile, setPendingFile] = useState<File | null>(null);
@@ -106,7 +108,14 @@ export function ChatComposer({
         </div>
       )}
 
-      <div className="p-2 sm:p-3 grid grid-cols-[44px_minmax(0,1fr)_44px] sm:grid-cols-[44px_minmax(0,1fr)_auto] gap-2 items-center max-w-full">
+      <div
+        className={cn(
+          "p-2 sm:p-3 grid gap-2 items-center max-w-full",
+          attachLabel === "Attach file"
+            ? "grid-cols-[44px_minmax(0,1fr)_44px] sm:grid-cols-[44px_minmax(0,1fr)_auto]"
+            : "grid-cols-[44px_minmax(0,1fr)_44px] sm:grid-cols-[auto_minmax(0,1fr)_auto]"
+        )}
+      >
         <input
           ref={fileInputRef}
           type="file"
@@ -120,10 +129,14 @@ export function ChatComposer({
           size="icon"
           disabled={disabled || loading}
           onClick={() => fileInputRef.current?.click()}
-          aria-label="Attach file"
-          className="h-11 w-11 shrink-0"
+          aria-label={attachLabel}
+          title={attachLabel}
+          className={cn("h-11 w-11 shrink-0", attachLabel !== "Attach file" && "sm:w-auto sm:px-3")}
         >
           <Paperclip className="h-4 w-4" />
+          {attachLabel !== "Attach file" && (
+            <span className="hidden sm:inline ml-1 text-xs">{attachLabel}</span>
+          )}
         </Button>
         <Input
           value={value}

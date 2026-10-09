@@ -4,7 +4,7 @@ export function asksForPerson(query: string) {
 }
 
 export const CHAT_FALLBACK_REPLY =
-  "I'm here to help with deposits, cash outs, and game accounts. Tell me what you need.";
+  "Sweepstakes Hub AI here. I can help with deposits, cash outs, and game accounts. Tell me what you need.";
 
 export const CHAT_PERSON_REPLY =
-  "A person from Sweepstakes Hub support will reply in this chat.";
+  "Sweepstakes Hub AI here. A person from Sweepstakes Hub support will reply in this chat.";

@@ -1,4 +1,4 @@
-import { getGameBySlug } from "@/lib/games";
+import { canonicalGameSlug, getGameBySlug } from "@/lib/games";
 
 /** Server-only Juwa agent panel URL (never NEXT_PUBLIC) */
 export function getJuwaAdminPanelUrl(): string | null {
@@ -63,9 +63,26 @@ export function getAutomationSecret(): string | null {
  * Wallet create / load / redeem UI — enabled for every game in the catalog
  * except upcoming (coming soon) titles. Fulfillment runs through each game's API.
  */
+const AUTOMATED_GAME_SLUGS = new Set([
+  "cash-machine",
+  "cash-frenzy",
+  "gameroom",
+  "game-vault",
+  "mafia",
+  "juwa",
+  "vegas-sweeps",
+  "mr-all-in-one",
+  "orion-stars",
+  "milky-way",
+  "fire-kirin",
+  "vblink",
+]);
+
 export function isWalletLoadEnabledForGame(slug: string): boolean {
   const game = getGameBySlug(slug);
-  return Boolean(game && !game.upcoming);
+  if (game?.upcoming) return false;
+  if (game) return true;
+  return AUTOMATED_GAME_SLUGS.has(canonicalGameSlug(slug));
 }
 
 /** Wallet → game load limits ($5 minimum load / partial redeem, up to $500) */

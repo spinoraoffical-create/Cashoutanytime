@@ -87,6 +87,7 @@ export async function autoFulfillVegasRequest(
         success: true,
         message: `Vegas balance checked for ${cleanAccount}: $${bal.toFixed(2)}`,
         accountName: cleanAccount,
+        credentials: { username: cleanAccount },
         balance: bal,
       };
     }
