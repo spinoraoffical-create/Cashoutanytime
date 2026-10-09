@@ -2,9 +2,7 @@ import "server-only";
 
 import os from "node:os";
 import path from "node:path";
-import sharp from "sharp";
 import { chromium, type Frame, type Page } from "playwright";
-import { createWorker, PSM } from "tesseract.js";
 
 const STORE_URL = "https://firekirin.xyz:8888/Store.aspx";
 
@@ -20,6 +18,8 @@ function agentLogin(): { username: string; password: string } {
 async function readCaptcha(page: Page): Promise<string> {
   const filePath = path.join(os.tmpdir(), `fk-captcha-${Date.now()}.png`);
   await page.locator("#ImageCheck").screenshot({ path: filePath });
+  const sharp = (await import("sharp")).default;
+  const { createWorker, PSM } = await import("tesseract.js");
   const image = await sharp(filePath).resize({ width: 320, kernel: "nearest" }).greyscale().png().toBuffer();
   const worker = await createWorker("eng");
   try {

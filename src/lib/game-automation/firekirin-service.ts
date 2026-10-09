@@ -1,6 +1,5 @@
 import { createAdminClient } from "@/lib/supabase/admin";
 import { generateGamePassword } from "./account-username";
-import { createFireKirinPlayerOnStore } from "./firekirin-store";
 import {
   enqueueFireKirin,
   FireKirinApiClient,
@@ -225,6 +224,7 @@ async function autoFulfillFireKirinNow(
       if (!/^[A-Za-z0-9]{7,13}$/.test(cleanAccount)) {
         throw new Error("Fire Kirin username must be 7 to 13 letters or numbers.");
       }
+      const { createFireKirinPlayerOnStore } = await import("./firekirin-store");
       await createFireKirinPlayerOnStore(cleanAccount, passToUse);
       await saveFireKirinLogin(requestId, cleanAccount, passToUse, true);
       return {
