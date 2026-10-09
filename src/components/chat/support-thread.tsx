@@ -2,6 +2,7 @@
 
 import { useEffect, useState, type RefObject } from "react";
 import Link from "next/link";
+import { ShieldCheck, Star, UserRound } from "lucide-react";
 import { ChatMessageContent } from "@/components/chat/chat-message-content";
 import { saveSupportFeedback } from "@/lib/actions/messages";
 import {
@@ -129,14 +130,14 @@ export function SupportThread({
   return (
     <div ref={scrollRef} onScroll={onScroll} className={className}>
       {humanRequested && (
-        <div className="mb-4 rounded-2xl border border-white/10 bg-[#1a1024] px-4 py-3 text-sm">
-          <p className="font-semibold text-white">Your request is in the human support queue.</p>
-          <p className="mt-1 text-xs text-[#b9b3c6]">
-            You can leave and come back. This same thread stays open. Reference {reference}.
+        <div className="mb-4 px-1 text-sm">
+          <p className="flex items-center gap-2 font-semibold text-white">
+            <UserRound className="h-4 w-4 text-amber-300" />
+            Your request is in the human support queue.
           </p>
-          <Link href="/help" className="mt-2 inline-block text-xs font-bold text-[#ff6b89]">
-            Read frequently asked questions
-          </Link>
+          <p className="mt-1 text-xs text-[#b9b3c6]">
+            You can keep this conversation open or come back later. Reference {reference}.
+          </p>
         </div>
       )}
 
@@ -185,50 +186,55 @@ export function SupportThread({
       )}
 
       {hasReply && (
-        <div className="mt-2 rounded-2xl border border-white/10 bg-[#141414] px-4 py-3">
-          <p className="text-sm font-semibold text-white">How was this help?</p>
-          <div className="mt-2 flex flex-wrap gap-2">
+        <div className="mt-2 rounded-3xl border border-white/10 bg-[#101735] px-4 py-4">
+          <p className="text-lg font-bold text-white">How was this support?</p>
+          <p className="mt-2 text-sm text-[#b9b3c6]">
+            Rate the overall help and tell us whether this issue is resolved.
+          </p>
+          <p className="text-sm text-[#b9b3c6]">This does not change your account or balances.</p>
+          <p className="mt-4 font-bold text-white">How would you rate the help?</p>
+          <div className="mt-3 flex gap-2">
             {RATINGS.map((item) => (
               <button
                 key={item.score}
                 type="button"
                 onClick={() => void chooseRating(item.score)}
-                className={cn(
-                  "rounded-full border px-3 py-1.5 text-xs font-semibold",
-                  rating === item.score
-                    ? "border-orange-400 bg-orange-500/20 text-white"
-                    : "border-white/15 text-[#b9b3c6] hover:bg-white/5"
-                )}
+                aria-label={`${item.score} ${item.label}`}
                 aria-pressed={rating === item.score}
+                className={cn(
+                  "grid h-12 w-12 place-items-center rounded-2xl border",
+                  rating != null && item.score <= rating
+                    ? "border-amber-300 bg-amber-400/20 text-amber-300"
+                    : "border-white/10 bg-[#070b1f] text-[#b9b3c6]"
+                )}
               >
-                {item.score} {item.label}
+                <Star className={cn("h-5 w-5", rating != null && item.score <= rating && "fill-amber-300")} />
               </button>
             ))}
           </div>
-          <div className="mt-3 flex flex-wrap gap-2">
+          <p className="mt-2 text-xs text-[#b9b3c6]">
+            {rating ? RATINGS.find((item) => item.score === rating)?.label : "Choose a rating to continue."}
+          </p>
+          <p className="mt-4 font-bold text-white">Is your issue resolved?</p>
+          <div className="mt-3 grid gap-2">
             <button
               type="button"
               disabled={!rating || saving}
               onClick={() => void markResolved()}
-              className="rounded-full bg-primary px-4 py-2 text-xs font-bold text-white disabled:opacity-40"
+              className="flex h-12 items-center justify-center gap-2 rounded-2xl border border-white/10 bg-[#070b1f] text-sm font-semibold text-white disabled:opacity-40"
             >
-              Yes, resolved
+              <ShieldCheck className="h-4 w-4" /> Yes, resolved
             </button>
             <button
               type="button"
               disabled={!rating || saving}
               onClick={stillNeedHelp}
-              className="rounded-full border border-white/15 px-4 py-2 text-xs font-semibold text-white disabled:opacity-40"
+              className="flex h-12 items-center justify-center gap-2 rounded-2xl border border-white/10 bg-[#070b1f] text-sm font-semibold text-white disabled:opacity-40"
             >
-              No, I still need help
+              <UserRound className="h-4 w-4" /> No, I still need help
             </button>
           </div>
-          {resolved === true && (
-            <p className="mt-2 text-xs text-emerald-300">Marked resolved.</p>
-          )}
-          {resolved === false && (
-            <p className="mt-2 text-xs text-[#b9b3c6]">Sent to the same thread.</p>
-          )}
+          {resolved === true && <p className="mt-2 text-xs text-emerald-300">Marked resolved.</p>}
         </div>
       )}
     </div>

@@ -19,6 +19,7 @@ interface ChatComposerProps {
   className?: string;
   showSendLabel?: boolean;
   attachLabel?: string;
+  tone?: "default" | "support";
 }
 
 export function ChatComposer({
@@ -31,6 +32,7 @@ export function ChatComposer({
   className,
   showSendLabel = false,
   attachLabel = "Attach file",
+  tone = "default",
 }: ChatComposerProps) {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [pendingFile, setPendingFile] = useState<File | null>(null);
@@ -110,10 +112,12 @@ export function ChatComposer({
 
       <div
         className={cn(
-          "p-2 sm:p-3 grid gap-2 items-center max-w-full",
-          attachLabel === "Attach file"
-            ? "grid-cols-[44px_minmax(0,1fr)_44px] sm:grid-cols-[44px_minmax(0,1fr)_auto]"
-            : "grid-cols-[44px_minmax(0,1fr)_44px] sm:grid-cols-[auto_minmax(0,1fr)_auto]"
+          "grid max-w-full items-center gap-2 p-2 sm:p-3",
+          tone === "support"
+            ? "grid-cols-[44px_minmax(0,1fr)_44px]"
+            : attachLabel === "Attach file"
+              ? "grid-cols-[44px_minmax(0,1fr)_44px] sm:grid-cols-[44px_minmax(0,1fr)_auto]"
+              : "grid-cols-[44px_minmax(0,1fr)_44px] sm:grid-cols-[auto_minmax(0,1fr)_auto]"
         )}
       >
         <input
@@ -131,10 +135,14 @@ export function ChatComposer({
           onClick={() => fileInputRef.current?.click()}
           aria-label={attachLabel}
           title={attachLabel}
-          className={cn("h-11 w-11 shrink-0", attachLabel !== "Attach file" && "sm:w-auto sm:px-3")}
+          className={cn(
+            "h-11 w-11 shrink-0",
+            tone === "support" && "rounded-2xl border-white/10 bg-[#141a33]",
+            tone !== "support" && attachLabel !== "Attach file" && "sm:w-auto sm:px-3"
+          )}
         >
           <Paperclip className="h-4 w-4" />
-          {attachLabel !== "Attach file" && (
+          {tone !== "support" && attachLabel !== "Attach file" && (
             <span className="hidden sm:inline ml-1 text-xs">{attachLabel}</span>
           )}
         </Button>
@@ -144,7 +152,10 @@ export function ChatComposer({
           onFocus={() => void unlockMessageNotificationSound()}
           placeholder={placeholder}
           disabled={disabled || loading}
-          className="min-w-0 w-full h-11 text-base sm:text-sm"
+          className={cn(
+            "h-11 min-w-0 w-full text-base sm:text-sm",
+            tone === "support" && "rounded-full border-white/10 bg-[#141a33]"
+          )}
         />
         <Button
           type="submit"
@@ -153,7 +164,8 @@ export function ChatComposer({
           aria-label="Send message"
           className={cn(
             "h-11 w-11 shrink-0",
-            showSendLabel && "sm:w-auto sm:min-w-[44px] sm:px-4"
+            tone === "support" && "rounded-full bg-emerald-500 text-white hover:bg-emerald-400",
+            showSendLabel && tone !== "support" && "sm:w-auto sm:min-w-[44px] sm:px-4"
           )}
         >
           <Send className="h-5 w-5 shrink-0" />

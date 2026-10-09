@@ -32,7 +32,7 @@ import { useDashboardProfile } from "@/lib/dashboard/dashboard-profile-context";
 import { appendMessage, mergeMessagesById } from "@/lib/chat/merge-messages";
 import { subscribeToConversationInserts, subscribeToMessageInserts } from "@/lib/chat/subscribe-messages";
 import { toast } from "sonner";
-import { ArrowLeft, MessageCircle } from "lucide-react";
+import { ArrowLeft, Headphones, MessageCircle } from "lucide-react";
 import { SupportAiStarter } from "@/components/chat/support-ai-starter";
 import type { Message } from "@/types/database";
 
@@ -104,31 +104,43 @@ function UserChatPanel({
 
   return (
     <div className="flex flex-col flex-1 min-h-0 h-full overflow-hidden">
-      <div className="p-3 sm:p-4 border-b border-white/10 flex items-center gap-2 sm:gap-3 bg-[#121212] shrink-0">
-        {showMobileBack && (
+      <div className="flex items-center gap-3 border-b border-white/10 bg-[#070b1f] px-3 py-3 shrink-0">
+        {showMobileBack ? (
           <Button
             variant="ghost"
             size="icon"
-            className="shrink-0"
+            className="shrink-0 rounded-full bg-white/10"
             onClick={handleBack}
             aria-label="Back to chats"
           >
             <ArrowLeft className="h-4 w-4" />
           </Button>
-        )}
-        <div className="flex-1 min-w-0">
-          <h2 className="font-semibold text-white truncate">
+        ) : supportLayout ? (
+          <Link
+            href="/support"
+            className="grid h-10 w-10 shrink-0 place-items-center rounded-full bg-white/10 text-white"
+            aria-label="Back to support"
+          >
+            <ArrowLeft className="h-4 w-4" />
+          </Link>
+        ) : null}
+        <span className="relative grid h-11 w-11 shrink-0 place-items-center rounded-full bg-emerald-500 text-white">
+          <Headphones className="h-5 w-5" />
+          <span className="absolute bottom-0 right-0 h-2.5 w-2.5 rounded-full bg-amber-400 ring-2 ring-[#070b1f]" />
+        </span>
+        <div className="min-w-0 flex-1">
+          <h2 className="truncate font-bold text-white">
             {humanRequested || supportLayout ? "Human support" : selectedConversation.title}
           </h2>
-          <p className="text-xs text-muted-foreground truncate">
+          <p className={cn("truncate text-xs", humanRequested ? "text-amber-300" : "text-[#b9b3c6]")}>
             {humanRequested
               ? "Human support requested · updates stay here"
-              : "An automated assistant answers first. Ask for a person at any time."}
+              : "An automated assistant answers first"}
           </p>
-          <Link href="/help" className="text-xs font-bold text-[#ff6b89]">
-            Frequently asked questions
-          </Link>
         </div>
+        <Link href="/help" className="shrink-0 text-xs font-bold text-white">
+          FAQ
+        </Link>
         {humanRequested ? null : (
           <Button
             type="button"
@@ -154,7 +166,7 @@ function UserChatPanel({
         initialResolved={selectedConversation.supportResolved}
         scrollRef={scrollRef}
         onScroll={onScrollMessages}
-        className={`${CHAT_SCROLL_CLASS} p-3 sm:p-4 pb-4 bg-[#0f0f0f]`}
+        className={`${CHAT_SCROLL_CLASS} bg-[#070b1f] p-3 pb-4 sm:p-4`}
         onStillNeedHelp={() => void onFollowUp("I still need help. I need to speak with a person.")}
       />
 
@@ -164,10 +176,10 @@ function UserChatPanel({
         onSend={onSend}
         loading={loading}
         disabled={!selectedId}
-        placeholder={humanRequested || supportLayout ? "Message human support…" : "Message support…"}
+        placeholder={humanRequested || supportLayout ? "Message human support..." : "Message support…"}
         attachLabel="Attach image"
-        showSendLabel
-        className="bg-[#121212] border-white/10 shrink-0"
+        tone={supportLayout || humanRequested ? "support" : "default"}
+        className="shrink-0 border-white/10 bg-[#070b1f]"
       />
     </div>
   );
@@ -176,9 +188,11 @@ function UserChatPanel({
 export function UserMessagesInbox({
   initialData,
   variant = "inbox",
+  signedInUserId = null,
 }: {
   initialData?: UserMessagesInboxInitialData;
   variant?: "inbox" | "thread";
+  signedInUserId?: string | null;
 } = {}) {
   const dashboardProfile = useDashboardProfile();
   const searchParams = useSearchParams();
@@ -192,7 +206,7 @@ export function UserMessagesInbox({
   );
   const [messages, setMessages] = useState<Message[]>(() => initialData?.messages ?? []);
   const [userId, setUserId] = useState<string | null>(
-    () => initialData?.userId ?? profileUserId
+    () => initialData?.userId ?? profileUserId ?? signedInUserId
   );
   const [botSenderId, setBotSenderId] = useState<string | null>(
     () => initialData?.botSenderId ?? null
@@ -269,17 +283,6 @@ export function UserMessagesInbox({
 
     if (profileUserId && !userId) {
       setUserId(profileUserId);
-    }
-
-    if (!supabase) {
-      setInitLoading(false);
-      return;
-    }
-
-    const activeUserId = userId ?? profileUserId;
-    if (!activeUserId) {
-      setInitLoading(false);
-      return;
     }
 
     setInitLoading(true);
