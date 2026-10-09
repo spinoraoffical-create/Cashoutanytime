@@ -54,13 +54,6 @@ export const ADMIN_NAV: AdminNavSection[] = [
       { href: "/admin/game-loads", label: "Wallet Loads & Redeems", permission: "requests.manage" },
       { href: "/admin/payouts", label: "Cash-out / Payouts", permission: "requests.manage" },
       { href: "/admin/transactions", label: "Transaction History", permission: "requests.manage" },
-      { href: "/admin/requests", label: "Deposit records", permission: "requests.manage" },
-      {
-        href: "/admin/failed-loads",
-        label: "Failed loads",
-        permission: "requests.manage",
-        roleAny: ["store_creator", "sub_creator"],
-      },
       { href: "/admin/cashout-holds", label: "Held cash outs", permission: "requests.manage" },
     ],
   },

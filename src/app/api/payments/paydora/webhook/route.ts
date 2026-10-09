@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import {
+  collectedDepositAmount,
   isPaidDepositStatus,
   verifyPaydoraSignature,
   type PaydoraWebhookEnvelope,
@@ -50,12 +51,14 @@ export async function POST(req: Request) {
           base_amount?: number | null;
         } | null;
         const savedAmount = Number(saved?.base_amount);
-        if (!saved?.user_id || !saved.game_slug || !Number.isFinite(savedAmount) || savedAmount <= 0) {
+        const collected = collectedDepositAmount(payload.data);
+        const creditBase = Math.min(savedAmount, collected);
+        if (!saved?.user_id || !saved.game_slug || !Number.isFinite(savedAmount) || savedAmount <= 0 || !(creditBase > 0)) {
           throw new Error("Payment intent or game is missing");
         }
         await creditPaydoraDeposit({
           userId: saved.user_id,
-          amount: savedAmount,
+          amount: creditBase,
           depositId: payload.data.depositId,
           referenceId: payload.data.referenceId,
           gameSlug: saved.game_slug,

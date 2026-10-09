@@ -2,6 +2,8 @@
 
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
+import { createAdminClient } from "@/lib/supabase/admin";
+import { getStaffContext } from "@/lib/data/admin";
 import { notifyAdminOfCustomerMessage } from "@/lib/telegram/notify-admin-message";
 import { messagePreview } from "@/lib/chat/message-preview";
 import type { Message } from "@/types/database";
@@ -212,6 +214,50 @@ export async function sendUserMessage(
   return { success: true, message: inserted };
 }
 
+async function newestActiveConversation(userId: string) {
+  const supabase = await createClient();
+  const admin = createAdminClient();
+
+  async function newest(db: NonNullable<ReturnType<typeof createAdminClient>>) {
+    const { data } = await db
+      .from("conversations")
+      .select("id, updated_at")
+      .eq("user_id", userId)
+      .eq("is_active", true)
+      .order("updated_at", { ascending: false })
+      .limit(1);
+    return (data as { id: string; updated_at: string }[] | null)?.[0] ?? null;
+  }
+
+  let conversation = await newest(supabase);
+  if (!conversation && admin) conversation = await newest(admin);
+  if (conversation) return conversation;
+
+  const { data, error } = await supabase
+    .from("conversations")
+    .insert({ user_id: userId, is_active: true })
+    .select("id, updated_at")
+    .limit(1);
+  conversation = (data as { id: string; updated_at: string }[] | null)?.[0] ?? null;
+  if (conversation) return conversation;
+
+  if (admin) {
+    const created = await admin
+      .from("conversations")
+      .insert({ user_id: userId, is_active: true })
+      .select("id, updated_at")
+      .limit(1);
+    conversation = (created.data as { id: string; updated_at: string }[] | null)?.[0] ?? null;
+    if (!conversation) {
+      console.error("[messages] conversation:", error?.message, created.error?.message);
+    }
+  } else if (error) {
+    console.error("[messages] conversation:", error.message);
+  }
+
+  return conversation;
+}
+
 export async function ensureUserConversation() {
   const supabase = await createClient();
   const {
@@ -219,26 +265,8 @@ export async function ensureUserConversation() {
   } = await supabase.auth.getUser();
   if (!user) return { error: "Not authenticated" };
 
-  let { data: conversation } = await supabase
-    .from("conversations")
-    .select("id, updated_at")
-    .eq("user_id", user.id)
-    .eq("is_active", true)
-    .maybeSingle();
-
-  if (!conversation) {
-    const { data: created, error } = await supabase
-      .from("conversations")
-      .insert({ user_id: user.id })
-      .select("id, updated_at")
-      .single();
-
-    if (error) {
-      console.error("[messages] conversation:", error.message);
-      return { error: "Could not open chat. Try again." };
-    }
-    conversation = created;
-  }
+  const conversation = await newestActiveConversation(user.id);
+  if (!conversation) return { error: "Could not open chat. Try again." };
 
   return { conversationId: conversation.id, updatedAt: conversation.updated_at };
 }
@@ -257,26 +285,8 @@ export async function initUserMessagesInbox(): Promise<{
   } = await supabase.auth.getUser();
   if (!user) return { error: "Not authenticated" };
 
-  let { data: conversation } = await supabase
-    .from("conversations")
-    .select("id, updated_at")
-    .eq("user_id", user.id)
-    .eq("is_active", true)
-    .maybeSingle();
-
-  if (!conversation) {
-    const { data: created, error } = await supabase
-      .from("conversations")
-      .insert({ user_id: user.id })
-      .select("id, updated_at")
-      .single();
-
-    if (error) {
-      console.error("[messages] conversation:", error.message);
-      return { error: "Could not open chat. Try again." };
-    }
-    conversation = created;
-  }
+  const conversation = await newestActiveConversation(user.id);
+  if (!conversation) return { error: "Could not open chat. Try again." };
 
   const conversations = await getUserConversations();
   const selectedConversationId = conversations[0]?.id ?? conversation.id;
@@ -332,13 +342,8 @@ export async function getAdminUnreadMessageCount(): Promise<number> {
   } = await supabase.auth.getUser();
   if (!user) return 0;
 
-  const { data: profile } = await supabase
-    .from("profiles")
-    .select("role")
-    .eq("id", user.id)
-    .single();
-
-  if (profile?.role !== "admin") return 0;
+  const staff = await getStaffContext();
+  if (!staff) return 0;
 
   const { data: conversations } = await supabase
     .from("conversations")
@@ -367,13 +372,8 @@ export async function getAdminConversationUnreads(): Promise<AdminConversationUn
   } = await supabase.auth.getUser();
   if (!user) return [];
 
-  const { data: profile } = await supabase
-    .from("profiles")
-    .select("role")
-    .eq("id", user.id)
-    .single();
-
-  if (profile?.role !== "admin") return [];
+  const staff = await getStaffContext();
+  if (!staff) return [];
 
   const { data: conversations } = await supabase
     .from("conversations")

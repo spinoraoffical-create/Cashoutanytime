@@ -51,6 +51,10 @@ export function getFireKirinAdminPanelUrl(): string | null {
   return process.env.FIREKIRIN_ADMIN_URL?.trim() || "http://start.firekirin.xyz:8580/";
 }
 
+export function getVblinkAdminPanelUrl(): string | null {
+  return process.env.VBLINK_API_URL?.trim() || "https://gm.vblink777.club/#/login";
+}
+
 export function getAutomationSecret(): string | null {
   return process.env.GAME_AUTOMATION_SECRET?.trim() || null;
 }

@@ -454,9 +454,11 @@ export function UserMessagesInbox({
     });
     if (result.error) {
       toast.error(result.error);
-      setInput(content);
-      setLoading(false);
-      return false;
+      if (!result.message) {
+        setInput(content);
+        setLoading(false);
+        return false;
+      }
     }
 
     if (result.message) {

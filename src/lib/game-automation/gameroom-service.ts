@@ -1,3 +1,4 @@
+import { createUntilAccepted } from "./account-username";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { formatGameAutomationError } from "./error-formatter";
 import {
@@ -59,7 +60,7 @@ export async function autoFulfillGameroomRequest(
     requestedUsername?: string | null;
     requestedPassword?: string | null;
   }
-): Promise<{ success: boolean; error?: string }> {
+): Promise<{ success: boolean; error?: string; username?: string; password?: string; redeemedAmount?: number }> {
   if (!isGameroomApiConfigured()) {
     return { success: false, error: "Gameroom API credentials not configured." };
   }
@@ -72,12 +73,14 @@ export async function autoFulfillGameroomRequest(
       const username = input.requestedUsername?.trim();
       if (!username) return { success: false, error: "Account not found" };
       const password = input.requestedPassword || `Pass_${Math.floor(1000 + Math.random() * 9000)}`;
-      const created = await createGameroomAccount({ username, password });
+      const opened = await createUntilAccepted(username, "gameroom", (name) =>
+        createGameroomAccount({ username: name, password })
+      );
+      const created = opened.value;
 
       await admin
         .from("game_load_requests")
         .update({
-          status: "completed",
           game_username: created.account,
           game_password: created.password,
           completed_at: new Date().toISOString(),
@@ -97,7 +100,6 @@ export async function autoFulfillGameroomRequest(
       await admin
         .from("game_load_requests")
         .update({
-          status: "completed",
           amount: scoreInfo.balance,
           admin_notes: `Balance: $${scoreInfo.balance.toFixed(2)}${scoreInfo.isGame ? " (In Game)" : ""}`,
           completed_at: new Date().toISOString(),
@@ -105,7 +107,7 @@ export async function autoFulfillGameroomRequest(
         })
         .eq("id", requestId);
 
-      return { success: true };
+      return { success: true, redeemedAmount: scoreInfo.balance };
     }
 
     if (loadType === "load" || loadType === "reload") {
@@ -119,7 +121,6 @@ export async function autoFulfillGameroomRequest(
       await admin
         .from("game_load_requests")
         .update({
-          status: "completed",
           completed_at: new Date().toISOString(),
           updated_at: new Date().toISOString(),
         })
@@ -139,13 +140,12 @@ export async function autoFulfillGameroomRequest(
       await admin
         .from("game_load_requests")
         .update({
-          status: "completed",
           completed_at: new Date().toISOString(),
           updated_at: new Date().toISOString(),
         })
         .eq("id", requestId);
 
-      return { success: true };
+      return { success: true, redeemedAmount: amount };
     }
 
     return { success: false, error: `Unknown load type: ${loadType}` };
@@ -161,7 +161,6 @@ export async function autoFulfillGameroomRequest(
     await admin
       .from("game_load_requests")
       .update({
-        status: "failed",
         error_message: userError,
         updated_at: new Date().toISOString(),
       })

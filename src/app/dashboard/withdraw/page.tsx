@@ -3,7 +3,9 @@ import Link from "next/link";
 import { getProfile } from "@/lib/supabase/session";
 import { GlassCard } from "@/components/shared/glass-card";
 import { Button } from "@/components/ui/button";
-import { ShieldCheck, Banknote, AlertCircle, ArrowRight, Wallet } from "lucide-react";
+import { CashoutRequestForm } from "@/components/player/cashout-request-form";
+import { getPaydoraPaymentMethods } from "@/lib/payments/paydora";
+import { ShieldCheck, Banknote, ArrowRight } from "lucide-react";
 
 export const metadata: Metadata = {
   title: "Withdraw & Cash Out",
@@ -11,7 +13,18 @@ export const metadata: Metadata = {
 
 export default async function DashboardWithdrawPage() {
   const profile = await getProfile();
-  const isVerified = (profile as any)?.kyc_status === "verified";
+  const kyc = (profile as { kyc_status?: string | null; cashout_wallet?: number | null } | null)?.kyc_status;
+  const isVerified = kyc === "verified" || kyc === "approved";
+  const balance = Number((profile as { cashout_wallet?: number | null } | null)?.cashout_wallet ?? 0);
+  let methods: { value: string; name: string }[] = [];
+  if (isVerified) {
+    try {
+      const catalog = await getPaydoraPaymentMethods();
+      methods = catalog.withdrawals.map((method) => ({ value: method.value, name: method.name }));
+    } catch {
+      methods = [];
+    }
+  }
 
   return (
     <div className="space-y-6 max-w-4xl mx-auto">
@@ -56,31 +69,7 @@ export default async function DashboardWithdrawPage() {
             </span>
           </div>
 
-          <div className="grid gap-4 sm:grid-cols-2">
-            {[
-              { name: "Cash App ($Cashtag)", icon: "💚", time: "5-15 mins" },
-              { name: "USDT (TRC-20 / ERC-20)", icon: "🌐", time: "5 mins" },
-              { name: "PayPal Direct", icon: "💙", time: "15 mins" },
-              { name: "Zelle Transfer", icon: "⚡", time: "15 mins" },
-            ].map((method) => (
-              <div
-                key={method.name}
-                className="rounded-xl border border-border/60 bg-background/60 p-4 hover:border-amber-500/40 transition-all flex items-center justify-between"
-              >
-                <div>
-                  <span className="text-sm font-bold text-foreground flex items-center gap-1.5">
-                    <span>{method.icon}</span> {method.name}
-                  </span>
-                  <span className="text-[11px] text-muted-foreground mt-0.5 block">Speed: {method.time}</span>
-                </div>
-                <Link href="/dashboard/games">
-                  <Button size="sm" className="bg-[#f3264f] text-white hover:bg-[#b70d3a] font-bold text-xs">
-                    Cash Out
-                  </Button>
-                </Link>
-              </div>
-            ))}
-          </div>
+          <CashoutRequestForm balance={balance} methods={methods} />
         </GlassCard>
       )}
     </div>

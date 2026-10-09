@@ -1,11 +1,14 @@
 import crypto from "crypto";
+import type { ClientRequest } from "node:http";
 import https from "https";
 import { HttpsProxyAgent } from "https-proxy-agent";
 
 /**
  * Fire Kirin Terminal API v1.0
- * https://firekirin.xyz:8034/ws/service.ashx
+ * https://firekirin.xyz:8033/ws/service.ashx
  */
+
+const OFFICIAL_API_URL = "https://firekirin.xyz:8033/ws/service.ashx";
 
 export interface FireKirinLoginResponse {
   code: string | number;
@@ -35,11 +38,19 @@ export function parseFireKirinUserBalance(info: FireKirinQueryResponse): number 
   return Number.isFinite(value) ? value : 0;
 }
 
+export function isWholeDollar(amount: number): boolean {
+  return Number.isFinite(amount) && amount > 0 && Math.abs(amount - Math.trunc(amount)) <= 1e-6;
+}
+
+export function fireKirinTransactionId(requestId: string): string {
+  return requestId.replace(/-/g, "").slice(0, 20);
+}
+
 export interface FireKirinConfig {
   apiUrl?: string;
   agentName?: string;
   agentPassword?: string;
-  /** Set to `null` to skip proxy; omit to use env vars. */
+  /** Fallback only. Direct calls to port 8033 do not use it. `null` disables the fallback. */
   proxyUrl?: string | null;
 }
 
@@ -52,10 +63,6 @@ function md5(str: string): string {
   return crypto.createHash("md5").update(str).digest("hex").toLowerCase();
 }
 
-function makeTransactionId(): string {
-  return `fk${Date.now().toString(36)}`.slice(0, 20);
-}
-
 function httpsPost(
   urlStr: string,
   hostHeader: string,
@@ -63,6 +70,19 @@ function httpsPost(
   timeoutMs: number = 15000
 ): Promise<string> {
   return new Promise((resolve, reject) => {
+    let settled = false;
+    let req: ClientRequest | undefined;
+    const finish = (err: Error | null, body?: string) => {
+      if (settled) return;
+      settled = true;
+      clearTimeout(timer);
+      req?.destroy();
+      if (err) reject(err);
+      else resolve(body ?? "");
+    };
+    const timer = setTimeout(() => {
+      finish(new Error(`Fire Kirin API connection timed out after ${timeoutMs / 1000}s`));
+    }, timeoutMs);
     try {
       const parsed = new URL(urlStr);
       const agent = proxyUrlStr
@@ -71,7 +91,7 @@ function httpsPost(
 
       const options: https.RequestOptions = {
         hostname: parsed.hostname,
-        port: parsed.port ? Number(parsed.port) : 8034,
+        port: parsed.port ? Number(parsed.port) : 8033,
         path: parsed.pathname + parsed.search,
         method: "POST",
         headers: {
@@ -84,80 +104,120 @@ function httpsPost(
         agent,
       };
 
-      const req = https.request(options, (res) => {
+      const request = https.request(options, (res) => {
         let data = "";
         res.on("data", (chunk) => (data += chunk));
-        res.on("end", () => resolve(data));
+        res.on("end", () => finish(null, data));
+      });
+      req = request;
+
+      request.setTimeout(timeoutMs, () => {
+        request.destroy();
+        finish(new Error(`Fire Kirin API connection timed out after ${timeoutMs / 1000}s`));
       });
 
-      req.on("timeout", () => {
-        req.destroy();
-        reject(new Error(`Fire Kirin API connection timed out after ${timeoutMs / 1000}s`));
-      });
-
-      req.on("error", (e) => reject(e));
-      req.end();
+      request.on("error", (e: Error) => finish(e));
+      request.end();
     } catch (err) {
-      reject(err);
+      finish(err instanceof Error ? err : new Error(String(err)));
     }
   });
+}
+
+let lastFireKirinStamp = 0;
+let fireKirinQueue: Promise<void> = Promise.resolve();
+
+/** One Fire Kirin login at a time. A second login replaces the agent key. */
+export function enqueueFireKirin<T>(task: () => Promise<T>): Promise<T> {
+  const run = fireKirinQueue.then(task, task);
+  fireKirinQueue = run.then(
+    () => undefined,
+    () => undefined
+  );
+  return run;
+}
+
+/** Each successful Fire Kirin call burns its timestamp. The next call waits for a new second. */
+async function nextFireKirinStamp(): Promise<string> {
+  let now = Math.floor(Date.now() / 1000);
+  if (now <= lastFireKirinStamp) {
+    const waitMs = (lastFireKirinStamp + 1) * 1000 - Date.now() + 50;
+    await new Promise((resolve) => setTimeout(resolve, Math.max(waitMs, 50)));
+    now = Math.floor(Date.now() / 1000);
+  }
+  if (now <= lastFireKirinStamp) now = lastFireKirinStamp + 1;
+  lastFireKirinStamp = now;
+  return String(now);
+}
+
+function transportFailure(err: unknown): boolean {
+  const message = err instanceof Error ? err.message : String(err);
+  return /timed out|unreachable|ECONN|ENOTFOUND|EAI_AGAIN|socket|network/i.test(message);
 }
 
 export class FireKirinApiClient {
   private apiUrl: string;
   private agentName: string;
   private agentPasswdHash: string;
-  private proxyUrl?: string;
+  private fallbackProxy?: string;
+  private useProxy = false;
+  private session: FireKirinSession | null = null;
   public lastAgentBalance: number = 0;
 
   constructor(config: FireKirinConfig = {}) {
-    this.apiUrl = (
-      config.apiUrl ||
-      process.env.FIREKIRIN_API_URL ||
-      "https://52.41.26.140:8034/ws/service.ashx"
-    ).trim();
+    this.apiUrl = OFFICIAL_API_URL;
 
-    this.agentName = (
-      config.agentName ||
-      process.env.FIREKIRIN_AGENT_USERNAME ||
-      ""
-    ).trim();
+    this.agentName = (config.agentName || process.env.FIREKIRIN_AGENT_USERNAME || "").trim();
 
-    const rawPass =
-      config.agentPassword ||
-      process.env.FIREKIRIN_AGENT_PASSWORD ||
-      "";
-
+    const rawPass = config.agentPassword || process.env.FIREKIRIN_AGENT_PASSWORD || "";
     this.agentPasswdHash = md5(rawPass.trim());
 
     if (config.proxyUrl === null) {
-      this.proxyUrl = undefined;
+      this.fallbackProxy = undefined;
     } else {
-      this.proxyUrl = (
-        config.proxyUrl ||
-        process.env.FIREKIRIN_PROXY_URL ||
-        process.env.GAMEVAULT_PROXY_URL ||
-        ""
-      ).trim() || undefined;
+      this.fallbackProxy = (config.proxyUrl || process.env.FIREKIRIN_PROXY_URL || "").trim() || undefined;
     }
   }
 
-  private async request(url: string): Promise<any> {
-    const text = await httpsPost(url, "firekirin.xyz", this.proxyUrl);
+  get name(): string {
+    return this.agentName;
+  }
+
+  private stamp(): Promise<string> {
+    return nextFireKirinStamp();
+  }
+
+  private async readJson(url: string, proxyUrl?: string): Promise<any> {
+    const text = await httpsPost(url, "firekirin.xyz", proxyUrl);
     const trimmed = text.trim();
     if (!trimmed || trimmed.startsWith("<") || /bad gateway/i.test(trimmed)) {
-      const hint = this.proxyUrl
-        ? "Proxy cannot reach Fire Kirin on port 8034 (bad gateway). Ask your proxy provider to allow port 8034, or ask Fire Kirin support to confirm the Terminal API host is online."
-        : "Direct connection blocked — Fire Kirin requires a whitelisted egress IP (use FIREKIRIN_PROXY_URL).";
-      throw new Error(`Fire Kirin API unreachable: ${trimmed.slice(0, 120) || "empty response"}. ${hint}`);
+      throw new Error(`Fire Kirin API unreachable: ${trimmed.slice(0, 120) || "empty response"}.`);
     }
-    let json: any = {};
     try {
-      json = JSON.parse(trimmed);
+      return JSON.parse(trimmed);
     } catch {
       throw new Error(`Fire Kirin invalid JSON response: ${trimmed.slice(0, 200)}`);
     }
-    return json;
+  }
+
+  /** Direct to port 8033. The proxy is used only after that call fails to connect. */
+  private async request(url: string): Promise<any> {
+    if (!this.useProxy) {
+      try {
+        return await this.readJson(url);
+      } catch (err) {
+        if (!this.fallbackProxy || !transportFailure(err)) throw err;
+        this.useProxy = true;
+      }
+    }
+    return this.readJson(url, this.fallbackProxy);
+  }
+
+  private async loginAt(time: string): Promise<FireKirinLoginResponse> {
+    const loginUrl = `${this.apiUrl}?action=agentLogin&agentName=${encodeURIComponent(
+      this.agentName
+    )}&agentPasswd=${encodeURIComponent(this.agentPasswdHash)}&time=${time}`;
+    return this.request(loginUrl);
   }
 
   public async getAgentBalance(): Promise<number> {
@@ -165,35 +225,28 @@ export class FireKirinApiClient {
     return this.lastAgentBalance;
   }
 
+  /** One agentLogin for this client. Later actions use a new timestamp and this agentKey. */
   public async getValidSession(): Promise<FireKirinSession> {
-    const time = Date.now().toString();
-    const loginUrl = `${this.apiUrl}?action=agentLogin&agentName=${encodeURIComponent(
-      this.agentName
-    )}&agentPasswd=${encodeURIComponent(this.agentPasswdHash)}&time=${time}`;
+    if (this.session) return this.session;
 
-    console.log(
-      `[FireKirin API] agentLogin | agentName: "${this.agentName}" | proxy: ${this.proxyUrl ? "ENABLED" : "DIRECT"}`
-    );
-
-    const json: FireKirinLoginResponse = await this.request(loginUrl);
+    const time = await this.stamp();
+    const json = await this.loginAt(time);
     const agentKey = json.agentkey || json.agentKey;
-    const balance = json.balance ?? json.Balance;
-
-    console.log(
-      `[FireKirin API] agentLogin response | code: ${json.code} | balance: "${balance}" | agentKey: ${agentKey ? String(agentKey).slice(0, 6) + "..." : "NONE"}`
-    );
-
     if (String(json.code) !== "200" || !agentKey) {
-      const msg = json.msg || `code ${json.code}`;
-      throw new Error(`Fire Kirin agentLogin failed: ${msg}`);
+      throw new Error(`Fire Kirin agentLogin failed: ${json.msg || `code ${json.code}`}`);
     }
-
-    this.lastAgentBalance = parseFloat(String(balance || "0"));
-    return { agentKey: String(agentKey), time };
+    return this.rememberSession(json, String(agentKey), time);
   }
 
-  private createSignFromSession(session: FireKirinSession): { sign: string; time: string } {
-    const time = Date.now().toString();
+  private rememberSession(json: FireKirinLoginResponse, agentKey: string, time: string): FireKirinSession {
+    const balance = json.balance ?? json.Balance;
+    this.lastAgentBalance = parseFloat(String(balance || "0"));
+    this.session = { agentKey, time };
+    return this.session;
+  }
+
+  private async createSignFromSession(session: FireKirinSession): Promise<{ sign: string; time: string }> {
+    const time = await this.stamp();
     const rawSignStr = (this.agentName + time + session.agentKey).toLowerCase();
     const sign = md5(rawSignStr);
     return { sign, time };
@@ -204,8 +257,11 @@ export class FireKirinApiClient {
     pass: string,
     existingSession?: FireKirinSession
   ): Promise<{ account: string; pass: string; session: FireKirinSession }> {
+    if (account.trim().toLowerCase() === this.agentName.toLowerCase()) {
+      throw new Error("Fire Kirin registerUser refused: player account cannot be the agent login.");
+    }
     const session = existingSession || (await this.getValidSession());
-    const { sign, time } = this.createSignFromSession(session);
+    const { sign, time } = await this.createSignFromSession(session);
     const passHash = md5(pass);
 
     const url = `${this.apiUrl}?action=registerUser&account=${encodeURIComponent(
@@ -214,14 +270,9 @@ export class FireKirinApiClient {
       this.agentName
     )}&time=${time}&sign=${sign}`;
 
-    console.log(`[FireKirin API] registerUser for account: "${account}"`);
-
     const json = await this.request(url);
     if (String(json.code) !== "200") {
-      let errMsg = json.msg || `Registration failed with code ${json.code}`;
-      if (String(json.code) === "201" && /signature/i.test(errMsg)) {
-        errMsg = `${errMsg} (Check IP whitelist and agent store balance on Fire Kirin panel)`;
-      }
+      const errMsg = json.msg || `Registration failed with code ${json.code}`;
       throw new Error(`Fire Kirin registerUser error [code ${json.code}]: ${errMsg}`);
     }
 
@@ -233,7 +284,7 @@ export class FireKirinApiClient {
     existingSession?: FireKirinSession
   ): Promise<FireKirinQueryResponse> {
     const session = existingSession || (await this.getValidSession());
-    const { sign, time } = this.createSignFromSession(session);
+    const { sign, time } = await this.createSignFromSession(session);
 
     const url = `${this.apiUrl}?action=queryInfo&account=${encodeURIComponent(
       account
@@ -241,10 +292,7 @@ export class FireKirinApiClient {
 
     const json: FireKirinQueryResponse = await this.request(url);
     if (String(json.code) !== "200") {
-      let errMsg = json.msg || `Query failed with code ${json.code}`;
-      if (String(json.code) === "201") {
-        errMsg = `${errMsg} (Session timeout or signature error)`;
-      }
+      const errMsg = json.msg || `Query failed with code ${json.code}`;
       throw new Error(`Fire Kirin queryInfo error [code ${json.code}]: ${errMsg}`);
     }
 
@@ -257,15 +305,18 @@ export class FireKirinApiClient {
     existingSession?: FireKirinSession,
     transactionId?: string
   ): Promise<{ success: boolean; account: string; amount: number; transactionId: string }> {
+    if (!isWholeDollar(amount)) {
+      throw new Error("Fire Kirin recharge amount must be a whole dollar.");
+    }
+    const dollars = Math.trunc(amount);
     const session = existingSession || (await this.getValidSession());
-    const { sign, time } = this.createSignFromSession(session);
-    const txId = (transactionId || makeTransactionId()).slice(0, 20);
+    const { sign, time } = await this.createSignFromSession(session);
+    const txId = (transactionId || "").slice(0, 20);
+    const tx = txId ? `&transactionId=${encodeURIComponent(txId)}` : "";
 
     const url = `${this.apiUrl}?action=recharge&account=${encodeURIComponent(
       account
-    )}&amount=${Math.floor(amount)}&transactionId=${encodeURIComponent(txId)}&agentName=${encodeURIComponent(
-      this.agentName
-    )}&time=${time}&sign=${sign}`;
+    )}&amount=${dollars}${tx}&agentName=${encodeURIComponent(this.agentName)}&time=${time}&sign=${sign}`;
 
     const json = await this.request(url);
     if (String(json.code) !== "200") {
@@ -273,7 +324,7 @@ export class FireKirinApiClient {
       throw new Error(`Fire Kirin recharge error [code ${json.code}]: ${errMsg}`);
     }
 
-    return { success: true, account, amount, transactionId: txId };
+    return { success: true, account, amount: dollars, transactionId: txId };
   }
 
   public async withdrawPlayer(
@@ -282,15 +333,18 @@ export class FireKirinApiClient {
     existingSession?: FireKirinSession,
     transactionId?: string
   ): Promise<{ success: boolean; account: string; amount: number; transactionId: string }> {
+    if (!isWholeDollar(amount)) {
+      throw new Error("Fire Kirin redeem amount must be a whole dollar.");
+    }
+    const dollars = Math.trunc(amount);
     const session = existingSession || (await this.getValidSession());
-    const { sign, time } = this.createSignFromSession(session);
-    const txId = (transactionId || makeTransactionId()).slice(0, 20);
+    const { sign, time } = await this.createSignFromSession(session);
+    const txId = (transactionId || "").slice(0, 20);
+    const tx = txId ? `&transactionId=${encodeURIComponent(txId)}` : "";
 
     const url = `${this.apiUrl}?action=redeem&account=${encodeURIComponent(
       account
-    )}&amount=${Math.floor(amount)}&transactionId=${encodeURIComponent(txId)}&agentName=${encodeURIComponent(
-      this.agentName
-    )}&time=${time}&sign=${sign}`;
+    )}&amount=${dollars}${tx}&agentName=${encodeURIComponent(this.agentName)}&time=${time}&sign=${sign}`;
 
     const json = await this.request(url);
     if (String(json.code) !== "200") {
@@ -298,12 +352,12 @@ export class FireKirinApiClient {
       throw new Error(`Fire Kirin redeem error [code ${json.code}]: ${errMsg}`);
     }
 
-    return { success: true, account, amount, transactionId: txId };
+    return { success: true, account, amount: dollars, transactionId: txId };
   }
 
   public async kickPlayerOut(account: string, existingSession?: FireKirinSession): Promise<void> {
     const session = existingSession || (await this.getValidSession());
-    const { sign, time } = this.createSignFromSession(session);
+    const { sign, time } = await this.createSignFromSession(session);
 
     const url = `${this.apiUrl}?action=kickPlayerOut&account=${encodeURIComponent(
       account

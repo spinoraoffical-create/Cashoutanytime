@@ -46,17 +46,27 @@ export async function sendMessageClient(
     return { error: `${error.message}${hint}` };
   }
 
-  void fetch("/api/chat/after-send", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({
-      conversationId,
-      content: content.trim(),
-      attachmentType: attachment?.type ?? null,
-      kind,
-    }),
-    keepalive: true,
-  }).catch(() => {});
+  try {
+    const res = await fetch("/api/chat/after-send", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        conversationId,
+        content: content.trim(),
+        attachmentType: attachment?.type ?? null,
+        kind,
+      }),
+    });
+    if (!res.ok) {
+      const payload = (await res.json().catch(() => null)) as { error?: string } | null;
+      return {
+        message: data as Message,
+        error: payload?.error || "The reply could not be saved.",
+      };
+    }
+  } catch {
+    return { message: data as Message, error: "The reply could not be saved." };
+  }
 
   return { message: data as Message };
 }

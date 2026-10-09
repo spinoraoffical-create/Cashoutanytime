@@ -1,3 +1,4 @@
+import { createUntilAccepted } from "./account-username";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { formatGameAutomationError } from "./error-formatter";
 import {
@@ -128,7 +129,7 @@ export async function autoFulfillGameVaultRequest(
     requestedUsername?: string | null;
     requestedPassword?: string | null;
   }
-): Promise<{ success: boolean; error?: string }> {
+): Promise<{ success: boolean; error?: string; username?: string; password?: string; redeemedAmount?: number }> {
   if (!isGameVaultApiConfigured()) {
     return { success: false, error: "Game Vault API credentials not configured." };
   }
@@ -143,12 +144,14 @@ export async function autoFulfillGameVaultRequest(
       if (cleanUser.length < 4) return { success: false, error: "Account not found" };
       const username = cleanUser;
       const password = input.requestedPassword || `Pass${Math.floor(1000 + Math.random() * 9000)}`;
-      const created = await createGameVaultAccount({ username, password });
+      const opened = await createUntilAccepted(username, "game-vault", (name) =>
+        createGameVaultAccount({ username: name, password })
+      );
+      const created = opened.value;
 
       await admin
         .from("game_load_requests")
         .update({
-          status: "completed",
           game_username: created.account,
           game_password: created.password,
           admin_notes: created.userId,
@@ -167,7 +170,7 @@ export async function autoFulfillGameVaultRequest(
         });
       } catch (e) {}
 
-      return { success: true };
+      return { success: true, username: created.account, password: created.password };
     }
 
     if (loadType === "check_balance") {
@@ -180,7 +183,6 @@ export async function autoFulfillGameVaultRequest(
       await admin
         .from("game_load_requests")
         .update({
-          status: "completed",
           amount: scoreInfo.balance,
           admin_notes: `Balance: $${scoreInfo.balance.toFixed(2)}`,
           completed_at: new Date().toISOString(),
@@ -188,7 +190,7 @@ export async function autoFulfillGameVaultRequest(
         })
         .eq("id", requestId);
 
-      return { success: true };
+      return { success: true, redeemedAmount: scoreInfo.balance };
     }
 
     if (loadType === "load" || loadType === "reload") {
@@ -203,7 +205,6 @@ export async function autoFulfillGameVaultRequest(
       await admin
         .from("game_load_requests")
         .update({
-          status: "completed",
           completed_at: new Date().toISOString(),
           updated_at: new Date().toISOString(),
         })
@@ -224,13 +225,12 @@ export async function autoFulfillGameVaultRequest(
       await admin
         .from("game_load_requests")
         .update({
-          status: "completed",
           completed_at: new Date().toISOString(),
           updated_at: new Date().toISOString(),
         })
         .eq("id", requestId);
 
-      return { success: true };
+      return { success: true, redeemedAmount: amount };
     }
 
     return { success: false, error: `Unknown load type: ${loadType}` };
@@ -246,7 +246,6 @@ export async function autoFulfillGameVaultRequest(
     await admin
       .from("game_load_requests")
       .update({
-        status: "failed",
         error_message: userError,
         updated_at: new Date().toISOString(),
       })

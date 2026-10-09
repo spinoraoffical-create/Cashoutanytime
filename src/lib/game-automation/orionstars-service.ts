@@ -55,8 +55,7 @@ export async function autoFulfillOrionStarsRequest(
       if (admin && requestId) {
         await admin
           .from("game_load_requests")
-          .update({
-            status: "completed",
+          .update({
             game_username: created.account,
             game_password: created.pass,
             completed_at: new Date().toISOString(),
@@ -88,8 +87,7 @@ export async function autoFulfillOrionStarsRequest(
       if (admin && requestId) {
         await admin
           .from("game_load_requests")
-          .update({
-            status: "completed",
+          .update({
             amount: userBalance,
             admin_notes: `Balance: $${userBalance.toFixed(2)}`,
             completed_at: new Date().toISOString(),
@@ -123,8 +121,7 @@ export async function autoFulfillOrionStarsRequest(
       if (admin && requestId) {
         await admin
           .from("game_load_requests")
-          .update({
-            status: "completed",
+          .update({
             completed_at: new Date().toISOString(),
             updated_at: new Date().toISOString(),
           })
@@ -154,8 +151,7 @@ export async function autoFulfillOrionStarsRequest(
       if (admin && requestId) {
         await admin
           .from("game_load_requests")
-          .update({
-            status: "completed",
+          .update({
             completed_at: new Date().toISOString(),
             updated_at: new Date().toISOString(),
           })
@@ -184,8 +180,7 @@ export async function autoFulfillOrionStarsRequest(
 
       await admin
         .from("game_load_requests")
-        .update({
-          status: "failed",
+        .update({
           error_message: err.message || "Orion Stars provider operation failed",
           updated_at: new Date().toISOString(),
         })

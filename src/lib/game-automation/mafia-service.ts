@@ -1,3 +1,4 @@
+import { createUntilAccepted } from "./account-username";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { formatGameAutomationError } from "./error-formatter";
 import { MafiaApiClient, isMafiaApiConfigured } from "./mafia-api";
@@ -97,7 +98,7 @@ export async function autoFulfillMafiaRequest(
     requestedUsername?: string | null;
     requestedPassword?: string | null;
   }
-): Promise<{ success: boolean; error?: string }> {
+): Promise<{ success: boolean; error?: string; username?: string; password?: string; redeemedAmount?: number }> {
   if (!isMafiaApiConfigured()) {
     return { success: false, error: "Mafia API credentials not configured." };
   }
@@ -114,12 +115,12 @@ export async function autoFulfillMafiaRequest(
       if (!username) return { success: false, error: "Account not found" };
       const password = input.requestedPassword || "123123";
 
-      const created = await client.createAccount(username, password);
+      const opened = await createUntilAccepted(username, "mafia", (name) => client.createAccount(name, password));
+      const created = opened.value;
 
       await admin
         .from("game_load_requests")
         .update({
-          status: "completed",
           game_username: created.account,
           game_password: created.pass,
           completed_at: new Date().toISOString(),
@@ -127,7 +128,7 @@ export async function autoFulfillMafiaRequest(
         })
         .eq("id", requestId);
 
-      return { success: true };
+      return { success: true, username: created.account, password: created.pass };
     }
 
     // 2. Check balance
@@ -136,12 +137,12 @@ export async function autoFulfillMafiaRequest(
       if (!username) throw new Error("Game username missing");
 
       const player = await client.findPlayerByAccount(username);
-      const balance = player ? player.score || 0 : 0;
+      if (!player) throw new Error("Account not found");
+      const balance = player.score || 0;
 
       await admin
         .from("game_load_requests")
         .update({
-          status: "completed",
           amount: balance,
           admin_notes: `Balance: $${balance.toFixed(2)}`,
           completed_at: new Date().toISOString(),
@@ -149,7 +150,7 @@ export async function autoFulfillMafiaRequest(
         })
         .eq("id", requestId);
 
-      return { success: true };
+      return { success: true, redeemedAmount: balance };
     }
 
     // 3. Load / Reload
@@ -163,7 +164,6 @@ export async function autoFulfillMafiaRequest(
       await admin
         .from("game_load_requests")
         .update({
-          status: "completed",
           completed_at: new Date().toISOString(),
           updated_at: new Date().toISOString(),
         })
@@ -183,13 +183,12 @@ export async function autoFulfillMafiaRequest(
       await admin
         .from("game_load_requests")
         .update({
-          status: "completed",
           completed_at: new Date().toISOString(),
           updated_at: new Date().toISOString(),
         })
         .eq("id", requestId);
 
-      return { success: true };
+      return { success: true, redeemedAmount: amount };
     }
 
     return { success: false, error: `Unknown load type: ${loadType}` };
@@ -205,7 +204,6 @@ export async function autoFulfillMafiaRequest(
     await admin
       .from("game_load_requests")
       .update({
-        status: "failed",
         error_message: userError,
         updated_at: new Date().toISOString(),
       })

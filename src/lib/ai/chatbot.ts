@@ -4,6 +4,7 @@ import {
   getBotSenderProfileId,
   personalityPrompt,
 } from "@/lib/ai/settings";
+import { asksForPerson, CHAT_FALLBACK_REPLY } from "@/lib/ai/escalate";
 
 export interface AIChatBotResponse {
   response: string;
@@ -82,7 +83,6 @@ export async function processAIChatQuery(
   }
 
   const queryLower = userQuery.toLowerCase().trim();
-  const threshold = Number(settings.human_handover_threshold) || 0.6;
 
   let bestMatch: { answer: string; confidence: number } | null = null;
   for (const item of PLATFORM_KNOWLEDGE) {
@@ -100,12 +100,7 @@ export async function processAIChatQuery(
 
   let botResponse = bestMatch?.answer || "";
   let confidenceScore = bestMatch?.confidence || 0.6;
-  let shouldEscalateToHuman =
-    confidenceScore < threshold ||
-    queryLower.includes("agent") ||
-    queryLower.includes("human") ||
-    queryLower.includes("person") ||
-    queryLower.includes("manager");
+  let modelFailed = false;
 
   if (apiKey && settings.auto_reply_enabled && (userId || !bestMatch || bestMatch.confidence < 0.92)) {
     try {
@@ -176,7 +171,6 @@ export async function processAIChatQuery(
           if (text) {
             botResponse = text;
             confidenceScore = 0.88;
-            shouldEscalateToHuman = false;
           }
         }
       } else {
@@ -205,26 +199,21 @@ export async function processAIChatQuery(
           if (text) {
             botResponse = text;
             confidenceScore = 0.88;
-            shouldEscalateToHuman = false;
           }
         }
       }
     } catch (error) {
       console.error("[AIChatBot] LLM error:", error);
+      modelFailed = true;
     }
   }
 
   if (!botResponse) {
-    botResponse = `Hello! I am ${settings.bot_name}. I can help with Game Requests, Deposits, Cashouts, and VIP Rewards. Reply with "agent" to reach a human.`;
+    botResponse = CHAT_FALLBACK_REPLY;
     confidenceScore = 0.7;
   }
 
-  shouldEscalateToHuman =
-    shouldEscalateToHuman ||
-    confidenceScore < threshold ||
-    queryLower.includes("agent") ||
-    queryLower.includes("human") ||
-    queryLower.includes("person");
+  const shouldEscalateToHuman = asksForPerson(queryLower) || modelFailed;
 
   const db = createAdminClient();
   if (db) {

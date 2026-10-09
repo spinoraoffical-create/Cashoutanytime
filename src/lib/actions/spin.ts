@@ -13,6 +13,7 @@ import {
   type GlobalSpinStats,
 } from "@/lib/spin/prize-engine";
 import { creditCurrentWallet } from "@/lib/wallet/service-mutate";
+import { createAdminClient } from "@/lib/supabase/admin";
 import { assertFreeplayAllowed } from "@/lib/actions/security";
 import { DAILY_SPIN_ENABLED } from "@/lib/constants";
 
@@ -36,6 +37,14 @@ export interface SpinStatus {
   usedToday: number;
   remaining: number;
   nextFreeSpinMs: number | null;
+}
+
+async function addVipPoints(userId: string, points: number) {
+  const admin = createAdminClient();
+  if (!admin || points <= 0) return;
+  const { data } = await admin.from("profiles").select("vip_points").eq("id", userId).maybeSingle();
+  const current = Number((data as { vip_points?: number } | null)?.vip_points ?? 0);
+  await admin.from("profiles").update({ vip_points: current + points }).eq("id", userId);
 }
 
 function msUntilNextSpin(recentSpinTimes: string[], dailyLimit: number): number | null {
@@ -171,34 +180,24 @@ export async function spinWheel(): Promise<SpinResult> {
   const globalStats = await getGlobalSpinStats();
   const { prize, index } = resolveSpinPrize(globalStats);
 
-  const { error } = await supabase.from("wheel_spins").insert({
-    user_id: user.id,
-    prize_label: prize.label,
-    prize_type: prize.type,
-    prize_value: prize.value,
+  const { error } = await supabase.rpc("record_wheel_spin", {
+    p_prize_label: prize.label,
+    p_prize_type: prize.type,
+    p_prize_value: prize.value,
   });
 
   if (error) {
     const msg = error.message ?? String(error);
     console.error("[spinWheel] wheel_spins insert failed:", msg, error.code, error.details);
-
+    if (/no spins left/i.test(msg)) {
+      return { error: "No spins left. Your next free spin unlocks in about 24 hours." };
+    }
     return { error: "The wheel is unavailable right now. Try again later." };
   }
 
   if (prize.type === "cash" && prize.value > 0) {
     const pointsToAdd = prize.value * 10;
-    const { data: profile } = await supabase
-      .from("profiles")
-      .select("vip_points")
-      .eq("id", user.id)
-      .single();
-
-    if (profile) {
-      await supabase
-        .from("profiles")
-        .update({ vip_points: profile.vip_points + pointsToAdd })
-        .eq("id", user.id);
-    }
+    await addVipPoints(user.id, pointsToAdd);
 
     const credited = await creditCurrentWallet(
       user.id,
@@ -219,18 +218,7 @@ export async function spinWheel(): Promise<SpinResult> {
       "success"
     );
   } else if (prize.type === "points" && prize.value > 0) {
-    const { data: profile } = await supabase
-      .from("profiles")
-      .select("vip_points")
-      .eq("id", user.id)
-      .single();
-
-    if (profile) {
-      await supabase
-        .from("profiles")
-        .update({ vip_points: profile.vip_points + prize.value })
-        .eq("id", user.id);
-    }
+    await addVipPoints(user.id, prize.value);
 
     await createNotification(
       user.id,

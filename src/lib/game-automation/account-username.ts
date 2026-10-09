@@ -103,3 +103,36 @@ export function validateCustomGameAccountCredentials(
 
   return { ok: true, username: normalizedUsername, password: normalizedPassword };
 }
+
+/** A new 7–13 character login so Replace does not reuse a name the game already has. */
+export function freshAccountName(current: string, gameSlug = ""): string {
+  const max = maxUsernameLenForGame(gameSlug);
+  const alnum = current.toLowerCase().replace(/[^a-z0-9]/g, "");
+  const headLen = Math.max(3, Math.min(alnum.length || 6, max - 4));
+  const head = (alnum || "player").slice(0, headLen);
+  const need = Math.min(4, max - head.length);
+  return `${head}${randomDigitSuffix(need)}`.slice(0, max);
+}
+
+export function isAccountTakenError(message: string): boolean {
+  return /already exists|already exist|already taken|code 20\b|已存在|duplicate account|name is exist|account exist/i.test(message);
+}
+
+export async function createUntilAccepted<T>(
+  username: string,
+  gameSlug: string,
+  create: (name: string) => Promise<T>
+): Promise<{ value: T; username: string }> {
+  let name = username.trim();
+  for (let attempt = 0; attempt < 4; attempt += 1) {
+    try {
+      const value = await create(name);
+      return { value, username: name };
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      if (!isAccountTakenError(message) || attempt === 3) throw error;
+      name = freshAccountName(name, gameSlug);
+    }
+  }
+  throw new Error("That username is already taken. Try again.");
+}

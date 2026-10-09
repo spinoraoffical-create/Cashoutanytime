@@ -193,7 +193,11 @@ export class GameroomApiClient {
     const res = await this.request<GameroomLoginResponse>("/api/agent/login", { method: "POST", body }, false);
 
     if (!res.data?.token) {
-      throw new Error(res.message || "Store login failed: no token returned");
+      const message = res.message || "Store login failed: no token returned";
+      if (/password can only be letters and numbers/i.test(message)) {
+        throw new Error("Gameroom agent password must be 6–12 letters and numbers.");
+      }
+      throw new Error(message);
     }
 
     this.token = res.data.token;

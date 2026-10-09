@@ -166,28 +166,64 @@ export async function updateChatbotSettings(
   return error ? { ok: false, error: aiTableError(error.message) } : { ok: true };
 }
 
-/** Profile ID used as sender for AI bot messages in conversations. */
+const BOT_USERNAME = "support-bot";
+const BOT_EMAIL = "support-bot@users.cashoutanytime.invalid";
+
+/** Dedicated support-bot profile. Never a random admin and never the player. */
 export async function getBotSenderProfileId(): Promise<string | null> {
-  if (process.env.SPINORA_BOT_SENDER_ID?.trim()) {
-    return process.env.SPINORA_BOT_SENDER_ID.trim();
-  }
-  if (botSenderCache !== undefined) return botSenderCache;
+  const fromEnv = process.env.SPINORA_BOT_SENDER_ID?.trim();
+  if (fromEnv) return fromEnv;
+  if (botSenderCache) return botSenderCache;
 
   const db = createAdminClient();
-  if (!db) {
-    botSenderCache = null;
-    return null;
-  }
+  if (!db) return null;
 
-  const { data } = await db
+  const { data: existing } = await db
     .from("profiles")
     .select("id")
-    .eq("role", "admin")
-    .limit(1)
-    .maybeSingle();
+    .eq("username", BOT_USERNAME)
+    .limit(1);
+  const found = (existing as { id: string }[] | null)?.[0]?.id;
+  if (found) {
+    botSenderCache = found;
+    return found;
+  }
 
-  botSenderCache = data?.id ?? null;
-  return botSenderCache ?? null;
+  const settings = await getChatbotSettings();
+  const { data: created, error } = await db.auth.admin.createUser({
+    email: BOT_EMAIL,
+    password: `${crypto.randomUUID()}Aa1!`,
+    email_confirm: true,
+    user_metadata: {
+      username: BOT_USERNAME,
+      display_name: settings.bot_name,
+    },
+  });
+  const createdId = created.user?.id;
+  if (!createdId) {
+    console.error("[chat] support-bot create:", error?.message);
+    const { data: again } = await db.from("profiles").select("id").eq("username", BOT_USERNAME).limit(1);
+    const recovered = (again as { id: string }[] | null)?.[0]?.id ?? null;
+    if (recovered) botSenderCache = recovered;
+    return recovered;
+  }
+
+  await db
+    .from("profiles")
+    .update({
+      username: BOT_USERNAME,
+      display_name: settings.bot_name,
+      full_name: settings.bot_name,
+      email: BOT_EMAIL,
+      role: "customer",
+    })
+    .eq("id", createdId);
+
+  const { data: saved } = await db.from("profiles").select("id").eq("id", createdId).limit(1);
+  const savedId = (saved as { id: string }[] | null)?.[0]?.id ?? null;
+  if (!savedId) return null;
+  botSenderCache = savedId;
+  return savedId;
 }
 
 export function personalityPrompt(personality: ChatbotAiSettings["personality"]): string {

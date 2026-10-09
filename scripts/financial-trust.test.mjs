@@ -62,7 +62,8 @@ assert.equal(webhook.includes("saved.user_id || userId"), false);
 
 const settle = readFileSync(new URL("../src/lib/payments/auto-settle.ts", import.meta.url), "utf8");
 assert.equal(settle.includes("userId.slice(0, 8)"), false);
-assert.match(settle, /bonusForPercent\(savedBase, percent\)/);
+assert.match(settle, /bonusForPercent\(paidBase, percent\)/);
+assert.match(settle, /Math.min\(savedBase/);
 assert.equal(settle.includes("row.promo_code || input.promoCode"), false);
 assert.match(settle, /promoCode: row\.promo_code/);
 

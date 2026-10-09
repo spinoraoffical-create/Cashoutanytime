@@ -41,6 +41,7 @@ export const AUTOMATED_GAME_SLUGS = [
   "orion-stars",
   "milky-way",
   "fire-kirin",
+  "vblink",
 ] as const;
 export type AutomatedGameSlug = (typeof AUTOMATED_GAME_SLUGS)[number];
 

@@ -201,34 +201,40 @@ export class CashFrenzyApiClient {
     return this.token;
   }
 
-  async getPlayerList(limit: number = 50, page: number = 1): Promise<CashFrenzyPlayerListResponse> {
-    const params = new URLSearchParams({ limit: String(limit), page: String(page) });
+  async getPlayerList(
+    limit: number = 50,
+    page: number = 1,
+    extra: Record<string, string> = {}
+  ): Promise<CashFrenzyPlayerListResponse> {
+    const params = new URLSearchParams({
+      limit: String(limit),
+      page: String(page),
+      ...extra,
+    });
     return this.request<CashFrenzyPlayerListResponse>(`/api/player/playerList?${params.toString()}`);
   }
 
   async findPlayerByAccount(accountOrId: string | number): Promise<CashFrenzyPlayer | null> {
-    const target = String(accountOrId).trim().toLowerCase();
-    let listRes = await this.getPlayerList(100, 1);
-    let match = listRes.data?.find((p) => p.Account.toLowerCase() === target || String(p.id) === target);
-    if (match) return match;
-
-    const totalCount = listRes.count || 0;
-    const maxPages = Math.ceil(totalCount / 100);
-    for (let p = 2; p <= Math.min(maxPages, 10); p++) {
-      listRes = await this.getPlayerList(100, p);
-      match = listRes.data?.find((player) => player.Account.toLowerCase() === target || String(player.id) === target);
-      if (match) return match;
+    try {
+      const id = await this.resolvePlayerId(accountOrId);
+      return { id: Number(id), Account: String(accountOrId) } as CashFrenzyPlayer;
+    } catch {
+      return null;
     }
-
-    return null;
   }
 
   async resolvePlayerId(accountOrId: string | number): Promise<string> {
-    const strVal = String(accountOrId).trim();
-    const player = await this.findPlayerByAccount(strVal);
-    if (player) return String(player.id);
-    if (/^\d+$/.test(strVal)) return strVal;
-    throw new Error(`Player '${strVal}' not found on CashFrenzy agent account.`);
+    const { resolveLayuiPlayerId } = await import("./layui-player-resolve");
+    return resolveLayuiPlayerId({
+      agentKey: "cashfrenzy",
+      accountOrId,
+      fetchList: async (params) => {
+        const limit = Number(params.limit || 20);
+        const page = Number(params.page || 1);
+        const { limit: _limit, page: _page, ...extra } = params;
+        return this.getPlayerList(limit, page, extra);
+      },
+    });
   }
 
   async addPlayer(

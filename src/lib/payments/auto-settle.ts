@@ -5,6 +5,7 @@ import { writeAudit } from "@/lib/actions/admin/core";
 import { fulfillTrackedRequest } from "@/lib/actions/game-loads";
 import { assignPlayerToAgentByCode } from "@/lib/agents/assign";
 import { bonusForPercent, depositKind } from "@/lib/payments/bonus-math";
+import { ensureGameAccountUsername, generateGamePassword } from "@/lib/game-automation/account-username";
 import { isJuwaApiConfigured } from "@/lib/game-automation/juwa-api";
 import { isVegasApiConfigured } from "@/lib/game-automation/vegas-api";
 import { isCashMachineApiConfigured } from "@/lib/game-automation/cashmachine-service";
@@ -16,6 +17,7 @@ import { isMafiaApiConfigured } from "@/lib/game-automation/mafia-api";
 import { isOrionStarsApiConfigured } from "@/lib/game-automation/orionstars-api";
 import { isMilkyWayApiConfigured } from "@/lib/game-automation/milkyway-api";
 import { isFireKirinApiConfigured } from "@/lib/game-automation/firekirin-api";
+import { isVblinkApiConfigured } from "@/lib/game-automation/vblink-service";
 
 type Admin = NonNullable<ReturnType<typeof createAdminClient>>;
 
@@ -73,6 +75,8 @@ function apiReady(slug: string) {
       return isMilkyWayApiConfigured();
     case "fire-kirin":
       return isFireKirinApiConfigured();
+    case "vblink":
+      return isVblinkApiConfigured();
     default:
       return false;
   }
@@ -215,7 +219,9 @@ export async function quotePaidDeposit(
   if (!Number.isFinite(percent)) {
     throw new PaymentIdentityError("Apply supabase/migrations/20261008000130_auto_ops.sql before crediting deposits.");
   }
-  const priced = bonusForPercent(savedBase, percent);
+  const offered = Number(input.baseAmount);
+  const paidBase = Math.min(savedBase, Number.isFinite(offered) && offered > 0 ? offered : savedBase);
+  const priced = bonusForPercent(paidBase, percent);
   const quote: DepositQuote = {
     gameSlug,
     gameName: stored.name || row.game_name,
@@ -234,7 +240,7 @@ export async function quotePaidDeposit(
     gameSlug: locked.game_slug,
     gameName: locked.game_name,
     promoCode: locked.promo_code,
-    baseAmount: Number(locked.base_amount ?? priced.base),
+    baseAmount: priced.base,
     bonusPercent: Number(locked.bonus_percent ?? 0),
     bonusAmount: Number(locked.bonus_amount ?? 0),
     finalCredit: Number(locked.final_credit),
@@ -386,27 +392,65 @@ async function loadGameOnce(
     username = (account as { game_username?: string } | null)?.game_username ?? null;
   }
   if (!username) {
-    const sourceKey = `auto:${input.depositId}`;
-    const { error: insertError } = await admin.from("game_load_requests").insert({
-      user_id: input.userId,
-      game_slug: input.quote.gameSlug,
-      game_name: input.quote.gameName || input.quote.gameSlug,
-      amount: input.quote.finalCredit,
-      wallet_type: "current",
-      load_type: "reload",
-      status: "failed",
-      source_key: sourceKey,
-      wallet_refunded: true,
-      error_message: "Account not found",
-      admin_notes: "No game account for this player. The wallet credit was not sent to a game.",
-    });
-    if (insertError && !/duplicate|unique/i.test(insertError.message)) throw migrationError(insertError);
-    await admin
-      .from("deposit_bonus_ledger")
-      .update({ game_load_status: "failed", game_load_error: "Account not found" })
-      .eq("deposit_key", input.depositId)
-      .in("game_load_status", ["pending", "failed"]);
-    return;
+    const { data: profile } = await admin.from("profiles").select("username").eq("id", input.userId).maybeSingle();
+    const stem = (profile as { username?: string | null } | null)?.username || "player";
+    const generated = ensureGameAccountUsername(stem, input.quote.gameSlug);
+    const password = generateGamePassword();
+    const accountKey = `auto-account:${input.depositId}`;
+    const { data: createdRows, error: createError } = await admin
+      .from("game_load_requests")
+      .insert({
+        user_id: input.userId,
+        game_slug: input.quote.gameSlug,
+        game_name: input.quote.gameName || input.quote.gameSlug,
+        amount: 0,
+        wallet_type: "current",
+        load_type: "create_account",
+        game_username: generated,
+        game_password: password,
+        status: "pending",
+        source_key: accountKey,
+        admin_notes: "Automatic account create before deposit load",
+      })
+      .select("id")
+      .limit(1);
+    let createId = (createdRows as { id: string }[] | null)?.[0]?.id ?? null;
+    if (!createId && createError && /duplicate|unique/i.test(createError.message)) {
+      const { data: existingRows } = await admin
+        .from("game_load_requests")
+        .select("id")
+        .eq("source_key", accountKey)
+        .limit(1);
+      createId = (existingRows as { id: string }[] | null)?.[0]?.id ?? null;
+    } else if (createError) {
+      throw migrationError(createError);
+    }
+    if (!createId) {
+      await admin
+        .from("deposit_bonus_ledger")
+        .update({ game_load_status: "failed", game_load_error: "Could not open a game account." })
+        .eq("deposit_key", input.depositId);
+      return;
+    }
+    const opened = await fulfillTrackedRequest(createId);
+    if (!opened.success) {
+      await admin
+        .from("deposit_bonus_ledger")
+        .update({ game_load_status: "failed", game_load_error: opened.error || "Could not open a game account." })
+        .eq("deposit_key", input.depositId);
+      return;
+    }
+    if (gameId) {
+      const { data: account } = await admin
+        .from("game_accounts")
+        .select("game_username")
+        .eq("user_id", input.userId)
+        .eq("game_id", gameId)
+        .maybeSingle();
+      username = (account as { game_username?: string } | null)?.game_username ?? generated;
+    } else {
+      username = generated;
+    }
   }
 
   const sourceKey = `auto:${input.depositId}`;

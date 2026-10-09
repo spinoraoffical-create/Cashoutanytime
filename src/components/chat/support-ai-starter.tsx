@@ -4,6 +4,9 @@ import { useState } from "react";
 import { Loader2, Send } from "lucide-react";
 import { toast } from "sonner";
 import { SITE_NAME } from "@/lib/constants";
+import { createClient } from "@/lib/supabase/client";
+import { ensureUserConversation } from "@/lib/actions/messages";
+import { sendMessageClient } from "@/lib/chat/send-message-client";
 
 const TOPICS = [
   { id: "payment", label: "Payment status", message: "I need help with my payment status." },
@@ -23,26 +26,33 @@ export function SupportAiStarter({
 }) {
   const [draft, setDraft] = useState("");
   const [sending, setSending] = useState(false);
-  const [reply, setReply] = useState<string | null>(null);
 
-  async function send(text: string, requestHuman = false) {
+  async function send(text: string) {
     const message = text.trim();
     if (!message || sending) return;
     setSending(true);
-    setReply(null);
     try {
-      const res = await fetch("/api/chat/live-bot", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ message, userId, requestHuman }),
+      const opened = await ensureUserConversation();
+      if ("error" in opened) {
+        toast.error(opened.error || "Could not open chat. Try again.");
+        return;
+      }
+      const supabase = createClient();
+      if (!supabase) {
+        toast.error("Could not open chat. Try again.");
+        return;
+      }
+      const result = await sendMessageClient(supabase, {
+        conversationId: opened.conversationId,
+        senderId: userId,
+        content: message,
+        kind: "user",
       });
-      const data = await res.json();
-      if (!res.ok || data.error) {
-        toast.error("Support is temporarily unavailable. Please try again later.");
+      if (result.error) {
+        toast.error(result.error);
         return;
       }
       setDraft("");
-      setReply(typeof data.reply === "string" ? data.reply : "Sweepstakes Hub support is here.");
       onConversationStarted?.();
     } catch {
       toast.error("Support is temporarily unavailable. Please try again later.");
@@ -74,12 +84,6 @@ export function SupportAiStarter({
         ))}
       </div>
 
-      {reply ? (
-        <div className="rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-sm text-white">
-          {reply}
-        </div>
-      ) : null}
-
       <form
         className="mt-auto flex flex-col gap-2"
         onSubmit={(e) => {
@@ -106,7 +110,7 @@ export function SupportAiStarter({
           <button
             type="button"
             disabled={sending}
-            onClick={() => void send("I need to speak with a person.", true)}
+            onClick={() => void send("I need to speak with a person.")}
             className="rounded-full border border-white/15 px-4 py-2 text-sm font-semibold text-white hover:bg-white/5 disabled:opacity-50"
           >
             Request person

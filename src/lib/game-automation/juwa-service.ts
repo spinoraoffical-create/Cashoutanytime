@@ -1,4 +1,5 @@
 import { createAdminClient } from "@/lib/supabase/admin";
+import { createUntilAccepted } from "./account-username";
 import { JuwaApiClient } from "./juwa-api";
 
 export interface AutoFulfillJuwaOptions {
@@ -38,7 +39,8 @@ export async function autoFulfillJuwaRequest(
       const passToUse = password?.trim() || `Pass_${Math.floor(1000 + Math.random() * 9000)}`;
 
       // 1. Call addUser on Juwa External API
-      const created = await client.addUser(cleanAccount, passToUse);
+      const opened = await createUntilAccepted(cleanAccount, "juwa", (name) => client.addUser(name, passToUse));
+      const created = opened.value;
       console.log(`[Juwa Service] addUser success | userId: ${created.userId} | accountName: ${created.accountName}`);
 
       // 2. Update Database row to completed
@@ -46,7 +48,6 @@ export async function autoFulfillJuwaRequest(
         await admin
           .from("game_load_requests")
           .update({
-            status: "completed",
             game_username: created.accountName,
             game_password: passToUse,
             admin_notes: `Juwa User ID: ${created.userId}`,
@@ -81,7 +82,6 @@ export async function autoFulfillJuwaRequest(
         await admin
           .from("game_load_requests")
           .update({
-            status: "completed",
             amount: bal,
             admin_notes: `Balance: $${bal.toFixed(2)}`,
             completed_at: new Date().toISOString(),
@@ -119,7 +119,6 @@ export async function autoFulfillJuwaRequest(
         await admin
           .from("game_load_requests")
           .update({
-            status: "completed",
             completed_at: new Date().toISOString(),
             updated_at: new Date().toISOString(),
           })
@@ -154,7 +153,6 @@ export async function autoFulfillJuwaRequest(
         await admin
           .from("game_load_requests")
           .update({
-            status: "completed",
             completed_at: new Date().toISOString(),
             updated_at: new Date().toISOString(),
           })
@@ -184,7 +182,6 @@ export async function autoFulfillJuwaRequest(
       await admin
         .from("game_load_requests")
         .update({
-          status: "failed",
           error_message: err.message || "Juwa API operation failed",
           updated_at: new Date().toISOString(),
         })

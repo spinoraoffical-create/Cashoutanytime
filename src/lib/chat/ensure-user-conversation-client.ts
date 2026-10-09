@@ -12,16 +12,19 @@ export async function ensureUserConversationClient(
     .select("id")
     .eq("user_id", userId)
     .eq("is_active", true)
-    .maybeSingle();
+    .order("updated_at", { ascending: false })
+    .limit(1);
 
-  if (existing?.id) return existing.id;
+  const existingId = (existing as { id: string }[] | null)?.[0]?.id;
+  if (existingId) return existingId;
 
   const { data: created, error } = await supabase
     .from("conversations")
-    .insert({ user_id: userId })
+    .insert({ user_id: userId, is_active: true })
     .select("id")
-    .single();
+    .limit(1);
 
-  if (error || !created?.id) return null;
-  return created.id;
+  const createdId = (created as { id: string }[] | null)?.[0]?.id;
+  if (error || !createdId) return null;
+  return createdId;
 }

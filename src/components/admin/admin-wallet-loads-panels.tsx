@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useSearchParams } from "next/navigation";
 import { Search, Radio } from "lucide-react";
@@ -105,13 +106,13 @@ export function AdminWalletLoadsPanels({ loads: initialLoads, users }: AdminWall
     };
   }, [router]);
 
-  const depositLoads = useMemo(
-    () =>
-      loads.filter(
-        (l) => l.wallet_type === "current" && ["load", "reload", "redeem"].includes(l.load_type)
-      ),
-    [loads]
-  );
+  const failedOnly = searchParams.get("status") === "failed";
+  const depositLoads = useMemo(() => {
+    const rows = loads.filter(
+      (l) => l.wallet_type === "current" && ["load", "reload", "redeem"].includes(l.load_type)
+    );
+    return failedOnly ? rows.filter((l) => l.status === "failed") : rows;
+  }, [loads, failedOnly]);
 
   const loadStatsByUser = useMemo(() => {
     const map = new Map<string, UserLoadStats>();
@@ -146,12 +147,13 @@ export function AdminWalletLoadsPanels({ loads: initialLoads, users }: AdminWall
 
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
-    const list = q
-      ? users.filter(
-          (user) =>
-            user.full_name?.toLowerCase().includes(q) || user.email.toLowerCase().includes(q)
-        )
-      : users;
+    const list = users.filter((user) => {
+      const matches =
+        !q || user.full_name?.toLowerCase().includes(q) || user.email.toLowerCase().includes(q);
+      if (!matches) return false;
+      if (failedOnly && !depositLoads.some((load) => load.user_id === user.id)) return false;
+      return true;
+    });
 
     return [...list].sort((a, b) => {
       const aStats = loadStatsByUser.get(a.id);
@@ -163,7 +165,7 @@ export function AdminWalletLoadsPanels({ loads: initialLoads, users }: AdminWall
       const bTime = bStats?.lastAt ?? b.created_at ?? "";
       return bTime.localeCompare(aTime);
     });
-  }, [users, query, loadStatsByUser]);
+  }, [users, query, loadStatsByUser, failedOnly, depositLoads]);
 
   const visible = filtered.slice(0, visibleCount);
   const hasMore = visibleCount < filtered.length;
@@ -253,6 +255,15 @@ export function AdminWalletLoadsPanels({ loads: initialLoads, users }: AdminWall
             ))
           )}
         </div>
+      </div>
+
+      <div className="flex flex-wrap gap-2">
+        <Button variant={failedOnly ? "outline" : "default"} size="sm" asChild>
+          <Link href="/admin/game-loads">All</Link>
+        </Button>
+        <Button variant={failedOnly ? "default" : "outline"} size="sm" asChild>
+          <Link href="/admin/game-loads?status=failed">Failed</Link>
+        </Button>
       </div>
 
       <div className="relative max-w-md">

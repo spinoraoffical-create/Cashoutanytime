@@ -17,6 +17,7 @@ import { useMediaQuery } from "@/lib/hooks/use-media-query";
 import { formatRelativeTime } from "@/lib/utils";
 import { cn } from "@/lib/utils";
 import type { Message } from "@/types/database";
+import { toast } from "sonner";
 
 interface UserQuickChatProps {
   open: boolean;
@@ -105,9 +106,12 @@ function QuickChatPanel({
     });
 
     if (result.error) {
-      setInput(content);
-      setLoading(false);
-      return false;
+      toast.error(result.error);
+      if (!result.message) {
+        setInput(content);
+        setLoading(false);
+        return false;
+      }
     }
 
     if (result.message) {

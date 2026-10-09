@@ -11,7 +11,10 @@ function resolveRedirect(request: NextRequest, type: EmailOtpType | null) {
     searchParams.get("redirect") ||
     searchParams.get("next") ||
     (type === "recovery" ? "/reset-password/update" : "/dashboard");
-  return raw.startsWith("/") ? raw : "/dashboard";
+  if (!raw.startsWith("/") || raw.startsWith("//") || raw.includes("://") || raw.includes("\\")) {
+    return "/dashboard";
+  }
+  return raw;
 }
 
 export async function GET(request: NextRequest) {

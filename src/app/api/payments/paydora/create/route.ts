@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { createPaydoraDeposit, getPaydoraPaymentMethods, isRemovedCheckoutMethod } from "@/lib/payments/paydora";
+import { amountsForMethod, createPaydoraDeposit, getPaydoraPaymentMethods, isRemovedCheckoutMethod } from "@/lib/payments/paydora";
 import { rememberPaymentIntent } from "@/lib/payments/auto-settle";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
@@ -47,6 +47,10 @@ export async function POST(req: Request) {
     const chosen = allowed.find((method) => method.id === paymentMethodId);
     if (!chosen) {
       return NextResponse.json({ error: "Choose Card, Chime, or Cash App." }, { status: 400 });
+    }
+    const listed = amountsForMethod(chosen.value).map(Number);
+    if (!listed.some((listedAmount) => Math.abs(listedAmount - amount) < 0.001)) {
+      return NextResponse.json({ error: "Choose a listed deposit amount." }, { status: 400 });
     }
 
     const ip = publicClientIp(req);

@@ -1,4 +1,5 @@
 import { createAdminClient } from "@/lib/supabase/admin";
+import { createUntilAccepted } from "./account-username";
 import { VegasApiClient } from "./vegas-api";
 
 export interface AutoFulfillVegasOptions {
@@ -36,7 +37,8 @@ export async function autoFulfillVegasRequest(
       console.log(`[Vegas Service] Processing create_account for account: "${cleanAccount}"`);
       const passToUse = password?.trim() || `Pass_${Math.floor(1000 + Math.random() * 9000)}`;
 
-      const created = await client.addUser(cleanAccount, passToUse);
+      const opened = await createUntilAccepted(cleanAccount, "vegas-sweeps", (name) => client.addUser(name, passToUse));
+      const created = opened.value;
       console.log(
         `[Vegas Service] addUser success | userId: ${created.userId} | accountName: ${created.accountName}`
       );
@@ -45,7 +47,6 @@ export async function autoFulfillVegasRequest(
         await admin
           .from("game_load_requests")
           .update({
-            status: "completed",
             game_username: created.accountName,
             game_password: passToUse,
             admin_notes: `Vegas User ID: ${created.userId}`,
@@ -80,7 +81,6 @@ export async function autoFulfillVegasRequest(
         await admin
           .from("game_load_requests")
           .update({
-            status: "completed",
             amount: bal,
             admin_notes: `Balance: $${bal.toFixed(2)}`,
             completed_at: new Date().toISOString(),
@@ -118,7 +118,6 @@ export async function autoFulfillVegasRequest(
         await admin
           .from("game_load_requests")
           .update({
-            status: "completed",
             completed_at: new Date().toISOString(),
             updated_at: new Date().toISOString(),
           })
@@ -153,7 +152,6 @@ export async function autoFulfillVegasRequest(
         await admin
           .from("game_load_requests")
           .update({
-            status: "completed",
             completed_at: new Date().toISOString(),
             updated_at: new Date().toISOString(),
           })
@@ -183,7 +181,6 @@ export async function autoFulfillVegasRequest(
       await admin
         .from("game_load_requests")
         .update({
-          status: "failed",
           error_message: err.message || "Vegas API operation failed",
           updated_at: new Date().toISOString(),
         })

@@ -201,6 +201,20 @@ export function verifyPaydoraSignature(rawBody: Buffer | string, signatureHeader
   return crypto.timingSafeEqual(Buffer.from(given), Buffer.from(expected));
 }
 
+/** Partial deposits credit paidAmount. Otherwise credit the verified paid amount. */
+export function collectedDepositAmount(data: {
+  status?: string | null;
+  amount?: number | null;
+  paidAmount?: number | null;
+}) {
+  const status = (data.status || "").toLowerCase();
+  const partial = status === "partial" || status.includes("partial");
+  const raw = partial ? data.paidAmount : (data.paidAmount ?? data.amount);
+  const paid = Number(raw);
+  if (!Number.isFinite(paid) || paid <= 0) return 0;
+  return Math.round(paid * 100) / 100;
+}
+
 export function isPaidDepositStatus(status: string) {
   return ["paid", "partial_paid", "paid_with_remarks", "repair_order_success", "in_game_paid"].includes(status);
 }

@@ -3,7 +3,8 @@ import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { createNotification } from "@/lib/actions/notifications";
 import { notifyAdminOfCustomerMessage } from "@/lib/telegram/notify-admin-message";
-import { processAIChatQuery, getBotSenderProfileId } from "@/lib/ai/chatbot";
+import { processAIChatQuery, getBotSenderProfileId, stripHtmlForDisplay } from "@/lib/ai/chatbot";
+import { asksForPerson, CHAT_FALLBACK_REPLY, CHAT_PERSON_REPLY } from "@/lib/ai/escalate";
 import { getChatbotSettings } from "@/lib/ai/settings";
 import { isTelegramConfigured, sendTelegramMessage, escapeTelegramHtml } from "@/lib/telegram/client";
 import { SITE_URL } from "@/lib/constants";
@@ -71,19 +72,20 @@ export async function POST(request: Request) {
       );
     }
   } else {
-    const { data: conversation } = await supabase
+    const adminClient = createAdminClient();
+    const db = adminClient ?? supabase;
+    const { data: ownedRows } = await db
       .from("conversations")
       .select("user_id")
       .eq("id", conversationId)
-      .single();
+      .limit(1);
+    const conversation = (ownedRows as { user_id: string }[] | null)?.[0];
 
     if (!conversation || conversation.user_id !== user.id) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 403 });
     }
 
-    const adminClient = createAdminClient();
-    const bumpClient = adminClient ?? supabase;
-    await bumpClient
+    await db
       .from("conversations")
       .update({ updated_at: new Date().toISOString() })
       .eq("id", conversationId);
@@ -98,46 +100,57 @@ export async function POST(request: Request) {
     const chatSettings = await getChatbotSettings();
 
     if (content.trim() && chatSettings.is_enabled && chatSettings.auto_reply_enabled) {
-      void (async () => {
-        try {
-          const aiResult = await processAIChatQuery(content, conversationId, user.id);
-          const botSenderId = await getBotSenderProfileId();
-          const db = adminClient ?? supabase;
-
-          if (aiResult.shouldEscalateToHuman && chatSettings.telegram_escalation_enabled && isTelegramConfigured()) {
-            const { data: profile } = await db
-              .from("profiles")
-              .select("full_name, email")
-              .eq("id", user.id)
-              .maybeSingle();
-
-            const displayName = profile?.full_name || "Player";
-            const email = profile?.email || "No Email";
-
-            await sendTelegramMessage(
-              [
-                "🚨 <b>CHAT ESCALATION</b>",
-                `<b>Player:</b> ${escapeTelegramHtml(displayName)}`,
-                `<b>Email:</b> ${escapeTelegramHtml(email)}`,
-                `<b>Message:</b> ${escapeTelegramHtml(content.slice(0, 500))}`,
-                `<i>${SITE_URL}/admin/chat</i>`,
-              ].join("\n")
-            );
-            return;
-          }
-
-          if (aiResult.response && botSenderId) {
-            await db.from("messages").insert({
-              conversation_id: conversationId,
-              sender_id: botSenderId,
-              content: `🤖 ${aiResult.response}`,
-              is_read: false,
-            });
-          }
-        } catch (err) {
-          console.error("[AfterSend AI Auto-Reply Error]:", err);
+      try {
+        const aiResult = await processAIChatQuery(content, conversationId, user.id);
+        const botSenderId = await getBotSenderProfileId();
+        if (!botSenderId || botSenderId === user.id) {
+          return NextResponse.json({ error: "Support reply could not be saved." }, { status: 500 });
         }
-      })();
+
+        const plain = stripHtmlForDisplay(aiResult.response || "");
+        const replyText = (
+          asksForPerson(content) ? CHAT_PERSON_REPLY : plain || CHAT_FALLBACK_REPLY
+        ).replace(/<[^>]+>/g, " ").replace(/\s+/g, " ").trim();
+
+        const { error: insertError } = await db.from("messages").insert({
+          conversation_id: conversationId,
+          sender_id: botSenderId,
+          content: replyText || CHAT_FALLBACK_REPLY,
+          is_read: false,
+        });
+        if (insertError) {
+          console.error("[AfterSend AI insert]:", insertError.message);
+          return NextResponse.json({ error: "Support reply could not be saved." }, { status: 500 });
+        }
+
+        if (
+          aiResult.shouldEscalateToHuman &&
+          chatSettings.telegram_escalation_enabled &&
+          isTelegramConfigured()
+        ) {
+          const { data: profileRows } = await db
+            .from("profiles")
+            .select("full_name, email")
+            .eq("id", user.id)
+            .limit(1);
+          const profile = (profileRows as { full_name: string | null; email: string | null }[] | null)?.[0];
+          const displayName = profile?.full_name || "Player";
+          const email = profile?.email || "No Email";
+
+          await sendTelegramMessage(
+            [
+              "🚨 <b>CHAT ESCALATION</b>",
+              `<b>Player:</b> ${escapeTelegramHtml(displayName)}`,
+              `<b>Email:</b> ${escapeTelegramHtml(email)}`,
+              `<b>Message:</b> ${escapeTelegramHtml(content.slice(0, 500))}`,
+              `<i>${SITE_URL}/admin/chat</i>`,
+            ].join("\n")
+          );
+        }
+      } catch (err) {
+        console.error("[AfterSend AI Auto-Reply Error]:", err);
+        return NextResponse.json({ error: "Support reply could not be saved." }, { status: 500 });
+      }
     }
   }
 

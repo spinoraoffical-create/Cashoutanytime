@@ -61,52 +61,55 @@ export async function POST(req: Request) {
     const admin = createAdminClient();
     const botSenderId = await getBotSenderProfileId();
 
-    if (admin && userId && botSenderId) {
-      try {
-        const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
-        if (!uuidRegex.test(userId)) {
-          return NextResponse.json({ success: true, reply, alertedTelegram: needsHuman });
-        }
-
-        let { data: conv } = await admin
-          .from("conversations")
-          .select("id")
-          .eq("user_id", userId)
-          .eq("is_active", true)
-          .maybeSingle();
-
-        if (!conv) {
-          const { data: newConv } = await admin
-            .from("conversations")
-            .insert({ user_id: userId, is_active: true })
-            .select("id")
-            .single();
-          conv = newConv;
-        }
-
-        if (conv?.id) {
-          await admin.from("messages").insert({
-            conversation_id: conv.id,
-            sender_id: userId,
-            content: message || (hasMedia ? "Uploaded media file" : "User message"),
-            is_read: false,
-          });
-
-          await admin.from("messages").insert({
-            conversation_id: conv.id,
-            sender_id: botSenderId,
-            content: `🤖 ${reply}`,
-            is_read: true,
-          });
-
-          await admin
-            .from("conversations")
-            .update({ updated_at: new Date().toISOString() })
-            .eq("id", conv.id);
-        }
-      } catch (dbErr) {
-        console.warn("[live-bot] DB save warning:", dbErr);
+    if (userId) {
+      if (!admin || !botSenderId || botSenderId === userId) {
+        return NextResponse.json({ error: "Support reply could not be saved." }, { status: 500 });
       }
+
+      const { data: existingRows } = await admin
+        .from("conversations")
+        .select("id")
+        .eq("user_id", userId)
+        .eq("is_active", true)
+        .order("updated_at", { ascending: false })
+        .limit(1);
+      let convId = (existingRows as { id: string }[] | null)?.[0]?.id ?? null;
+
+      if (!convId) {
+        const { data: createdRows, error: createError } = await admin
+          .from("conversations")
+          .insert({ user_id: userId, is_active: true })
+          .select("id")
+          .limit(1);
+        convId = (createdRows as { id: string }[] | null)?.[0]?.id ?? null;
+        if (!convId) {
+          console.error("[live-bot] conversation:", createError?.message);
+          return NextResponse.json({ error: "Support reply could not be saved." }, { status: 500 });
+        }
+      }
+
+      const plainReply = stripHtmlForDisplay(reply).replace(/<[^>]+>/g, " ").replace(/\s+/g, " ").trim();
+      const { error: userInsertError } = await admin.from("messages").insert({
+        conversation_id: convId,
+        sender_id: userId,
+        content: message || (hasMedia ? "Uploaded media file" : "User message"),
+        is_read: false,
+      });
+      const { error: botInsertError } = await admin.from("messages").insert({
+        conversation_id: convId,
+        sender_id: botSenderId,
+        content: plainReply || reply,
+        is_read: false,
+      });
+      if (userInsertError || botInsertError) {
+        console.error("[live-bot] insert:", userInsertError?.message, botInsertError?.message);
+        return NextResponse.json({ error: "Support reply could not be saved." }, { status: 500 });
+      }
+
+      await admin
+        .from("conversations")
+        .update({ updated_at: new Date().toISOString() })
+        .eq("id", convId);
     }
 
     if (
