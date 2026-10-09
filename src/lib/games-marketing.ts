@@ -7,7 +7,21 @@ export function marketingGamesToCards(catalog: MarketingGame[]): Game[] {
 
   const mapped = catalog.flatMap((g) => {
     const local = GAMES.find((x) => canonicalGameSlug(x.slug) === canonicalGameSlug(g.slug));
-    if (!local) return [];
+    if (!local) {
+      return [{
+        id: g.id,
+        name: g.name,
+        slug: g.slug,
+        image: g.image_url || "/logo.webp",
+        provider: g.name,
+        category: "Arcade",
+        downloadUrl: g.download_url || "#",
+        bio: g.description || "",
+        players: (g.popularity ?? 50) * 100,
+        gradient: "from-zinc-600 to-zinc-900",
+        popular: Boolean(g.is_featured),
+      }];
+    }
     const slug = local.slug;
     return [{
       id: local?.id ?? g.id,

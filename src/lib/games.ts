@@ -420,6 +420,18 @@ export const GAMES: Game[] = [
     gradient: "from-amber-600 via-orange-600 to-stone-950",
     trending: true,
   },
+  {
+    id: "31",
+    name: "Mafia",
+    slug: "mafia",
+    image: "/logo.webp",
+    provider: "Mafia",
+    category: "Fish Game",
+    downloadUrl: "https://agentserver.mafia77777.com",
+    bio: "Mafia is an arcade fish table with street-boss showdowns and syndicate jackpots. Sweepstakes Hub creates the account and loads credits from your wallet.",
+    players: 15000,
+    gradient: "from-red-700 via-zinc-800 to-black",
+  },
 ];
 
 export type GameTab = "all" | "popular" | "trending" | "upcoming" | "promotional" | "topRated";

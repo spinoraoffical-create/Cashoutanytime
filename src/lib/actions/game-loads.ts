@@ -14,6 +14,7 @@ import {
 } from "@/lib/game-automation/account-username";
 import type { GameLoadWalletType } from "@/lib/game-automation/types";
 import { canonicalGameSlug } from "@/lib/games";
+import { withAdminStoreLogin } from "@/lib/game-automation/store-login";
 import {
   depositRolloverBounds,
   DEPOSIT_LOAD_TYPES,
@@ -185,7 +186,9 @@ async function fulfillOrFail(
   }
 ) {
   try {
-    const result = await autoFulfillGameRequest(gameSlug, requestId, loadType, input);
+    const result = await withAdminStoreLogin(gameSlug, () =>
+      autoFulfillGameRequest(gameSlug, requestId, loadType, input)
+    );
     if (!result) {
       await finishGameLoad({
         requestId,
