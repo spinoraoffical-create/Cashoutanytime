@@ -166,13 +166,20 @@ export async function updateChatbotSettings(
   return error ? { ok: false, error: aiTableError(error.message) } : { ok: true };
 }
 
-const BOT_USERNAME = "support-bot";
-const BOT_EMAIL = "support-bot@users.cashoutanytime.invalid";
+const BOT_USERNAME = "supportbot";
+const BOT_EMAIL = "supportbot@cashoutanytime.app";
 
 /** Dedicated support-bot profile. Never a random admin and never the player. */
 export async function getBotSenderProfileId(excludeUserId?: string): Promise<string | null> {
   const fromEnv = process.env.SPINORA_BOT_SENDER_ID?.trim();
-  if (fromEnv && fromEnv !== excludeUserId) return fromEnv;
+  if (fromEnv && fromEnv !== excludeUserId) {
+    const db = createAdminClient();
+    const { data } = db
+      ? await db.from("profiles").select("id").eq("id", fromEnv).limit(1)
+      : { data: null };
+    const exists = (data as { id: string }[] | null)?.[0]?.id;
+    if (exists) return exists;
+  }
   if (botSenderCache && botSenderCache !== excludeUserId) return botSenderCache;
 
   const db = createAdminClient();
@@ -181,12 +188,23 @@ export async function getBotSenderProfileId(excludeUserId?: string): Promise<str
   const { data: existing } = await db
     .from("profiles")
     .select("id")
-    .eq("username", BOT_USERNAME)
+    .in("username", [BOT_USERNAME, "support_bot"])
     .limit(1);
   const found = (existing as { id: string }[] | null)?.[0]?.id;
-  if (found) {
+  if (found && found !== excludeUserId) {
     botSenderCache = found;
     return found;
+  }
+
+  const { data: byEmail } = await db
+    .from("profiles")
+    .select("id")
+    .in("email", [BOT_EMAIL, "support-bot@users.cashoutanytime.invalid"])
+    .limit(1);
+  const emailed = (byEmail as { id: string }[] | null)?.[0]?.id;
+  if (emailed && emailed !== excludeUserId) {
+    botSenderCache = emailed;
+    return emailed;
   }
 
   const settings = await getChatbotSettings();

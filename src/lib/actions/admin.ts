@@ -257,7 +257,9 @@ export async function ensureAdminConversation(targetUserId: string): Promise<{
     .single();
 
   if (!targetUser) return { error: "User not found" };
-  if (targetUser.role === "admin") return { error: "Cannot start a chat with an admin account" };
+  if (targetUser.role === "admin" && targetUserId !== auth.user?.id) {
+    return { error: "Cannot start a chat with an admin account" };
+  }
 
   const { data: existing } = await auth.supabase
     .from("conversations")

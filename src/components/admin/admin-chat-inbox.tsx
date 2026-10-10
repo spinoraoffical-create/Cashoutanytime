@@ -7,7 +7,12 @@ import { Badge } from "@/components/ui/badge";
 import { createClient } from "@/lib/supabase/client";
 import { ensureAdminConversation } from "@/lib/actions/admin";
 import { sendMessageClient } from "@/lib/chat/send-message-client";
-import { getAdminConversationUnreads, type AdminConversationUnread } from "@/lib/actions/messages";
+import {
+  getAdminChatConversations,
+  getAdminConversationUnreads,
+  getSupportBotSenderId,
+  type AdminConversationUnread,
+} from "@/lib/actions/messages";
 import { uploadChatAttachment } from "@/lib/chat/attachments";
 import { ChatComposer } from "@/components/chat/chat-composer";
 import { ChatMessageContent } from "@/components/chat/chat-message-content";
@@ -30,7 +35,7 @@ import type { Message } from "@/types/database";
 
 interface ConversationUser {
   full_name?: string | null;
-  email?: string;
+  email?: string | null;
   is_online?: boolean;
   last_seen_at?: string | null;
 }
@@ -56,11 +61,17 @@ function unreadsToMap(list: AdminConversationUnread[]): Record<string, AdminConv
   return map;
 }
 
+function customerTitle(user: ConversationUser | null | undefined) {
+  const name = user?.full_name?.trim();
+  if (name) return name;
+  const email = user?.email?.trim() ?? "";
+  if (email && !email.endsWith("@phone.spinora.local")) return email;
+  return "Customer";
+}
+
 function displayContact(user: ConversationUser | null | undefined) {
-  const email = user?.email ?? "";
-  if (!email || email.endsWith("@phone.spinora.local")) {
-    return user?.full_name ? `${user.full_name} · Phone user` : "Phone user";
-  }
+  const email = user?.email?.trim() ?? "";
+  if (!email || email.endsWith("@phone.spinora.local")) return customerTitle(user);
   return email;
 }
 
@@ -70,6 +81,7 @@ interface AdminChatPanelProps {
   selected: AdminConversation | undefined;
   messages: Message[];
   adminId: string | null;
+  botSenderId: string | null;
   selectedId: string;
   input: string;
   onInputChange: (value: string) => void;
@@ -85,6 +97,7 @@ function AdminChatPanel({
   selected,
   messages,
   adminId,
+  botSenderId,
   selectedId,
   input,
   onInputChange,
@@ -118,9 +131,7 @@ function AdminChatPanel({
           </Button>
         )}
         <div className="flex-1 min-w-0">
-          <h2 className="font-semibold truncate text-white">
-            {selected?.user?.full_name || "Customer"}
-          </h2>
+          <h2 className="font-semibold truncate text-white">{customerTitle(selected?.user)}</h2>
           <p className="text-xs text-muted-foreground truncate">
             {displayContact(selected?.user)}
             {selected?.user && (
@@ -158,8 +169,10 @@ function AdminChatPanel({
           </p>
         ) : (
           messages.map((msg) => {
+            const isBot = Boolean(botSenderId && msg.sender_id === botSenderId);
             const isAdminMsg =
-              msg.from_staff === true || (msg.from_staff == null && msg.sender_id === adminId);
+              !isBot &&
+              (msg.from_staff === true || (msg.from_staff == null && msg.sender_id === adminId));
             return (
               <div
                 key={msg.id}
@@ -174,7 +187,9 @@ function AdminChatPanel({
                   )}
                 >
                   {!isAdminMsg && (
-                    <p className="text-[10px] font-semibold text-orange-400 mb-1">Customer</p>
+                    <p className="text-[10px] font-semibold text-orange-400 mb-1">
+                      {isBot ? "Sweepstakes Hub AI" : customerTitle(selected?.user)}
+                    </p>
                   )}
                   <ChatMessageContent message={msg} />
                   <p className="text-[10px] opacity-60 mt-1.5">
@@ -213,6 +228,7 @@ export function AdminChatInbox({
   const [selectedId, setSelectedId] = useState(initialConversations[0]?.id ?? "");
   const [messages, setMessages] = useState<Message[]>([]);
   const [adminId, setAdminId] = useState<string | null>(null);
+  const [botSenderId, setBotSenderId] = useState<string | null>(null);
   const [input, setInput] = useState("");
   const [loading, setLoading] = useState(false);
   const [mobileChatOpen, setMobileChatOpen] = useState(false);
@@ -223,12 +239,12 @@ export function AdminChatInbox({
   const supabase = useMemo(() => createClient(), []);
   const { refresh: refreshGlobalUnread } = useUnreadMessages();
 
-  selectedIdRef.current = selectedId;
   const conversationUserIdsRef = useRef<string[]>([]);
   conversationUserIdsRef.current = conversations.map((c) => c.user_id);
 
   const selectConversation = useCallback((id: string, options?: { openMobile?: boolean }) => {
     if (id !== selectedIdRef.current) {
+      selectedIdRef.current = id;
       setMessages([]);
     }
     setSelectedId(id);
@@ -298,13 +314,13 @@ export function AdminChatInbox({
   const loadMessages = useCallback(
     async (conversationId: string) => {
       if (!supabase) return;
-      const { data } = await supabase
+      const { data, error } = await supabase
         .from("messages")
         .select("*")
         .eq("conversation_id", conversationId)
         .order("created_at", { ascending: true });
 
-      if (selectedIdRef.current !== conversationId) return;
+      if (error || selectedIdRef.current !== conversationId) return;
 
       setMessages(data ?? []);
 
@@ -330,6 +346,7 @@ export function AdminChatInbox({
   useEffect(() => {
     if (!supabase) return;
     supabase.auth.getUser().then(({ data }) => setAdminId(data.user?.id ?? null));
+    void getSupportBotSenderId().then((id) => setBotSenderId(id));
     if (!initialUnreads?.length) {
       void loadUnreads();
     }
@@ -415,6 +432,32 @@ export function AdminChatInbox({
     }, 2000);
     return () => clearInterval(interval);
   }, [loadUnreads]);
+
+  useEffect(() => {
+    let cancelled = false;
+    const refreshList = async () => {
+      const list = await getAdminChatConversations();
+      if (cancelled || list.length === 0) return;
+      setConversations((prev) => {
+        const byId = new Map(prev.map((conversation) => [conversation.id, conversation]));
+        for (const row of list) {
+          const existing = byId.get(row.id);
+          byId.set(row.id, existing ? { ...existing, ...row, user: row.user ?? existing.user } : row);
+        }
+        return Array.from(byId.values()).sort(
+          (a, b) => new Date(b.updated_at).getTime() - new Date(a.updated_at).getTime()
+        );
+      });
+    };
+    void refreshList();
+    const interval = setInterval(() => {
+      if (document.visibilityState === "visible") void refreshList();
+    }, 3000);
+    return () => {
+      cancelled = true;
+      clearInterval(interval);
+    };
+  }, []);
 
   useEffect(() => {
     function onChatIncoming(event: Event) {
@@ -552,6 +595,7 @@ export function AdminChatInbox({
     selected,
     messages,
     adminId,
+    botSenderId,
     selectedId,
     input,
     onInputChange: setInput,
@@ -609,7 +653,7 @@ export function AdminChatInbox({
                     title={online ? "Online" : "Offline"}
                   />
                   <span className="font-medium text-sm truncate text-white flex-1">
-                    {user?.full_name || "Customer"}
+                    {customerTitle(user)}
                   </span>
                   {online && (
                     <span className="text-[10px] text-emerald-400 shrink-0 font-medium">Online</span>

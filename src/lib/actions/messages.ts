@@ -372,7 +372,7 @@ export async function getSupportBotSenderId() {
     data: { user },
   } = await supabase.auth.getUser();
   if (!user) return null;
-  return getBotSenderProfileId();
+  return getBotSenderProfileId(user.id);
 }
 
 /** Saves a 1–5 rating or resolved flag. Does not read or write wallet balances. */
@@ -446,6 +446,83 @@ export async function getAdminUnreadMessageCount(): Promise<number> {
     .neq("sender_id", user.id);
 
   return count ?? 0;
+}
+
+export interface AdminChatConversationRow {
+  id: string;
+  user_id: string;
+  updated_at: string;
+  user: {
+    full_name?: string | null;
+    email?: string | null;
+    last_seen_at?: string | null;
+  } | null;
+}
+
+/** Staff inbox list. Loads the profile in a second query so a bad embed cannot hide every chat. */
+export async function getAdminChatConversations(): Promise<AdminChatConversationRow[]> {
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) return [];
+  const staff = await getStaffContext();
+  if (!staff) return [];
+
+  const admin = createAdminClient();
+
+  async function load(db: NonNullable<ReturnType<typeof createAdminClient>>) {
+    const active = await db
+      .from("conversations")
+      .select("id, user_id, updated_at")
+      .eq("is_active", true)
+      .order("updated_at", { ascending: false })
+      .limit(80);
+    if (!active.error) return active.data;
+    const plain = await db
+      .from("conversations")
+      .select("id, user_id, updated_at")
+      .order("updated_at", { ascending: false })
+      .limit(80);
+    return plain.data;
+  }
+
+  let rows = (await load(supabase)) as AdminChatConversationRow[] | null;
+  if ((!rows || rows.length === 0) && admin) {
+    rows = (await load(admin)) as AdminChatConversationRow[] | null;
+  }
+  if (!rows?.length) return [];
+
+  const ids = [...new Set(rows.map((row) => row.user_id).filter(Boolean))];
+  const profileDb = admin ?? supabase;
+  const { data: profiles } = await profileDb
+    .from("profiles")
+    .select("id, full_name, email, last_seen_at")
+    .in("id", ids);
+  const byId = new Map(
+    ((profiles ?? []) as {
+      id: string;
+      full_name?: string | null;
+      email?: string | null;
+      last_seen_at?: string | null;
+    }[]).map((profile) => [profile.id, profile])
+  );
+
+  return rows.map((row) => {
+    const profile = byId.get(row.user_id);
+    return {
+      id: row.id,
+      user_id: row.user_id,
+      updated_at: row.updated_at,
+      user: profile
+        ? {
+            full_name: profile.full_name ?? null,
+            email: profile.email ?? null,
+            last_seen_at: profile.last_seen_at ?? null,
+          }
+        : null,
+    };
+  });
 }
 
 export async function getAdminConversationUnreads(): Promise<AdminConversationUnread[]> {

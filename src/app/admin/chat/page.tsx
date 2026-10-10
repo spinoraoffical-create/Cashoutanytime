@@ -1,7 +1,9 @@
-import { createClient } from "@/lib/supabase/server";
 import { AdminChatInbox, type AdminConversation } from "@/components/admin/admin-chat-inbox";
-import { getAdminConversationUnreads } from "@/lib/actions/messages";
+import { getAdminChatConversations, getAdminConversationUnreads } from "@/lib/actions/messages";
+import { repairPendingSupportReply } from "@/lib/chat/support-auto-reply";
 import { CHAT_PAGE_SHELL_CLASS } from "@/lib/chat/chat-layout";
+
+export const dynamic = "force-dynamic";
 
 export default async function AdminChatPage({
   searchParams,
@@ -9,19 +11,13 @@ export default async function AdminChatPage({
   searchParams: Promise<{ userId?: string }>;
 }) {
   const { userId } = await searchParams;
-  const supabase = await createClient();
-
-  const [{ data: conversations }, initialUnreads] = await Promise.all([
-    supabase
-      .from("conversations")
-      .select(
-        "id, user_id, updated_at, user:profiles!conversations_user_id_fkey(full_name, email, is_online, last_seen_at)"
-      )
-      .eq("is_active", true)
-      .order("updated_at", { ascending: false })
-      .limit(80),
+  const [conversations, initialUnreads] = await Promise.all([
+    getAdminChatConversations(),
     getAdminConversationUnreads(),
   ]);
+  await Promise.all(
+    conversations.slice(0, 12).map((conversation) => repairPendingSupportReply(conversation.user_id))
+  );
 
   return (
     <div className={CHAT_PAGE_SHELL_CLASS}>

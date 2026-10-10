@@ -114,7 +114,15 @@ export async function POST(request: Request) {
         .eq("id", conversationId);
     }
 
-    if (content.trim()) {
+    const staffReply = await db
+      .from("messages")
+      .select("id")
+      .eq("conversation_id", conversationId)
+      .eq("from_staff", true)
+      .limit(1);
+    const staffIsTalking = !staffReply.error && (staffReply.data?.length ?? 0) > 0;
+
+    if (content.trim() && !staffIsTalking) {
       let replyText = scriptedSupportReply(content, queue.queued);
       let escalate = wantsPerson;
       if (
