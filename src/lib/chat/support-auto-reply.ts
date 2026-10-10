@@ -11,6 +11,7 @@ import { supportReferenceCode } from "@/lib/chat/support-thread";
 
 /** Topic and greeting answers stay available until a staff member has replied. */
 export function scriptedSupportReply(content: string, queued: boolean): string | null {
+  if (/marked this support resolved/i.test(content)) return null;
   if (asksForPerson(content)) return queued ? null : CHAT_PERSON_REPLY;
   return supportTopicReply(content) || supportGreetingReply(content);
 }

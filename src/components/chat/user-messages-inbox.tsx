@@ -169,6 +169,9 @@ function UserChatPanel({
         onScroll={onScrollMessages}
         className={`${CHAT_SCROLL_CLASS} bg-[#070b1f] p-3 pb-4 sm:p-4`}
         onStillNeedHelp={() => void onFollowUp("I still need help. I need to speak with a person.")}
+        onMarkResolved={(score) =>
+          void onFollowUp(`I marked this support resolved. Rating: ${score} of 5.`)
+        }
       />
 
       <ChatComposer

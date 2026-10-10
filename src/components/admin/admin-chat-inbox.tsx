@@ -44,6 +44,8 @@ export interface AdminConversation {
   id: string;
   user_id: string;
   updated_at: string;
+  supportRating?: number | null;
+  supportResolved?: boolean | null;
   user: ConversationUser | null;
 }
 
@@ -132,6 +134,14 @@ function AdminChatPanel({
         )}
         <div className="flex-1 min-w-0">
           <h2 className="font-semibold truncate text-white">{customerTitle(selected?.user)}</h2>
+          {selected?.supportResolved === true && (
+            <p className="text-xs font-semibold text-emerald-300">
+              Resolved{selected.supportRating ? ` · ${selected.supportRating}/5` : ""}
+            </p>
+          )}
+          {selected?.supportResolved === false && (
+            <p className="text-xs font-semibold text-amber-300">Still needs help</p>
+          )}
           <p className="text-xs text-muted-foreground truncate">
             {displayContact(selected?.user)}
             {selected?.user && (
@@ -655,6 +665,14 @@ export function AdminChatInbox({
                   <span className="font-medium text-sm truncate text-white flex-1">
                     {customerTitle(user)}
                   </span>
+                  {conv.supportResolved === true && (
+                    <span className="text-[10px] font-semibold text-emerald-300 shrink-0">
+                      Resolved{conv.supportRating ? ` ${conv.supportRating}/5` : ""}
+                    </span>
+                  )}
+                  {conv.supportResolved === false && (
+                    <span className="text-[10px] font-semibold text-amber-300 shrink-0">Needs help</span>
+                  )}
                   {online && (
                     <span className="text-[10px] text-emerald-400 shrink-0 font-medium">Online</span>
                   )}

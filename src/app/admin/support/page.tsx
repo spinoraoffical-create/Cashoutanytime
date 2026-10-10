@@ -12,6 +12,7 @@ import { EmptyState } from "@/components/shared/empty-state";
 import { GlassCard } from "@/components/shared/glass-card";
 import { profileDisplayName } from "@/lib/admin/spinora-profile";
 import { adminDb } from "@/lib/actions/admin/core";
+import { getAdminChatConversations } from "@/lib/actions/messages";
 import { getAgentScope } from "@/lib/agents/scope";
 import { can, getStaffContext } from "@/lib/data/admin";
 import { redirect } from "next/navigation";
@@ -59,6 +60,10 @@ export default async function AdminSupportPage({
   const { data } = await ticketQuery;
 
   const tickets = data ?? [];
+  const liveChats = await getAdminChatConversations();
+  const visibleChats = liveChats.filter((chat) =>
+    filterKey === "resolved" ? chat.supportResolved === true : filterKey === "active" ? chat.supportResolved !== true : false
+  );
 
   return (
     <div className="mx-auto max-w-5xl">
@@ -93,7 +98,38 @@ export default async function AdminSupportPage({
         })}
       </div>
 
-      {tickets.length === 0 ? (
+      {visibleChats.length > 0 && (
+        <GlassCard className="mb-4 overflow-hidden">
+          <p className="border-b border-foreground/8 px-4 py-3 text-sm font-semibold sm:px-6">
+            Live chats
+          </p>
+          <ul className="divide-y divide-foreground/8">
+            {visibleChats.map((chat) => {
+              const name = chat.user?.full_name?.trim() || chat.user?.email || "Customer";
+              return (
+                <li key={chat.id}>
+                  <Link
+                    href={`/admin/chat?userId=${chat.user_id}`}
+                    className="flex items-center gap-4 px-4 py-4 transition-colors hover:bg-foreground/[0.03] sm:px-6"
+                  >
+                    <div className="min-w-0 flex-1">
+                      <p className="truncate text-sm font-semibold">{name}</p>
+                      <p className="text-xs text-muted-foreground">
+                        {chat.supportResolved
+                          ? `Resolved${chat.supportRating ? ` · rated ${chat.supportRating}/5` : ""}`
+                          : "Open chat"}
+                      </p>
+                    </div>
+                    <ChevronRight className="size-4 shrink-0 text-muted-foreground" aria-hidden />
+                  </Link>
+                </li>
+              );
+            })}
+          </ul>
+        </GlassCard>
+      )}
+
+      {tickets.length === 0 && visibleChats.length === 0 ? (
         <EmptyState
           icon={<LifeBuoy />}
           title={`No ${filter.label.toLowerCase()} chats`}

@@ -59,6 +59,7 @@ interface SupportThreadProps {
   onScroll?: () => void;
   className?: string;
   onStillNeedHelp: () => void;
+  onMarkResolved?: (rating: number) => void;
 }
 
 export function SupportThread({
@@ -74,6 +75,7 @@ export function SupportThread({
   onScroll,
   className,
   onStillNeedHelp,
+  onMarkResolved,
 }: SupportThreadProps) {
   const [rating, setRating] = useState<number | null>(initialRating);
   const [resolved, setResolved] = useState<boolean | null>(initialResolved);
@@ -101,11 +103,12 @@ export function SupportThread({
   }
 
   async function markResolved() {
-    if (!rating || saving) return;
+    if (!rating || saving || resolved === true) return;
     setResolved(true);
     remember(rating, true);
     setSaving(true);
-    await saveSupportFeedback(conversationId, { resolved: true });
+    await saveSupportFeedback(conversationId, { resolved: true, rating });
+    onMarkResolved?.(rating);
     setSaving(false);
   }
 

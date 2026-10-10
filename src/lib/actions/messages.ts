@@ -406,6 +406,8 @@ export async function saveSupportFeedback(
 
   const { error } = await supabase.from("conversations").update(patch).eq("id", conversationId).eq("user_id", user.id);
   if (error) return { error: "Feedback could not be saved yet." };
+  revalidatePath("/admin/chat");
+  revalidatePath("/admin/support");
   return { ok: true as const };
 }
 
@@ -452,6 +454,8 @@ export interface AdminChatConversationRow {
   id: string;
   user_id: string;
   updated_at: string;
+  supportRating: number | null;
+  supportResolved: boolean | null;
   user: {
     full_name?: string | null;
     email?: string | null;
@@ -472,6 +476,13 @@ export async function getAdminChatConversations(): Promise<AdminChatConversation
   const admin = createAdminClient();
 
   async function load(db: NonNullable<ReturnType<typeof createAdminClient>>) {
+    const rich = await db
+      .from("conversations")
+      .select("id, user_id, updated_at, support_rating, support_resolved")
+      .eq("is_active", true)
+      .order("updated_at", { ascending: false })
+      .limit(80);
+    if (!rich.error) return rich.data;
     const active = await db
       .from("conversations")
       .select("id, user_id, updated_at")
@@ -493,8 +504,30 @@ export async function getAdminChatConversations(): Promise<AdminChatConversation
   }
   if (!rows?.length) return [];
 
-  const ids = [...new Set(rows.map((row) => row.user_id).filter(Boolean))];
   const profileDb = admin ?? supabase;
+  const { data: recentNotes } = await profileDb
+    .from("messages")
+    .select("conversation_id, content, created_at")
+    .in(
+      "conversation_id",
+      rows.map((row) => row.id)
+    )
+    .order("created_at", { ascending: false })
+    .limit(300);
+  const notedStatus = new Map<string, boolean>();
+  const notedRating = new Map<string, number>();
+  for (const note of (recentNotes ?? []) as { conversation_id: string; content: string | null }[]) {
+    if (notedStatus.has(note.conversation_id) || !note.content) continue;
+    if (/marked this support resolved/i.test(note.content)) {
+      notedStatus.set(note.conversation_id, true);
+      const score = note.content.match(/Rating:\s*(\d)\s*of\s*5/i);
+      if (score) notedRating.set(note.conversation_id, Number(score[1]));
+    } else if (/still need help/i.test(note.content)) {
+      notedStatus.set(note.conversation_id, false);
+    }
+  }
+
+  const ids = [...new Set(rows.map((row) => row.user_id).filter(Boolean))];
   const { data: profiles } = await profileDb
     .from("profiles")
     .select("id, full_name, email, last_seen_at")
@@ -510,10 +543,14 @@ export async function getAdminChatConversations(): Promise<AdminChatConversation
 
   return rows.map((row) => {
     const profile = byId.get(row.user_id);
+    const storedResolved = (row as { support_resolved?: boolean | null }).support_resolved;
+    const storedRating = (row as { support_rating?: number | null }).support_rating;
     return {
       id: row.id,
       user_id: row.user_id,
       updated_at: row.updated_at,
+      supportResolved: typeof storedResolved === "boolean" ? storedResolved : (notedStatus.get(row.id) ?? null),
+      supportRating: storedRating ?? notedRating.get(row.id) ?? null,
       user: profile
         ? {
             full_name: profile.full_name ?? null,

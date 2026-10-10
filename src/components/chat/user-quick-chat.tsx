@@ -243,6 +243,9 @@ function QuickChatPanel({
         onStillNeedHelp={() =>
           void handleFollowUp("I still need help. I need to speak with a person.")
         }
+        onMarkResolved={(score) =>
+          void handleFollowUp(`I marked this support resolved. Rating: ${score} of 5.`)
+        }
       />
 
       <ChatComposer

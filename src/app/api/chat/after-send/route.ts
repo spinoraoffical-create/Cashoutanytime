@@ -122,7 +122,7 @@ export async function POST(request: Request) {
       .limit(1);
     const staffIsTalking = !staffReply.error && (staffReply.data?.length ?? 0) > 0;
 
-    if (content.trim() && !staffIsTalking) {
+    if (content.trim() && !staffIsTalking && !/marked this support resolved/i.test(content)) {
       let replyText = scriptedSupportReply(content, queue.queued);
       let escalate = wantsPerson;
       if (
