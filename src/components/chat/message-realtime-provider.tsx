@@ -27,6 +27,7 @@ import {
 } from "@/lib/chat/events";
 import { getDepositMethod, type DepositPaymentMethodId } from "@/lib/payments/methods";
 import { subscribeToConversationInserts, subscribeToMessageInserts } from "@/lib/chat/subscribe-messages";
+import { isAdminOutgoingMessage } from "@/lib/chat/admin-outgoing";
 import { UserQuickChat } from "@/components/chat/user-quick-chat";
 import {
   MessageRealtimeContext,
@@ -198,9 +199,10 @@ export function MessageRealtimeProvider({ children }: { children: ReactNode }) {
   const openChatForMessage = useCallback(
     async (msg: Message) => {
       const userId = userIdRef.current;
-      if (!userId || msg.sender_id === userId) return;
-
       const adminView = isAdminRef.current;
+      if (!userId) return;
+      if (msg.sender_id === userId && (msg.from_staff || !adminView || isAdminOutgoingMessage(msg))) return;
+
       const path = pathnameRef.current;
 
       playIncomingMessageSound(msg.sender_id, userId);
@@ -222,6 +224,22 @@ export function MessageRealtimeProvider({ children }: { children: ReactNode }) {
         void showMessagePopup(
           msg,
           `/dashboard/messages?conversation=${msg.conversation_id}`
+        );
+        return;
+      }
+
+      if (path?.startsWith("/support")) {
+        const supabase = createClient();
+        const { data: conv } = supabase
+          ? await supabase
+              .from("conversations")
+              .select("user_id")
+              .eq("id", msg.conversation_id)
+              .single()
+          : { data: null };
+        void showMessagePopup(
+          msg,
+          conv?.user_id ? `/admin/chat?userId=${conv.user_id}` : "/admin/chat"
         );
         return;
       }
@@ -511,7 +529,8 @@ export function MessageRealtimeProvider({ children }: { children: ReactNode }) {
         supabase,
         `msg-rt-all-${userId}`,
         userId,
-        (msg) => handleIncomingMessageRef.current(msg)
+        (msg) => handleIncomingMessageRef.current(msg),
+        { deliverOwnMessages: isAdminUser }
       );
     }
 

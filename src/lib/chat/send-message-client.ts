@@ -24,20 +24,26 @@ export async function sendMessageClient(
     return { error: "Message cannot be empty" };
   }
 
-  const { data, error } = await supabase
-    .from("messages")
-    .insert({
-      conversation_id: conversationId,
-      sender_id: senderId,
-      content: content.trim(),
-      ...(attachment && {
-        attachment_url: attachment.url,
-        attachment_type: attachment.type,
-        attachment_name: attachment.name,
-      }),
-    })
-    .select("*")
-    .single();
+  const row = {
+    conversation_id: conversationId,
+    sender_id: senderId,
+    content: content.trim(),
+    ...(kind === "admin" ? { from_staff: true } : {}),
+    ...(attachment && {
+      attachment_url: attachment.url,
+      attachment_type: attachment.type,
+      attachment_name: attachment.name,
+    }),
+  };
+
+  let { data, error } = await supabase.from("messages").insert(row).select("*").single();
+  if (error && kind === "admin" && /from_staff/i.test(error.message)) {
+    const withoutStaffFlag = { ...row };
+    delete withoutStaffFlag.from_staff;
+    const retry = await supabase.from("messages").insert(withoutStaffFlag).select("*").single();
+    data = retry.data;
+    error = retry.error;
+  }
 
   if (error) {
     const hint = error.message.includes("attachment_")

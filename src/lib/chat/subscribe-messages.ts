@@ -46,6 +46,8 @@ export function subscribeToMessageInserts(
   options?: {
     /** When set, ignore messages outside these conversations (typical for customers). */
     conversationIds?: Set<string> | string[];
+    /** Admin testing from the same login still needs those rows. */
+    deliverOwnMessages?: boolean;
   }
 ) {
   const allowed = buildAllowedSet(options?.conversationIds);
@@ -57,7 +59,7 @@ export function subscribeToMessageInserts(
       { event: "INSERT", schema: "public", table: "messages" },
       (payload) => {
         const msg = payload.new as Message;
-        if (msg.sender_id === userId) return;
+        if (msg.sender_id === userId && !options?.deliverOwnMessages) return;
         if (allowed && !allowed.has(msg.conversation_id)) return;
         onMessage(msg);
       }

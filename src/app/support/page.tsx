@@ -35,6 +35,10 @@ export default async function SupportPage({
     getPublishedFaqs(),
   ]);
   const chatHref = user ? "/support/chat" : "/login?redirect=/support/chat";
+  const topicHref = (id: string) => {
+    const dest = `/support/chat?topic=${id}`;
+    return user ? dest : `/login?redirect=${encodeURIComponent(dest)}`;
+  };
   const query = (q ?? "").trim().toLowerCase();
   const topics = TOPICS.filter(
     (topic) =>
@@ -84,7 +88,7 @@ export default async function SupportPage({
             {topics.map((topic) => {
               const Icon = topic.icon;
               return (
-                <a key={topic.id} href={`#${topic.id}`} className="flex items-center gap-3 py-4">
+                <Link key={topic.id} href={topicHref(topic.id)} className="flex items-center gap-3 py-4">
                   <span className="grid h-11 w-11 shrink-0 place-items-center rounded-2xl bg-white/8">
                     <Icon className="h-5 w-5" />
                   </span>
@@ -93,7 +97,7 @@ export default async function SupportPage({
                     <span className="mt-0.5 block text-sm text-[#b9b3c6]">{topic.hint}</span>
                   </span>
                   <ChevronRight className="h-4 w-4 shrink-0 text-[#b9b3c6]" />
-                </a>
+                </Link>
               );
             })}
           </div>
@@ -105,9 +109,6 @@ export default async function SupportPage({
 
         {faqs.length > 0 && (
           <section className="mt-8 space-y-4">
-            {TOPICS.map((topic) => (
-              <div key={topic.id} id={topic.id} />
-            ))}
             <h2 className="text-lg font-bold">Answers</h2>
             {faqs.map((faq) => (
               <article key={faq.q} className="rounded-2xl border border-white/10 p-4">

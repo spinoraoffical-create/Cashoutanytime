@@ -4,6 +4,7 @@ import { VipPageLayout } from "@/components/layout/vip-page-layout";
 import { UserMessagesInbox } from "@/components/chat/user-messages-inbox";
 import { CHAT_PAGE_SHELL_CLASS } from "@/lib/chat/chat-layout";
 import { initUserMessagesInbox } from "@/lib/actions/messages";
+import { repairPendingSupportReply } from "@/lib/chat/support-auto-reply";
 import { getAuthUser } from "@/lib/supabase/session";
 
 export const dynamic = "force-dynamic";
@@ -11,6 +12,7 @@ export const dynamic = "force-dynamic";
 export default async function SupportChatPage() {
   const user = await getAuthUser();
   if (!user) redirect("/login?redirect=/support/chat");
+  await repairPendingSupportReply(user.id);
   const initialData = await initUserMessagesInbox();
 
   return (

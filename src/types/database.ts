@@ -49,6 +49,7 @@ export interface Message {
   attachment_type: MessageAttachmentType | null;
   attachment_name: string | null;
   is_read: boolean;
+  from_staff?: boolean;
   created_at: string;
 }
 

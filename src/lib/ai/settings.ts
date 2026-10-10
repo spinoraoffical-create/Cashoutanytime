@@ -170,10 +170,10 @@ const BOT_USERNAME = "support-bot";
 const BOT_EMAIL = "support-bot@users.cashoutanytime.invalid";
 
 /** Dedicated support-bot profile. Never a random admin and never the player. */
-export async function getBotSenderProfileId(): Promise<string | null> {
+export async function getBotSenderProfileId(excludeUserId?: string): Promise<string | null> {
   const fromEnv = process.env.SPINORA_BOT_SENDER_ID?.trim();
-  if (fromEnv) return fromEnv;
-  if (botSenderCache) return botSenderCache;
+  if (fromEnv && fromEnv !== excludeUserId) return fromEnv;
+  if (botSenderCache && botSenderCache !== excludeUserId) return botSenderCache;
 
   const db = createAdminClient();
   if (!db) return null;

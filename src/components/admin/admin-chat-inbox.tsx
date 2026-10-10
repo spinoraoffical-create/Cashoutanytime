@@ -21,6 +21,7 @@ import { useChatAutoScroll } from "@/lib/chat/use-chat-auto-scroll";
 import { CHAT_INCOMING_EVENT, type ChatIncomingDetail } from "@/lib/chat/events";
 import { playIncomingMessageSound } from "@/lib/chat/message-notification-sound";
 import { subscribeToConversationInserts, subscribeToMessageInserts } from "@/lib/chat/subscribe-messages";
+import { isAdminOutgoingMessage, markAdminOutgoing, markAdminOutgoingSoon } from "@/lib/chat/admin-outgoing";
 import { appendMessage, mergeMessagesById } from "@/lib/chat/merge-messages";
 import { isUserOnline } from "@/lib/presence/utils";
 import { toast } from "sonner";
@@ -157,7 +158,8 @@ function AdminChatPanel({
           </p>
         ) : (
           messages.map((msg) => {
-            const isAdminMsg = msg.sender_id === adminId;
+            const isAdminMsg =
+              msg.from_staff === true || (msg.from_staff == null && msg.sender_id === adminId);
             return (
               <div
                 key={msg.id}
@@ -335,7 +337,7 @@ export function AdminChatInbox({
 
   const handleIncomingMessage = useCallback(
     (msg: Message) => {
-      if (!supabase || !adminId || msg.sender_id === adminId) return;
+      if (!supabase || !adminId || isAdminOutgoingMessage(msg)) return;
 
       playIncomingMessageSound(msg.sender_id, adminId);
       scheduleLoadUnreads();
@@ -359,10 +361,16 @@ export function AdminChatInbox({
   useEffect(() => {
     if (!supabase || !adminId) return;
 
-    return subscribeToMessageInserts(supabase, `admin-inbox-${adminId}`, adminId, (msg) => {
-      if (msg.conversation_id === selectedIdRef.current) return;
-      handleIncomingMessage(msg);
-    });
+    return subscribeToMessageInserts(
+      supabase,
+      `admin-inbox-${adminId}`,
+      adminId,
+      (msg) => {
+        if (msg.conversation_id === selectedIdRef.current) return;
+        handleIncomingMessage(msg);
+      },
+      { deliverOwnMessages: true }
+    );
   }, [supabase, adminId, handleIncomingMessage]);
 
   useEffect(() => {
@@ -373,7 +381,7 @@ export function AdminChatInbox({
       `admin-live-${selectedId}`,
       selectedId,
       (msg) => {
-        if (msg.sender_id === adminId) return;
+        if (isAdminOutgoingMessage(msg)) return;
         handleIncomingMessage(msg);
       }
     );
@@ -399,6 +407,14 @@ export function AdminChatInbox({
     const interval = setInterval(poll, 800);
     return () => clearInterval(interval);
   }, [supabase, selectedId]);
+
+  useEffect(() => {
+    const interval = setInterval(() => {
+      if (document.visibilityState !== "visible") return;
+      void loadUnreads();
+    }, 2000);
+    return () => clearInterval(interval);
+  }, [loadUnreads]);
 
   useEffect(() => {
     function onChatIncoming(event: Event) {
@@ -499,6 +515,7 @@ export function AdminChatInbox({
       attachment = uploadResult.data;
     }
 
+    markAdminOutgoingSoon(selectedId, content);
     const result = await sendMessageClient(supabase, {
       conversationId: selectedId,
       senderId: adminId!,
@@ -516,6 +533,7 @@ export function AdminChatInbox({
     }
 
     if (result.message) {
+      markAdminOutgoing(result.message.id);
       setMessages((prev) =>
         prev.some((m) => m.id === result.message!.id) ? prev : [...prev, result.message!]
       );

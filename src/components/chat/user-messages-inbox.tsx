@@ -2,7 +2,8 @@
 
 import { useState, useEffect, useRef, useCallback, useMemo, type RefObject } from "react";
 import Link from "next/link";
-import { useSearchParams } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
+import { SUPPORT_TOPIC_PROMPTS, type SupportTopicId } from "@/lib/ai/escalate";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { createClient } from "@/lib/supabase/client";
@@ -196,6 +197,9 @@ export function UserMessagesInbox({
 } = {}) {
   const dashboardProfile = useDashboardProfile();
   const searchParams = useSearchParams();
+  const router = useRouter();
+  const topicSent = useRef(false);
+  const sendTopicRef = useRef<(text: string) => void>(() => {});
   const profileUserId = dashboardProfile?.userId ?? null;
   const hasServerData = Boolean(initialData?.userId && !initialData.error);
   const [conversations, setConversations] = useState<ConversationPreview[]>(
@@ -337,9 +341,18 @@ export function UserMessagesInbox({
     void openConversation(conversationParam);
   }, [searchParams, initLoading, openConversation]);
 
+  useEffect(() => {
+    if (topicSent.current || initLoading || !selectedId || !userId) return;
+    const topic = searchParams.get("topic");
+    if (!topic || !(topic in SUPPORT_TOPIC_PROMPTS)) return;
+    topicSent.current = true;
+    sendTopicRef.current(SUPPORT_TOPIC_PROMPTS[topic as SupportTopicId]);
+    router.replace("/support/chat", { scroll: false });
+  }, [initLoading, selectedId, userId, searchParams, router]);
+
   const handleIncomingMessage = useCallback(
     (msg: Message) => {
-      if (!supabase || !userId || msg.sender_id === userId) return;
+      if (!supabase || !userId || (msg.sender_id === userId && msg.from_staff !== true)) return;
 
       playIncomingMessageSound(msg.sender_id, userId);
 
@@ -384,7 +397,7 @@ export function UserMessagesInbox({
       `user-live-${selectedId}`,
       selectedId,
       (msg) => {
-        if (msg.sender_id === userId) return;
+        if (msg.sender_id === userId && msg.from_staff !== true) return;
         handleIncomingMessage(msg);
       }
     );
@@ -496,6 +509,10 @@ export function UserMessagesInbox({
   function handleFollowUp(text: string) {
     return sendText(text, null, false);
   }
+
+  sendTopicRef.current = (text: string) => {
+    void sendText(text, null, false);
+  };
 
   const chatPanelProps = {
     selectedConversation,

@@ -152,8 +152,10 @@ export function SupportThread({
               {group.day}
             </p>
             {group.items.map((message) => {
-              const isOwn = message.sender_id === userId;
-              const isAssistant = !isOwn && (botSenderId ? message.sender_id === botSenderId : true);
+              const fromStaff = message.from_staff === true;
+              const isOwn = message.sender_id === userId && !fromStaff;
+              const isAssistant =
+                !isOwn && !fromStaff && (botSenderId ? message.sender_id === botSenderId : true);
               const label = isOwn ? null : isAssistant ? `${SITE_NAME} AI` : "Owner";
               const showWallet = !isOwn && isAssistant && messageMentionsWallet(message.content);
               return (
