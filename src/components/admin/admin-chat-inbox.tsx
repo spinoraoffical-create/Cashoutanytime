@@ -27,7 +27,7 @@ import { CHAT_INCOMING_EVENT, type ChatIncomingDetail } from "@/lib/chat/events"
 import { playIncomingMessageSound } from "@/lib/chat/message-notification-sound";
 import { subscribeToConversationInserts, subscribeToMessageInserts } from "@/lib/chat/subscribe-messages";
 import { isAdminOutgoingMessage, markAdminOutgoing, markAdminOutgoingSoon } from "@/lib/chat/admin-outgoing";
-import { appendMessage, mergeMessagesById } from "@/lib/chat/merge-messages";
+import { appendMessage } from "@/lib/chat/merge-messages";
 import { isUserOnline } from "@/lib/presence/utils";
 import { toast } from "sonner";
 import { ArrowLeft, MessageCircle } from "lucide-react";
@@ -416,7 +416,7 @@ export function AdminChatInbox({
         .order("created_at", { ascending: true })
         .then(({ data }) => {
           if (selectedIdRef.current !== selectedId) return;
-          if (data) setMessages((prev) => mergeMessagesById(prev, data));
+          if (data) setMessages(data);
         });
     };
 

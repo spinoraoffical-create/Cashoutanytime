@@ -30,7 +30,7 @@ import { useChatAutoScroll } from "@/lib/chat/use-chat-auto-scroll";
 import { CHAT_INCOMING_EVENT, type ChatIncomingDetail } from "@/lib/chat/events";
 import { playIncomingMessageSound } from "@/lib/chat/message-notification-sound";
 import { useDashboardProfile } from "@/lib/dashboard/dashboard-profile-context";
-import { appendMessage, mergeMessagesById } from "@/lib/chat/merge-messages";
+import { appendMessage } from "@/lib/chat/merge-messages";
 import { subscribeToConversationInserts, subscribeToMessageInserts } from "@/lib/chat/subscribe-messages";
 import { toast } from "sonner";
 import { ArrowLeft, Headphones, MessageCircle } from "lucide-react";
@@ -269,7 +269,7 @@ export function UserMessagesInbox({
         .eq("conversation_id", convId)
         .order("created_at", { ascending: true });
 
-      setMessages((prev) => mergeMessagesById(prev, data ?? []));
+      setMessages(data ?? []);
       if (userId) void markConversationReadClient(supabase, convId, userId);
       if (options?.syncSidebar !== false) {
         void refreshUnread();
@@ -414,7 +414,7 @@ export function UserMessagesInbox({
         .eq("conversation_id", selectedId)
         .order("created_at", { ascending: true })
         .then(({ data }) => {
-          if (data) setMessages((prev) => mergeMessagesById(prev, data));
+          if (data) setMessages(data);
         });
     };
 

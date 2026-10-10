@@ -6,7 +6,7 @@ import { createNotification } from "@/lib/actions/notifications";
 import { notifyAdminOfCustomerMessage } from "@/lib/telegram/notify-admin-message";
 import { processAIChatQuery, getBotSenderProfileId, stripHtmlForDisplay } from "@/lib/ai/chatbot";
 import { asksForPerson, CHAT_FALLBACK_REPLY, CHAT_PERSON_REPLY, supportGreetingReply } from "@/lib/ai/escalate";
-import { scriptedSupportReply } from "@/lib/chat/support-auto-reply";
+import { insertSupportReplyOnce, scriptedSupportReply } from "@/lib/chat/support-auto-reply";
 import { supportReferenceCode } from "@/lib/chat/support-thread";
 import { getChatbotSettings } from "@/lib/ai/settings";
 import { isTelegramConfigured, sendTelegramMessage, escapeTelegramHtml } from "@/lib/telegram/client";
@@ -150,13 +150,13 @@ export async function POST(request: Request) {
       if (replyText) {
         const botSenderId = await getBotSenderProfileId(user.id);
         if (botSenderId && botSenderId !== user.id) {
-          const { error: insertError } = await db.from("messages").insert({
-            conversation_id: conversationId,
-            sender_id: botSenderId,
-            content: replyText,
-            is_read: false,
+          await insertSupportReplyOnce(db, {
+            conversationId,
+            userId: user.id,
+            botSenderId,
+            userContent: content,
+            reply: replyText,
           });
-          if (insertError) console.error("[AfterSend AI insert]:", insertError.message);
         } else {
           console.error("[AfterSend AI insert]: support bot profile is missing");
         }
