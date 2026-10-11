@@ -1,6 +1,7 @@
 import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
 
+import { pickLoginDestination, signedInUsesAdminHome } from "@/lib/auth/account-home";
 import { getSupabaseAnonKey, getSupabaseUrl, isSupabaseConfigured } from "@/lib/supabase/env";
 
 export async function updateSession(request: NextRequest) {
@@ -100,16 +101,30 @@ export async function updateSession(request: NextRequest) {
     return NextResponse.redirect(url);
   }
 
+  if (user?.id && emailConfirmed && path === "/") {
+    if (await signedInUsesAdminHome(supabase, user.id)) {
+      const url = request.nextUrl.clone();
+      url.pathname = "/admin";
+      url.search = "";
+      return NextResponse.redirect(url);
+    }
+  }
+
   if (
-    user &&
+    user?.id &&
     emailConfirmed &&
     isAuth &&
     path !== "/auth/callback" &&
     !path.startsWith("/reset-password/update")
   ) {
     const url = request.nextUrl.clone();
-    url.pathname = request.nextUrl.searchParams.get("redirect") || "/dashboard";
-    url.searchParams.delete("redirect");
+    const destination = pickLoginDestination(
+      request.nextUrl.searchParams.get("redirect"),
+      await signedInUsesAdminHome(supabase, user.id)
+    );
+    const parsed = new URL(destination, request.url);
+    url.pathname = parsed.pathname;
+    url.search = parsed.search;
     return NextResponse.redirect(url);
   }
 

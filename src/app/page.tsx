@@ -1,4 +1,8 @@
+import { redirect } from "next/navigation";
+
 import { HomeLandingShell } from "@/components/home/home-landing-shell";
+import { signedInUsesAdminHome } from "@/lib/auth/account-home";
+import { createClient } from "@/lib/supabase/server";
 import { getLinkedGameSlugs } from "@/lib/data/dashboard";
 import { getGames } from "@/lib/data/marketing";
 import { getActivePromotions } from "@/lib/data/promotions-public";
@@ -10,6 +14,10 @@ export const dynamic = "force-dynamic";
 
 export default async function HomePage() {
   const user = await getAuthUser();
+  if (user) {
+    const supabase = await createClient();
+    if (await signedInUsesAdminHome(supabase, user.id)) redirect("/admin");
+  }
   const profile = user ? await getProfile() : null;
   const [linkedGameSlugs, dbGames, promotions] = await Promise.all([
     user ? getLinkedGameSlugs(user.id) : Promise.resolve([] as string[]),

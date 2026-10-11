@@ -2,6 +2,7 @@ import { createServerClient } from "@supabase/ssr";
 import { cookies } from "next/headers";
 import { NextResponse, type NextRequest } from "next/server";
 import type { EmailOtpType } from "@supabase/supabase-js";
+import { pickLoginDestination, signedInUsesAdminHome } from "@/lib/auth/account-home";
 import { syncProfileFromAuthMetadata } from "@/lib/actions/auth";
 import { linkSignupSecurity } from "@/lib/actions/security";
 
@@ -137,6 +138,15 @@ export async function GET(request: NextRequest) {
   if (signedIn && lockedCode) {
     const { assignPlayerToAgentByCode } = await import("@/lib/agents/assign");
     await assignPlayerToAgentByCode(signedIn.id, lockedCode);
+  }
+
+  if (type !== "recovery" && signedIn) {
+    const nextPath = pickLoginDestination(redirect, await signedInUsesAdminHome(supabase, signedIn.id));
+    if (nextPath !== destUrl.pathname) {
+      const nextUrl = new URL(nextPath, origin);
+      if (type === "signup") nextUrl.searchParams.set("verified", "1");
+      response.headers.set("location", nextUrl.toString());
+    }
   }
 
   return response;

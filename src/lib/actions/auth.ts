@@ -8,6 +8,7 @@ import {
   phoneLookupVariants,
 } from "@/lib/auth/phone";
 import { isEmailIdentifier, normalizeEmail, formatAuthErrorMessage, maskEmail } from "@/lib/auth/identifier";
+import { pickLoginDestination, signedInUsesAdminHome } from "@/lib/auth/account-home";
 import { buildAuthCallbackUrl } from "@/lib/auth/callback-url";
 import { createClient } from "@/lib/supabase/server";
 import { missingProfileColumn } from "@/lib/admin/spinora-profile";
@@ -108,8 +109,9 @@ export async function sendLoginOtp(
 
 export async function verifyLoginOtp(
   identifier: string,
-  token: string
-): Promise<{ ok: boolean; error?: string }> {
+  token: string,
+  redirectTo?: string
+): Promise<{ ok: boolean; error?: string; home?: string }> {
   const allowed = await rateLimit("authOtp", `verify:${await otpRateLimitKey(identifier)}`);
   if (!allowed) return { ok: false, error: "Too many attempts. Please wait a few minutes." };
 
@@ -124,7 +126,14 @@ export async function verifyLoginOtp(
   });
 
   if (error) return { ok: false, error: formatAuthErrorMessage(error) };
-  return { ok: true };
+
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  const home = user
+    ? pickLoginDestination(redirectTo, await signedInUsesAdminHome(supabase, user.id))
+    : pickLoginDestination(redirectTo, false);
+  return { ok: true, home };
 }
 
 /** Check phone is not already linked to another account (register) */
@@ -353,7 +362,7 @@ async function persistContactViaSession(
 export type RegisterWithEmailResult = { ok: true; email: string } | { ok: false; error: string };
 
 export type SignInWithEmailResult =
-  | { ok: true; loggedIn: true }
+  | { ok: true; loggedIn: true; home: string }
   | { ok: true; loggedIn: false; email: string; confirmationSent: true }
   | { ok: false; error: string };
 
@@ -411,7 +420,13 @@ export async function signInWithEmailPassword(input: {
     return { ok: false, error: formatAuthErrorMessage(error) };
   }
 
-  return { ok: true, loggedIn: true };
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  const home = user
+    ? pickLoginDestination(input.redirect, await signedInUsesAdminHome(supabase, user.id))
+    : pickLoginDestination(input.redirect, false);
+  return { ok: true, loggedIn: true, home };
 }
 
 /** Register with email + password; phone saved immediately via service role */

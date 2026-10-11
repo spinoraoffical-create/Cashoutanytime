@@ -125,7 +125,7 @@ export function EmailAuthForm({ mode, redirect = "/", referralCodeFromUrl, agent
       }
 
       toast.success("Welcome back!");
-      router.push(redirect);
+      router.push(result.home);
       router.refresh();
       return;
     }

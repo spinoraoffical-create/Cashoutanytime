@@ -160,7 +160,7 @@ export function OtpAuthForm({ mode, redirect = "/", referralCodeFromUrl }: OtpAu
     setLoading(true);
 
     if (mode === "login") {
-      const verified = await verifyLoginOtp(identifier, otp.trim());
+      const verified = await verifyLoginOtp(identifier, otp.trim(), redirect);
       if (!verified.ok) {
         setLoading(false);
         toast.error(verified.error ?? "Invalid code");
@@ -168,7 +168,7 @@ export function OtpAuthForm({ mode, redirect = "/", referralCodeFromUrl }: OtpAu
       }
       setLoading(false);
       toast.success("Welcome back!");
-      router.push(redirect);
+      router.push(verified.home || "/");
       router.refresh();
       return;
     }
