@@ -4,6 +4,17 @@ import { updateSession } from "@/lib/supabase/middleware";
 export async function middleware(request: NextRequest) {
   const path = request.nextUrl.pathname;
 
+  const referral = path.match(/^\/r\/([^/]+)\/?$/);
+  if (referral) {
+    const stored = decodeURIComponent(referral[1]).trim().slice(0, 32);
+    const agentCode = /^[A-Za-z0-9_-]+$/.test(stored) ? stored : "";
+    const url = request.nextUrl.clone();
+    url.pathname = "/register";
+    url.search = "";
+    if (agentCode) url.searchParams.set("agent", agentCode);
+    return NextResponse.redirect(url);
+  }
+
   // 1. Geo-Blocking Compliance Guard (Vercel Edge headers)
   const restrictedStates = (process.env.RESTRICTED_STATES || "WA,ID,NV,MI").split(",");
   const country = request.headers.get("x-vercel-ip-country") || "";

@@ -248,3 +248,10 @@ begin
   where id = p_deposit_id;
 end;
 $$;
+
+grant select, insert, update, delete on public.agent_accounts to service_role;
+grant select, insert, update, delete on public.agent_messages to service_role;
+grant select on public.agent_accounts to authenticated;
+grant select, insert on public.agent_messages to authenticated;
+grant execute on function public.agent_may_touch_player(uuid) to authenticated, service_role;
+grant execute on function public.complete_deposit_request(uuid, numeric, text) to authenticated, service_role;

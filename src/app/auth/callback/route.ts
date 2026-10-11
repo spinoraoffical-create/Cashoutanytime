@@ -123,17 +123,18 @@ export async function GET(request: NextRequest) {
             .eq("id", user.id);
         }
       }
-      const { assignPlayerToAgentByCode } = await import("@/lib/agents/assign");
-      await assignPlayerToAgentByCode(user.id, agentCode || referralCode);
     }
-  } else if (agentCode?.trim()) {
-    const {
-      data: { user },
-    } = await supabase.auth.getUser();
-    if (user) {
-      const { assignPlayerToAgentByCode } = await import("@/lib/agents/assign");
-      await assignPlayerToAgentByCode(user.id, agentCode);
-    }
+  }
+
+  const {
+    data: { user: signedIn },
+  } = await supabase.auth.getUser();
+  const metadataCode =
+    typeof signedIn?.user_metadata?.agent_code === "string" ? signedIn.user_metadata.agent_code : "";
+  const lockedCode = agentCode?.trim() || metadataCode.trim();
+  if (signedIn && lockedCode) {
+    const { assignPlayerToAgentByCode } = await import("@/lib/agents/assign");
+    await assignPlayerToAgentByCode(signedIn.id, lockedCode);
   }
 
   return response;

@@ -11,11 +11,10 @@ import {
   TicketStatusBadge,
 } from "@/components/dashboard/ticket-status-badge";
 import { GlassCard } from "@/components/shared/glass-card";
-import { profileDisplayName, profileHandle } from "@/lib/admin/spinora-profile";
-import { adminDb } from "@/lib/actions/admin/core";
+import { profileDisplayName } from "@/lib/admin/spinora-profile";
 import { staffReplyAction } from "@/lib/actions/admin/support";
-import { getAgentScope, playerInScope } from "@/lib/agents/scope";
-import { can, getStaffContext } from "@/lib/data/admin";
+import { platformTicketAccess } from "@/lib/support/ticket-access";
+import { getAdminTicket } from "@/lib/support/ticket-store";
 import { redirect } from "next/navigation";
 
 export const metadata: Metadata = { title: "Chat" };
@@ -34,33 +33,15 @@ export default async function AdminTicketDetailPage({
 }: {
   params: Promise<{ id: string }>;
 }) {
-  const ctx = await getStaffContext();
-  const scope = await getAgentScope();
-  const platform = Boolean(ctx && (ctx.isSuperAdmin || can(ctx, "support.manage")));
-  if (scope?.level === "sub") redirect("/admin/agent-inbox");
-  if (!platform && scope?.level !== "store") redirect("/admin");
+  const { allowed, isSub } = await platformTicketAccess();
+  if (isSub) redirect("/admin/agent-inbox");
+  if (!allowed) notFound();
   const { id } = await params;
-  const db = adminDb();
-
-  const { data: ticket } = await db
-    .from("support_tickets")
-    .select(
-      "id, ticket_no, subject, category, status, priority, assigned_to, created_at, user_id, profiles(email, full_name)"
-    )
-    .eq("id", id)
-    .maybeSingle();
-
+  const ticket = await getAdminTicket(id);
   if (!ticket) notFound();
-  if (!platform && scope && !(await playerInScope(scope, (ticket as { user_id?: string }).user_id || ""))) notFound();
 
-  const { data: messages } = await db
-    .from("ticket_messages")
-    .select("id, is_staff, body, attachment_url, created_at")
-    .eq("ticket_id", id)
-    .order("created_at", { ascending: true });
-
-  const thread = messages ?? [];
-  const member = ticket.profiles as { email?: string | null; full_name?: string | null } | null;
+  const thread = ticket.messages;
+  const member = ticket.profiles;
 
   return (
     <div className="mx-auto max-w-3xl">

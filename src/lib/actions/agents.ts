@@ -27,9 +27,16 @@ export type AgentRow = {
 export type NetworkPlayer = {
   id: string;
   name: string;
+  phone: string;
   email: string;
+  subCreator: string;
+  store: string;
   wallet: number;
+  cashout: number;
+  coins: number;
+  level: number | null;
   createdAt: string;
+  status: "Active" | "Suspended";
   parentId: string | null;
   parentName: string;
   suspended: boolean;
@@ -212,20 +219,27 @@ export async function createAgentAction(input: z.infer<typeof createSchema>) {
   const userId = created.user.id;
   await db.from("profiles").update({ full_name: parsed.data.name }).eq("id", userId);
 
-  const promo = code();
   const roleLabel = parsed.data.kind === "store_creator" ? "store_creator" : parsed.data.roleLabel ?? "sub_creator";
-  const { error } = await db.from("agent_accounts").insert({
-    user_id: userId,
-    tier: parsed.data.kind,
-    role_label: roleLabel,
-    parent_id: parentId,
-    phone: parsed.data.phone || null,
-    promo_code: promo,
-    commission_bps: parsed.data.commissionBps,
-    approve_limit: parsed.data.kind === "sub_creator" ? parsed.data.approveLimit ?? 100 : null,
-    created_by: scope.userId,
-    active: true,
-  });
+  let promo = code();
+  let error: { message: string } | null = null;
+  for (let attempt = 0; attempt < 4; attempt += 1) {
+    if (attempt > 0) promo = code();
+    const inserted = await db.from("agent_accounts").insert({
+      user_id: userId,
+      tier: parsed.data.kind,
+      role_label: roleLabel,
+      parent_id: parentId,
+      phone: parsed.data.phone || null,
+      promo_code: promo,
+      commission_bps: parsed.data.commissionBps,
+      approve_limit: parsed.data.kind === "sub_creator" ? parsed.data.approveLimit ?? 100 : null,
+      created_by: scope.userId,
+      active: true,
+    });
+    error = inserted.error;
+    if (!error) break;
+    if (!/promo_code|duplicate|unique/i.test(error.message)) break;
+  }
   if (error) {
     return { ok: false as const, error: "The login was created, but the agent record was not. Apply the migration and try again." };
   }
@@ -238,7 +252,7 @@ export async function createAgentAction(input: z.infer<typeof createSchema>) {
     after: { tier: parsed.data.kind, parentId, email: parsed.data.email },
   });
   revalidatePath("/admin/sub-creators");
-  return { ok: true as const, message: "Agent created.", promoCode: promo };
+  return { ok: true as const, message: `Agent created. Promo code ${promo} stays on this account.`, promoCode: promo };
 }
 
 export async function setAgentActiveAction(userId: string, active: boolean) {
@@ -342,74 +356,179 @@ async function agentInScope(scope: AgentScope, userId: string) {
   return data.tier === "sub_creator" && data.parent_id === scope.userId;
 }
 
+type PlayerSource = {
+  id: string;
+  full_name: string | null;
+  email: string | null;
+  phone?: string | null;
+  wallet_balance: number | null;
+  cashout_wallet?: number | null;
+  coins_balance?: number | null;
+  xp?: number | null;
+  created_at: string;
+  parent_agent_id: string | null;
+  is_suspended: boolean | null;
+};
+
+const PLAYER_FIELDS = [
+  "id",
+  "full_name",
+  "email",
+  "phone",
+  "wallet_balance",
+  "cashout_wallet",
+  "coins_balance",
+  "xp",
+  "created_at",
+  "parent_agent_id",
+  "is_suspended",
+];
+
+function missingColumn(message: string) {
+  const named = message.match(/column profiles\.([a-z_]+) does not exist/i);
+  if (named) return named[1];
+  const cache = message.match(/Could not find the '([a-z_]+)' column/i);
+  return cache?.[1] ?? null;
+}
+
+function dash(value: string | null | undefined) {
+  const text = value?.trim();
+  return text ? text : "—";
+}
+
+/** Body of public.calculate_level. Used only when that function is not in the API schema. */
+function calculateLevel(xpTotal: number) {
+  return Math.max(1, Math.floor(Math.sqrt(Math.max(xpTotal, 0) / 100)) + 1);
+}
+
 export async function loadNetworkPlayers(input: {
   q?: string;
   parentId?: string;
+  exportAll?: boolean;
 }): Promise<{ rows: NetworkPlayer[]; parents: { id: string; name: string }[]; error?: string }> {
   const gate = await scopeOrError();
   if ("error" in gate) return { rows: [], parents: [], error: gate.error };
   const { scope } = gate;
+  if (scope.level !== "platform" && scope.parentIds.length === 0) return { rows: [], parents: [] };
+  if (input.parentId && input.parentId !== "all" && scope.level !== "platform" && !scope.parentIds.includes(input.parentId)) {
+    return { rows: [], parents: [], error: "That parent is outside your network." };
+  }
+
   const db = adminDb();
+  const fields = [...PLAYER_FIELDS];
+  const scanAll = Boolean(input.exportAll || input.q?.trim());
+  const pageSize = scanAll ? 1000 : 300;
+  let people: PlayerSource[] = [];
 
-  let query = db.from("profiles").select("id, full_name, email, wallet_balance, created_at, parent_agent_id, is_suspended");
-  if (scope.level !== "platform") {
-    if (scope.parentIds.length === 0) return { rows: [], parents: [], error: undefined };
-    query = query.in("parent_agent_id", scope.parentIds);
-  }
-  if (input.parentId && input.parentId !== "all") {
-    if (scope.level !== "platform" && !scope.parentIds.includes(input.parentId)) {
-      return { rows: [], parents: [], error: "That parent is outside your network." };
+  for (let attempt = 0; attempt < fields.length; attempt += 1) {
+    people = [];
+    let failed = false;
+    for (let from = 0; ; from += pageSize) {
+      let query = db.from("profiles").select(fields.join(", "));
+      if (scope.level !== "platform") query = query.in("parent_agent_id", scope.parentIds);
+      if (input.parentId && input.parentId !== "all") query = query.eq("parent_agent_id", input.parentId);
+      const { data, error } = await query.order("created_at", { ascending: false }).range(from, from + pageSize - 1);
+      if (error) {
+        const column = missingColumn(error.message);
+        if (column && fields.includes(column) && column !== "id") {
+          fields.splice(fields.indexOf(column), 1);
+          failed = true;
+          break;
+        }
+        return { rows: [], parents: [], error: "Could not load players." };
+      }
+      const batch = (data ?? []) as unknown as PlayerSource[];
+      people.push(...batch);
+      if (!scanAll || batch.length < pageSize) break;
     }
-    query = query.eq("parent_agent_id", input.parentId);
+    if (!failed) break;
   }
 
-  const { data, error } = await query.order("created_at", { ascending: false }).limit(300);
-  if (error) return { rows: [], parents: [], error: "Could not load players." };
-
-  const people = (data ?? []) as {
-    id: string;
-    full_name: string | null;
-    email: string | null;
-    wallet_balance: number | null;
-    created_at: string;
-    parent_agent_id: string | null;
-    is_suspended: boolean | null;
-  }[];
-
-  const q = input.q?.trim().toLowerCase();
-  const filtered = q
-    ? people.filter((row) => `${row.full_name ?? ""} ${row.email ?? ""}`.toLowerCase().includes(q))
-    : people;
-
-  const parentIds = [...new Set(filtered.map((row) => row.parent_agent_id).filter(Boolean) as string[])];
-  const { data: parents } = parentIds.length
-    ? await db.from("profiles").select("id, full_name, email").in("id", parentIds)
+  const parentIds = [...new Set(people.map((row) => row.parent_agent_id).filter(Boolean) as string[])];
+  const { data: agentRows } = parentIds.length
+    ? await db.from("agent_accounts").select("user_id, tier, parent_id").in("user_id", parentIds)
+    : { data: [] };
+  const agents = new Map(
+    ((agentRows ?? []) as { user_id: string; tier: string; parent_id: string | null }[]).map((row) => [row.user_id, row])
+  );
+  const storeIds = [...agents.values()]
+    .filter((row) => row.tier === "sub_creator" && row.parent_id)
+    .map((row) => row.parent_id as string);
+  const nameIds = [...new Set([...parentIds, ...storeIds, ...(scope.level === "sub" ? [] : scope.parentIds)])];
+  const { data: nameRows } = nameIds.length
+    ? await db.from("profiles").select("id, full_name, email").in("id", nameIds)
     : { data: [] };
   const parentName = new Map(
-    ((parents ?? []) as { id: string; full_name: string | null; email: string | null }[]).map((row) => [
+    ((nameRows ?? []) as { id: string; full_name: string | null; email: string | null }[]).map((row) => [
       row.id,
       row.full_name?.trim() || row.email || "Agent",
     ])
   );
 
-  const parentOptions =
-    scope.level === "sub"
-      ? [{ id: scope.userId, name: "You" }]
-      : scope.parentIds.map((id) => ({ id, name: parentName.get(id) || id.slice(0, 8) }));
+  const levels = new Map<number, number>();
+  const xpValues = [...new Set(people.map((row) => Number(row.xp ?? 0)))];
+  const probe = await db.rpc("calculate_level", { xp_total: xpValues[0] ?? 0 });
+  const functionMissing = Boolean(probe.error && /schema cache|calculate_level/i.test(probe.error.message));
+  if (!probe.error && probe.data != null) levels.set(xpValues[0] ?? 0, Number(probe.data));
+  await Promise.all(
+    xpValues.map(async (xp) => {
+      if (levels.has(xp)) return;
+      if (functionMissing) {
+        levels.set(xp, calculateLevel(xp));
+        return;
+      }
+      const { data, error } = await db.rpc("calculate_level", { xp_total: xp });
+      if (!error && data != null) levels.set(xp, Number(data));
+    })
+  );
 
-  return {
-    parents: parentOptions,
-    rows: filtered.map((row) => ({
+  const shaped = people.map((row) => {
+    const agent = row.parent_agent_id ? agents.get(row.parent_agent_id) : undefined;
+    const parentLabel = row.parent_agent_id ? parentName.get(row.parent_agent_id) || "Agent" : "—";
+    const subCreator = agent?.tier === "sub_creator" ? parentLabel : "—";
+    const store =
+      agent?.tier === "store_creator"
+        ? parentLabel
+        : agent?.tier === "sub_creator"
+          ? dash(agent.parent_id ? parentName.get(agent.parent_id) : "")
+          : "—";
+    const suspended = Boolean(row.is_suspended);
+    return {
       id: row.id,
       name: row.full_name?.trim() || row.email || "Player",
+      phone: dash(row.phone),
       email: row.email ?? "",
+      subCreator,
+      store,
       wallet: Number(row.wallet_balance ?? 0),
+      cashout: Number(row.cashout_wallet ?? 0),
+      coins: Number(row.coins_balance ?? 0),
+      level: levels.has(Number(row.xp ?? 0)) ? levels.get(Number(row.xp ?? 0)) ?? null : null,
       createdAt: row.created_at,
+      status: suspended ? "Suspended" as const : "Active" as const,
       parentId: row.parent_agent_id,
-      parentName: row.parent_agent_id ? parentName.get(row.parent_agent_id) || "Agent" : "Unassigned",
-      suspended: Boolean(row.is_suspended),
-    })),
-  };
+      parentName: parentLabel,
+      suspended,
+    };
+  });
+
+  const q = input.q?.trim().toLowerCase();
+  const filtered = q
+    ? shaped.filter((row) =>
+        [row.name, row.phone === "—" ? "" : row.phone, row.email, row.subCreator === "—" ? "" : row.subCreator, row.store === "—" ? "" : row.store]
+          .join(" ")
+          .toLowerCase()
+          .includes(q)
+      )
+    : shaped;
+  const rows = input.exportAll ? filtered : filtered.slice(0, 300);
+
+  const parentOptions =
+    scope.level === "sub"
+      ? []
+      : scope.parentIds.map((id) => ({ id, name: parentName.get(id) || "Agent" }));
+
+  return { parents: parentOptions, rows };
 }
 
 export async function movePlayerAction(playerId: string, nextParentId: string) {

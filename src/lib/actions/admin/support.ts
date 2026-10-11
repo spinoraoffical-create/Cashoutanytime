@@ -10,6 +10,14 @@ import {
   writeAudit,
 } from "@/lib/actions/admin/core";
 import type { TicketStatus } from "@/lib/database.types";
+import { platformTicketAccess } from "@/lib/support/ticket-access";
+import { addTicketMessage, assignStoredTicket, setStoredTicketStatus } from "@/lib/support/ticket-store";
+
+async function refuseStoreOrSub(): Promise<string | null> {
+  const access = await platformTicketAccess();
+  if (!access.allowed) return "Tickets stay with Super Admin.";
+  return null;
+}
 
 const STATUSES: TicketStatus[] = [
   "open",
@@ -26,6 +34,8 @@ export async function staffReplyAction(input: {
 }): Promise<AdminActionResult> {
   const auth = await authorize("support.manage");
   if ("error" in auth) return { ok: false, error: auth.error };
+  const blocked = await refuseStoreOrSub();
+  if (blocked) return { ok: false, error: blocked };
 
   const parsed = z
     .object({
@@ -40,27 +50,20 @@ export async function staffReplyAction(input: {
   }
 
   const db = adminDb();
-  const { error } = await db.from("ticket_messages").insert({
-    ticket_id: parsed.data.ticketId,
-    sender_id: auth.staff.userId,
-    is_staff: true,
+  const ticket = await addTicketMessage({
+    ticketId: parsed.data.ticketId,
+    senderId: auth.staff.userId,
+    isStaff: true,
     body: parsed.data.body,
-    attachment_url: parsed.data.attachmentUrl ?? null,
+    attachmentUrl: parsed.data.attachmentUrl ?? null,
   });
-  if (error) return { ok: false, error: "Could not send the reply." };
-
-  // notify the ticket owner
-  const { data: ticket } = await db
-    .from("support_tickets")
-    .select("user_id, ticket_no, subject")
-    .eq("id", parsed.data.ticketId)
-    .single();
+  if (!ticket) return { ok: false, error: "Could not send the reply." };
 
   if (ticket) {
     await db.from("notifications").insert({
-      user_id: ticket.user_id,
+      user_id: ticket.userId,
       type: "support",
-      title: `Reply on ticket #${ticket.ticket_no}`,
+      title: `Reply on ticket #${ticket.ticketNo}`,
       body: `Our team replied to "${ticket.subject}".`,
       link_url: `/dashboard/support/${parsed.data.ticketId}`,
       icon: "headset",
@@ -73,13 +76,13 @@ export async function staffReplyAction(input: {
       const siteUrl = process.env.NEXT_PUBLIC_SITE_URL ?? "http://localhost:3000";
       const mail = ticketReplyEmail({
         displayName: "there",
-        ticketNo: ticket.ticket_no,
+        ticketNo: ticket.ticketNo,
         subject: ticket.subject,
         siteUrl,
         ticketId: parsed.data.ticketId,
       });
       await sendMemberEmail({
-        userId: ticket.user_id,
+        userId: ticket.userId,
         channel: "support",
         subject: mail.subject,
         html: mail.html,
@@ -106,21 +109,15 @@ export async function setTicketStatusAction(input: {
 }): Promise<AdminActionResult> {
   const auth = await authorize("support.manage");
   if ("error" in auth) return { ok: false, error: auth.error };
+  const blocked = await refuseStoreOrSub();
+  if (blocked) return { ok: false, error: blocked };
 
   if (!STATUSES.includes(input.status)) {
     return { ok: false, error: "Invalid status." };
   }
 
-  const db = adminDb();
-  const { error } = await db
-    .from("support_tickets")
-    .update({
-      status: input.status,
-      closed_at:
-        input.status === "closed" ? new Date().toISOString() : null,
-    })
-    .eq("id", input.ticketId);
-  if (error) return { ok: false, error: "Could not update status." };
+  const saved = await setStoredTicketStatus(input.ticketId, input.status);
+  if (!saved) return { ok: false, error: "Could not update status." };
 
   await writeAudit({
     actorId: auth.staff.userId,
@@ -140,13 +137,11 @@ export async function assignTicketToMeAction(
 ): Promise<AdminActionResult> {
   const auth = await authorize("support.manage");
   if ("error" in auth) return { ok: false, error: auth.error };
+  const blocked = await refuseStoreOrSub();
+  if (blocked) return { ok: false, error: blocked };
 
-  const db = adminDb();
-  const { error } = await db
-    .from("support_tickets")
-    .update({ assigned_to: auth.staff.userId })
-    .eq("id", ticketId);
-  if (error) return { ok: false, error: "Could not assign the ticket." };
+  const saved = await assignStoredTicket(ticketId, auth.staff.userId);
+  if (!saved) return { ok: false, error: "Could not assign the ticket." };
 
   await writeAudit({
     actorId: auth.staff.userId,

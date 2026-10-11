@@ -18,7 +18,7 @@ export async function updateSession(request: NextRequest) {
     .getAll()
     .some((c) => c.name.includes("-auth-token") && c.value);
 
-  if (!isProtected && !isAuth) {
+  if (!isProtected && !isAuth && !hasSupabaseSession) {
     return NextResponse.next({ request });
   }
 
@@ -60,9 +60,27 @@ export async function updateSession(request: NextRequest) {
     },
   });
 
-  let {
-    data: { user },
-  } = await supabase.auth.getUser();
+  let user: { email_confirmed_at?: string | null; confirmed_at?: string | null; id?: string } | null = null;
+  try {
+    const result = await supabase.auth.getUser();
+    user = result.data.user;
+  } catch {
+    user = null;
+  }
+
+  if (!user && hasSupabaseSession) {
+    const stale = request.cookies.getAll().filter((cookie) => cookie.name.includes("-auth-token"));
+    for (const cookie of stale) request.cookies.delete(cookie.name);
+    const cleared = NextResponse.next({ request });
+    for (const cookie of stale) cleared.cookies.set(cookie.name, "", { path: "/", maxAge: 0 });
+    if (isProtected) {
+      const url = request.nextUrl.clone();
+      url.pathname = "/login";
+      url.searchParams.set("redirect", path);
+      return NextResponse.redirect(url);
+    }
+    return cleared;
+  }
 
   const emailConfirmed = Boolean(user?.email_confirmed_at ?? user?.confirmed_at);
 

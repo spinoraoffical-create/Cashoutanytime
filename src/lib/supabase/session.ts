@@ -3,11 +3,17 @@ import { createClient } from "@/lib/supabase/server";
 import type { Profile } from "@/types/database";
 
 export const getAuthUser = cache(async () => {
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  return user ?? null;
+  try {
+    const supabase = await createClient();
+    const {
+      data: { user },
+      error,
+    } = await supabase.auth.getUser();
+    if (error || !user) return null;
+    return user;
+  } catch {
+    return null;
+  }
 });
 
 export const getProfile = cache(async (): Promise<Profile | null> => {

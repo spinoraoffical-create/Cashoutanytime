@@ -1,5 +1,5 @@
-import Image from "next/image";
 import Link from "next/link";
+import { GameArt } from "@/components/games/game-art";
 import {
   BadgeCheck,
   ChevronRight,
@@ -22,7 +22,7 @@ function RoomCard({ game }: { game: Game }) {
       className="hub-card w-[148px] shrink-0 overflow-hidden rounded-2xl"
     >
       <div className="relative h-28 w-full bg-white/5">
-        <Image src={game.image} alt="" fill className="object-cover" />
+        <GameArt src={game.image} />
       </div>
       <div className="p-3">
         <p className="truncate text-sm font-bold">{game.name}</p>
@@ -129,7 +129,7 @@ export function PublicHome({ games }: { games?: Game[] }) {
                 className="hub-card flex items-center gap-3 rounded-2xl p-2 pr-3"
               >
                 <div className="relative h-14 w-14 overflow-hidden rounded-xl bg-white/5">
-                  <Image src={g.image} alt="" fill className="object-cover" />
+                  <GameArt src={g.image} />
                 </div>
                 <div className="min-w-0 flex-1">
                   <p className="truncate font-bold">{g.name}</p>
@@ -149,7 +149,7 @@ export function PublicHome({ games }: { games?: Game[] }) {
             {fish.slice(0, 4).map((g) => (
               <Link key={g.slug} href={`/games/${g.slug}`} className="hub-card overflow-hidden rounded-2xl">
                 <div className="relative h-24 w-full bg-white/5">
-                  <Image src={g.image} alt="" fill className="object-cover" />
+                  <GameArt src={g.image} />
                 </div>
                 <div className="p-3">
                   <p className="truncate text-sm font-bold">{g.name}</p>

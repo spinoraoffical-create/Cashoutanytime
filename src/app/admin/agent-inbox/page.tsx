@@ -23,21 +23,31 @@ export default async function AgentInboxPage({
   }
   const params = await searchParams;
   const db = adminDb();
-  const { data } = await db
-    .from("profiles")
-    .select("id, full_name, email")
-    .eq("parent_agent_id", scope.userId)
+  const { data: threadRows } = await db
+    .from("agent_messages")
+    .select("player_id")
+    .eq("agent_id", scope.userId)
     .order("created_at", { ascending: false })
-    .limit(100);
+    .limit(200);
+  const playerIds = [
+    ...new Set(((threadRows ?? []) as { player_id: string }[]).map((row) => row.player_id)),
+  ];
+  const { data } = playerIds.length
+    ? await db
+        .from("profiles")
+        .select("id, full_name, email")
+        .in("id", playerIds)
+        .eq("parent_agent_id", scope.userId)
+    : { data: [] };
   const players = (data ?? []) as { id: string; full_name: string | null; email: string | null }[];
-  const current = players.find((row) => row.id === params.player) ?? players[0];
+  const current = players.find((row) => row.id === params.player) ?? players[0] ?? null;
 
   return (
     <div className="mx-auto grid max-w-5xl gap-4 lg:grid-cols-[16rem_1fr]">
       <div>
         <AdminPageHeader title="Player chat" description="Only your players." />
         <ul className="space-y-1">
-          {players.length === 0 ? <li className="text-sm text-muted-foreground">No players yet.</li> : null}
+          {players.length === 0 ? <li className="text-sm text-muted-foreground">No chats yet.</li> : null}
           {players.map((player) => (
             <li key={player.id}>
               <Link

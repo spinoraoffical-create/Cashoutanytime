@@ -496,6 +496,11 @@ export async function finalizeRegistrationAfterSignUp(input: {
   const e164 = parseValidInternationalPhone(input.phone);
   if (!e164) return { ok: false, error: INVALID_PHONE_MESSAGE };
 
+  if (input.agentCode?.trim()) {
+    const { assignPlayerToAgentByCode } = await import("@/lib/agents/assign");
+    await assignPlayerToAgentByCode(input.userId, input.agentCode);
+  }
+
   const saved = await persistContactOnProfile(input.userId, {
     phone: e164,
     fullName: input.fullName.trim(),

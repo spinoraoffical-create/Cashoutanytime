@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
-import Image from "next/image";
+import { GameArt } from "@/components/games/game-art";
 import { useRouter } from "next/navigation";
 import { ArrowLeft, ChevronDown, ChevronRight } from "lucide-react";
 import Link from "next/link";
@@ -160,7 +160,7 @@ export function GameLandingClient({
           <ArrowLeft className="h-5 w-5" />
         </Link>
         <div className="relative h-11 w-11 shrink-0 overflow-hidden rounded-xl">
-          <Image src={game.image} alt="" fill className="object-cover" priority sizes="44px" />
+          <GameArt src={game.image} priority sizes="44px" />
         </div>
         <h1 className="min-w-0 truncate text-lg font-black">{game.name}</h1>
       </div>

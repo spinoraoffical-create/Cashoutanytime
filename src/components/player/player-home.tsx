@@ -2,6 +2,7 @@
 
 import { useMemo, useState } from "react";
 import Image from "next/image";
+import { GameArt } from "@/components/games/game-art";
 import Link from "next/link";
 import { ChevronRight, Search, Shield, X } from "lucide-react";
 import { motion } from "framer-motion";
@@ -20,7 +21,7 @@ function RoomCard({ game, tap }: { game: Game; tap?: { scale: number } }) {
     <motion.div whileTap={tap} className="shrink-0">
       <Link href={`/games/${game.slug}`} className="hub-card block w-40 overflow-hidden rounded-3xl transition hover:-translate-y-0.5">
         <div className="relative h-44 w-full bg-white/5">
-          <Image src={game.image} alt="" fill className="object-cover" />
+          <GameArt src={game.image} />
           {game.popular ? (
             <span className="absolute left-2 top-2 rounded-full bg-[#f5c542] px-2 py-0.5 text-[9px] font-bold uppercase text-zinc-950">
               Featured

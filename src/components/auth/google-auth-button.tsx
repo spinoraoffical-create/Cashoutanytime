@@ -9,12 +9,14 @@ import { getDeviceId } from "@/lib/security/device-fingerprint";
 interface GoogleAuthButtonProps {
   redirect?: string;
   referralCode?: string | null;
+  agentCode?: string | null;
   label?: string;
 }
 
 export function GoogleAuthButton({
   redirect = "/",
   referralCode,
+  agentCode,
   label = "Continue with Google",
 }: GoogleAuthButtonProps) {
   const [loading, setLoading] = useState(false);
@@ -34,6 +36,9 @@ export function GoogleAuthButton({
     callbackUrl.searchParams.set("redirect", redirect);
     if (referralCode?.trim()) {
       callbackUrl.searchParams.set("ref", referralCode.trim());
+    }
+    if (agentCode?.trim()) {
+      callbackUrl.searchParams.set("agent", agentCode.trim());
     }
 
     const { data, error } = await supabase.auth.signInWithOAuth({

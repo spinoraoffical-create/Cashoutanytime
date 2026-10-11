@@ -323,6 +323,7 @@ export async function getRecentActivity(limit = 8) {
     .from("activity_log")
     .select("id, action, description, metadata, created_at")
     .eq("user_id", user.id)
+    .neq("action", "player_support_ticket")
     .order("created_at", { ascending: false })
     .limit(limit);
   return data ?? [];

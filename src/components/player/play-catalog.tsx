@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { useSearchParams } from "next/navigation";
-import Image from "next/image";
+import { GameArt } from "@/components/games/game-art";
 import Link from "next/link";
 import { ChevronRight, Gamepad2, LayoutGrid, Search, SlidersHorizontal, Sparkles, Star } from "lucide-react";
 import { motion } from "framer-motion";
@@ -210,7 +210,7 @@ export function PlayCatalog({ games }: { games: Game[] }) {
               </button>
               <Link href={`/games/${g.slug}`} className="block">
                 <div className="relative h-36 w-full bg-white/5 sm:h-40">
-                  <Image src={g.image} alt="" fill className="object-cover" />
+                  <GameArt src={g.image} />
                   {g.popular ? (
                     <span className="absolute left-2 top-2 rounded bg-[#f5c542] px-1.5 py-0.5 text-[9px] font-bold uppercase text-zinc-950">
                       Featured

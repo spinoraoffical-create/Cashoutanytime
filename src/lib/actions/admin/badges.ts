@@ -2,6 +2,8 @@
 
 import { adminDb } from "@/lib/actions/admin/core";
 import { can, getStaffContext } from "@/lib/data/admin";
+import { platformTicketAccess } from "@/lib/support/ticket-access";
+import { countOpenTickets } from "@/lib/support/ticket-store";
 
 /** Sidebar badge counts — loaded after the admin shell paints. */
 export async function getAdminSidebarBadgesAction(): Promise<
@@ -30,12 +32,10 @@ export async function getAdminSidebarBadgesAction(): Promise<
       if (money) badges["/admin/money"] = money;
     }
 
-    if (can(ctx, "support.manage")) {
-      const openTickets = await db
-        .from("support_tickets")
-        .select("id", { count: "exact", head: true })
-        .in("status", ["open", "pending", "in_progress"]);
-      if (openTickets.count) badges["/admin/support"] = openTickets.count;
+    const ticketAccess = await platformTicketAccess();
+    if (ticketAccess.allowed) {
+      const openTickets = await countOpenTickets();
+      if (openTickets) badges["/admin/support"] = openTickets;
     }
 
     if (ctx.isSuperAdmin) {

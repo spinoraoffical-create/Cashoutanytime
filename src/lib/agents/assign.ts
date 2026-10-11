@@ -1,27 +1,19 @@
 import "server-only";
 
 import { adminDb } from "@/lib/actions/admin/core";
-import { keptParent } from "@/lib/offers/audience";
 
-/** Attach a new player to the sub-creator or store creator who owns this code. */
+/** Set parent_agent_id once, to the creator who owns this promo code. A sub-creator code stays on that sub-creator. */
 export async function assignPlayerToAgentByCode(playerId: string, rawCode: string | null | undefined) {
   const code = rawCode?.trim();
-  if (!code) return;
+  if (!code || !playerId) return;
   try {
     const db = adminDb();
     const { data: agent, error } = await db
       .from("agent_accounts")
-      .select("user_id, active")
+      .select("user_id, active, promo_code")
       .ilike("promo_code", code)
       .maybeSingle();
     if (error || !agent || agent.active === false || agent.user_id === playerId) return;
-
-    const { data: profile } = await db
-      .from("profiles")
-      .select("parent_agent_id")
-      .eq("id", playerId)
-      .maybeSingle();
-    if (keptParent(profile?.parent_agent_id, agent.user_id) !== agent.user_id) return;
 
     await db
       .from("profiles")

@@ -3,6 +3,7 @@
 import { useEffect, useState, type FormEvent } from "react";
 import { toast } from "sonner";
 
+import { loadAgentThread, sendAgentMessage } from "@/lib/actions/agent-chat";
 import { createClient } from "@/lib/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -13,10 +14,12 @@ export function AgentThread({
   playerId,
   agentId,
   selfId,
+  compact = false,
 }: {
   playerId: string;
   agentId: string;
   selfId: string;
+  compact?: boolean;
 }) {
   const [rows, setRows] = useState<Row[]>([]);
   const [body, setBody] = useState("");
@@ -24,20 +27,16 @@ export function AgentThread({
 
   useEffect(() => {
     const supabase = createClient();
-    if (!supabase) return;
     let cancelled = false;
-    void supabase
-      .from("agent_messages")
-      .select("id, sender_id, body, created_at")
-      .eq("player_id", playerId)
-      .eq("agent_id", agentId)
-      .order("created_at", { ascending: true })
-      .then(({ data, error }) => {
-        if (cancelled) return;
-        if (error) toast.error("Chat is not available until the agent migration is applied.");
-        else setRows((data ?? []) as Row[]);
-      });
+    void loadAgentThread(playerId, agentId).then((data) => {
+      if (!cancelled) setRows(data);
+    });
 
+    if (!supabase) {
+      return () => {
+        cancelled = true;
+      };
+    }
     const channel = supabase
       .channel(`agent-${playerId}-${agentId}`)
       .on(
@@ -60,25 +59,19 @@ export function AgentThread({
     event.preventDefault();
     const text = body.trim();
     if (!text) return;
-    const supabase = createClient();
-    if (!supabase) return;
     setSending(true);
-    const { error } = await supabase.from("agent_messages").insert({
-      player_id: playerId,
-      agent_id: agentId,
-      sender_id: selfId,
-      body: text,
-    });
+    const result = await sendAgentMessage({ playerId, agentId, body: text });
     setSending(false);
-    if (error) {
-      toast.error("Message was not sent.");
+    if (!result.ok) {
+      toast.error(result.error);
       return;
     }
+    setRows((current) => (current.some((item) => item.id === result.row.id) ? current : [...current, result.row]));
     setBody("");
   }
 
   return (
-    <div className="flex h-[28rem] flex-col rounded-2xl border border-border">
+    <div className={compact ? "flex h-full min-h-0 flex-col" : "flex h-[28rem] flex-col rounded-2xl border border-border"}>
       <div className="flex-1 space-y-2 overflow-y-auto p-4">
         {rows.length === 0 ? <p className="text-sm text-muted-foreground">No messages yet.</p> : null}
         {rows.map((row) => (

@@ -3,6 +3,7 @@ import "server-only";
 import { unstable_cache } from "next/cache";
 
 import { adminDb } from "@/lib/actions/admin/core";
+import { countOpenTickets } from "@/lib/support/ticket-store";
 
 export type DashboardStats = {
   totalUsers: number;
@@ -18,7 +19,7 @@ export const getDashboardStats = unstable_cache(
     const db = adminDb();
     const sinceIso = new Date(Date.now() - windowMs).toISOString();
 
-    const [totalUsers, newUsers, coins, pendingRequests, openTickets] = await Promise.all([
+    const [totalUsers, newUsers, coins, pendingRequests, openTicketCount] = await Promise.all([
       db.from("profiles").select("id", { count: "exact", head: true }),
       db.from("profiles").select("id", { count: "exact", head: true }).gte("created_at", sinceIso),
       db
@@ -32,10 +33,7 @@ export const getDashboardStats = unstable_cache(
         .from("deposit_requests")
         .select("id", { count: "exact", head: true })
         .in("status", ["pending", "processing"]),
-      db
-        .from("support_tickets")
-        .select("id", { count: "exact", head: true })
-        .in("status", ["open", "pending", "in_progress"]),
+      countOpenTickets(),
     ]);
 
     return {
@@ -43,7 +41,7 @@ export const getDashboardStats = unstable_cache(
       newUsersInWindow: newUsers.count ?? 0,
       coinsIssuedInWindow: (coins.data ?? []).reduce((sum, e) => sum + e.amount, 0),
       pendingRequests: pendingRequests.count ?? 0,
-      openTickets: openTickets.count ?? 0,
+      openTickets: openTicketCount,
     };
   },
   ["admin-dashboard-stats"],

@@ -22,6 +22,8 @@ import {
 } from "@/lib/admin/spinora-profile";
 import { assertCanSeePlayer } from "@/lib/agents/scope";
 import { can, getStaffContext } from "@/lib/data/admin";
+import { platformTicketAccess } from "@/lib/support/ticket-access";
+import { listPlayerTickets } from "@/lib/support/ticket-store";
 import type { VipTierKey } from "@/lib/database.types";
 
 export const metadata: Metadata = { title: "Member" };
@@ -62,6 +64,7 @@ export default async function AdminUserDetailPage({
   const { id } = await params;
   const scope = await assertCanSeePlayer(id);
   const ctx = await getStaffContext();
+  const ticketAccess = await platformTicketAccess();
   const db = adminDb();
 
   const { data: profile } = await db
@@ -76,7 +79,7 @@ export default async function AdminUserDetailPage({
   const { data: authUser } = await db.auth.admin.getUserById(id);
   const email = authUser?.user?.email ?? p.email ?? null;
 
-  const [rolesRes, userRolesRes, vipRes, ledgerRes, spinoraDepositsRes, winDepositsRes, ticketsRes] = await Promise.all([
+  const [rolesRes, userRolesRes, vipRes, ledgerRes, spinoraDepositsRes, winDepositsRes] = await Promise.all([
     db.from("roles").select("key, name").order("key"),
     db.from("user_roles").select("roles(key)").eq("user_id", id),
     db.from("vip_status").select("vip_tiers(key, name)").eq("user_id", id).maybeSingle(),
@@ -96,12 +99,10 @@ export default async function AdminUserDetailPage({
       .select("id, reference_code, request_type, deposit_amount, payment_method, status, created_at, resolved_at, games(name)")
       .eq("user_id", id)
       .order("created_at", { ascending: false }),
-    db
-      .from("support_tickets")
-      .select("id, ticket_no, subject, category, status, last_message_at, created_at")
-      .eq("user_id", id)
-      .order("last_message_at", { ascending: false }),
   ]);
+  const ticketsRes = ticketAccess.allowed
+    ? { data: await listPlayerTickets(id) }
+    : { data: [] };
 
   const allRoles = rolesRes.data ?? [];
   const userRoleKeys = (userRolesRes.data ?? [])
@@ -173,14 +174,16 @@ export default async function AdminUserDetailPage({
               </span>
             )}
           </TabsTrigger>
-          <TabsTrigger value="support">
-            Support
-            {tickets.length > 0 && (
-              <span className="ml-1.5 rounded-full bg-foreground/10 px-1.5 py-0.5 text-[10px] font-semibold">
-                {tickets.length}
-              </span>
-            )}
-          </TabsTrigger>
+          {ticketAccess.allowed ? (
+            <TabsTrigger value="support">
+              Support
+              {tickets.length > 0 && (
+                <span className="ml-1.5 rounded-full bg-foreground/10 px-1.5 py-0.5 text-[10px] font-semibold">
+                  {tickets.length}
+                </span>
+              )}
+            </TabsTrigger>
+          ) : null}
         </TabsList>
 
         {/* ── Profile tab ── */}
@@ -425,7 +428,7 @@ export default async function AdminUserDetailPage({
         </TabsContent>
 
         {/* ── Support History tab ── */}
-        <TabsContent value="support">
+        {ticketAccess.allowed ? <TabsContent value="support">
           {tickets.length === 0 ? (
             <GlassCard className="py-10 text-center text-sm text-muted-foreground">
               No support tickets found for this player.
@@ -464,7 +467,7 @@ export default async function AdminUserDetailPage({
               </ul>
             </GlassCard>
           )}
-        </TabsContent>
+        </TabsContent> : null}
       </Tabs>
     </div>
   );

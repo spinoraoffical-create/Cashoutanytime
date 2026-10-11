@@ -9,6 +9,8 @@ import { profileDisplayName } from "@/lib/admin/spinora-profile";
 import { AgentHome } from "@/components/admin/agent-home";
 import { getAgentScope } from "@/lib/agents/scope";
 import { can, requireStaff } from "@/lib/data/admin";
+import { platformTicketAccess } from "@/lib/support/ticket-access";
+import { countOpenTickets, listRecentTickets } from "@/lib/support/ticket-store";
 
 type FeedItem = {
   id: string;
@@ -55,7 +57,8 @@ export default async function AdminOverviewPage() {
   const ctx = await requireStaff();
   const db = adminDb();
   const money = can(ctx, "requests.manage");
-  const support = can(ctx, "support.manage");
+  const ticketAccess = await platformTicketAccess();
+  const support = ticketAccess.allowed;
   const players = can(ctx, "users.manage");
   const kyc = can(ctx, "cms.manage");
   const analytics = can(ctx, "analytics.read");
@@ -68,9 +71,7 @@ export default async function AdminOverviewPage() {
       money
         ? headCount(db.from("game_load_requests").select("id", { count: "exact", head: true }).in("status", ["pending", "processing"]))
         : Promise.resolve(0),
-      support
-        ? headCount(db.from("support_tickets").select("id", { count: "exact", head: true }).in("status", ["open", "pending", "in_progress"]))
-        : Promise.resolve(0),
+      support ? countOpenTickets() : Promise.resolve(0),
       kyc
         ? headCount(db.from("kyc_submissions").select("id", { count: "exact", head: true }).eq("status", "pending"))
         : Promise.resolve(0),
@@ -126,12 +127,8 @@ export default async function AdminOverviewPage() {
     }
   }
   if (support) {
-    const { data } = await db
-      .from("support_tickets")
-      .select("id, ticket_no, subject, created_at")
-      .order("created_at", { ascending: false })
-      .limit(5);
-    for (const row of data ?? []) {
+    const data = await listRecentTickets(5);
+    for (const row of data) {
       feed.push({
         id: `ticket-${row.id}`,
         href: `/admin/support/${row.id}`,

@@ -17,7 +17,7 @@ export default async function NetworkPlayersPage({
   const loaded = await loadNetworkPlayers({ q: params.q, parentId: params.parent });
 
   return (
-    <div className="mx-auto max-w-6xl">
+    <div className="mx-auto max-w-[90rem]">
       <AdminPageHeader
         title="Players"
         description={
@@ -33,6 +33,7 @@ export default async function NetworkPlayersPage({
         rows={loaded.rows}
         parents={loaded.parents}
         canMove={scope.level !== "sub"}
+        showParentFilter={scope.level !== "sub"}
         query={{ q: params.q, parent: params.parent }}
       />
     </div>

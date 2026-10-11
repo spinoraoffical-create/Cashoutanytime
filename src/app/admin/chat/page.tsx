@@ -1,7 +1,10 @@
+import { redirect } from "next/navigation";
+
 import { AdminChatInbox, type AdminConversation } from "@/components/admin/admin-chat-inbox";
 import { getAdminChatConversations, getAdminConversationUnreads } from "@/lib/actions/messages";
 import { repairPendingSupportReply } from "@/lib/chat/support-auto-reply";
 import { CHAT_PAGE_SHELL_CLASS } from "@/lib/chat/chat-layout";
+import { platformTicketAccess } from "@/lib/support/ticket-access";
 
 export const dynamic = "force-dynamic";
 
@@ -11,6 +14,17 @@ export default async function AdminChatPage({
   searchParams: Promise<{ userId?: string }>;
 }) {
   const { userId } = await searchParams;
+  const { allowed, isSub, isStore } = await platformTicketAccess();
+  if (isSub) redirect("/admin/agent-inbox");
+  if (isStore) {
+    return (
+      <div className={CHAT_PAGE_SHELL_CLASS}>
+        <h1 className="text-2xl font-bold">Customer Chat</h1>
+        <p className="text-sm text-muted-foreground">Player chats stay with the sub-creator on that account.</p>
+      </div>
+    );
+  }
+  if (!allowed) redirect("/admin");
   const [conversations, initialUnreads] = await Promise.all([
     getAdminChatConversations(),
     getAdminConversationUnreads(),

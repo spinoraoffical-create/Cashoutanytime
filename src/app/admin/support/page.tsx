@@ -11,10 +11,9 @@ import {
 import { EmptyState } from "@/components/shared/empty-state";
 import { GlassCard } from "@/components/shared/glass-card";
 import { profileDisplayName } from "@/lib/admin/spinora-profile";
-import { adminDb } from "@/lib/actions/admin/core";
 import { getAdminChatConversations } from "@/lib/actions/messages";
-import { getAgentScope } from "@/lib/agents/scope";
-import { can, getStaffContext } from "@/lib/data/admin";
+import { platformTicketAccess } from "@/lib/support/ticket-access";
+import { listAdminTickets } from "@/lib/support/ticket-store";
 import { redirect } from "next/navigation";
 import type { TicketStatus } from "@/lib/database.types";
 import { cn } from "@/lib/utils";
@@ -32,35 +31,15 @@ export default async function AdminSupportPage({
 }: {
   searchParams: Promise<{ filter?: string }>;
 }) {
-  const ctx = await getStaffContext();
-  const scope = await getAgentScope();
-  const platform = Boolean(ctx && (ctx.isSuperAdmin || can(ctx, "support.manage")));
-  if (scope?.level === "sub") redirect("/admin/agent-inbox");
-  if (!platform && scope?.level !== "store") redirect("/admin");
+  const { allowed, isSub, isStore } = await platformTicketAccess();
+  if (isSub) redirect("/admin/agent-inbox");
+  if (!allowed && !isStore) redirect("/admin");
   const params = await searchParams;
   const filterKey = params.filter ?? "active";
   const filter = FILTERS.find((f) => f.key === filterKey) ?? FILTERS[0];
 
-  const db = adminDb();
-  let ticketQuery = db
-    .from("support_tickets")
-    .select(
-      "id, ticket_no, subject, category, status, priority, last_message_at, user_id, profiles(email, full_name)"
-    )
-    .in("status", filter.statuses)
-    .order("last_message_at", { ascending: false })
-    .limit(100);
-  if (!platform && scope?.level === "store") {
-    const { data: owned } = scope.parentIds.length
-      ? await db.from("profiles").select("id").in("parent_agent_id", scope.parentIds).limit(1000)
-      : { data: [] as { id: string }[] };
-    const ids = ((owned ?? []) as { id: string }[]).map((row) => row.id);
-    ticketQuery = ids.length ? ticketQuery.in("user_id", ids) : ticketQuery.eq("user_id", "00000000-0000-0000-0000-000000000000");
-  }
-  const { data } = await ticketQuery;
-
-  const tickets = data ?? [];
-  const liveChats = await getAdminChatConversations();
+  const tickets = allowed ? await listAdminTickets(filter.statuses) : [];
+  const liveChats = allowed ? await getAdminChatConversations() : [];
   const visibleChats = liveChats.filter((chat) =>
     filterKey === "resolved" ? chat.supportResolved === true : filterKey === "active" ? chat.supportResolved !== true : false
   );

@@ -147,6 +147,20 @@ export function SubCreatorsManager({
                   </TableCell>
                   <TableCell>
                     <div className="flex flex-wrap gap-1">
+                      <Button
+                        type="button"
+                        size="sm"
+                        variant="outline"
+                        onClick={() => {
+                          const url = `${window.location.origin}/r/${row.promoCode}`;
+                          void navigator.clipboard.writeText(url).then(
+                            () => toast.success("Referral link copied."),
+                            () => toast.error("Could not copy the referral link.")
+                          );
+                        }}
+                      >
+                        Referral Link
+                      </Button>
                       <Button type="button" size="sm" variant="outline" onClick={() => setEdit(row)}>Edit</Button>
                       <Button type="button" size="sm" variant="outline" asChild>
                         <Link href={`/admin/players?parent=${row.userId}`}>Players</Link>
@@ -328,7 +342,7 @@ function EditForm({
     >
       <p className="font-semibold sm:col-span-2">Edit {row.name}</p>
       <p className="text-sm text-muted-foreground sm:col-span-2">
-        Signup link: /r/{row.promoCode} · Estimated commission {row.commissionBps / 100}% · Players {row.playerCount}
+        Promo code {row.promoCode} stays on this account. Estimated commission {row.commissionBps / 100}% · Players {row.playerCount}
       </p>
       <Input name="phone" defaultValue={row.phone} placeholder="Phone" />
       <select name="roleLabel" defaultValue={row.roleLabel} className="h-9 rounded-md border border-border bg-background px-2 text-sm">
