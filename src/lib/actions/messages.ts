@@ -231,6 +231,25 @@ export async function sendUserMessage(
     return { error: "Could not send that message. Try again." };
   }
 
+  const admin = createAdminClient();
+  const body = content.trim().slice(0, 2000);
+  if (admin && body) {
+    const { data: profile } = await admin
+      .from("profiles")
+      .select("parent_agent_id")
+      .eq("id", user.id)
+      .maybeSingle();
+    const agentId = (profile as { parent_agent_id?: string | null } | null)?.parent_agent_id ?? null;
+    if (agentId) {
+      await admin.from("agent_messages").insert({
+        player_id: user.id,
+        agent_id: agentId,
+        sender_id: user.id,
+        body,
+      });
+    }
+  }
+
   void notifyAdminOfCustomerMessage({
     conversationId,
     senderId: user.id,

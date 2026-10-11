@@ -33,7 +33,7 @@ export async function getAdminSidebarBadgesAction(): Promise<
     }
 
     const ticketAccess = await platformTicketAccess();
-    if (ticketAccess.allowed) {
+    if (ticketAccess.tickets) {
       const openTickets = await countOpenTickets();
       if (openTickets) badges["/admin/support"] = openTickets;
     }

@@ -58,7 +58,7 @@ export default async function AdminOverviewPage() {
   const db = adminDb();
   const money = can(ctx, "requests.manage");
   const ticketAccess = await platformTicketAccess();
-  const support = ticketAccess.allowed;
+  const support = ticketAccess.tickets;
   const players = can(ctx, "users.manage");
   const kyc = can(ctx, "cms.manage");
   const analytics = can(ctx, "analytics.read");

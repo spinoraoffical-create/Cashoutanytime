@@ -1,7 +1,5 @@
 import { VipPageLayout } from "@/components/layout/vip-page-layout";
-import { PlayerTicketDesk } from "@/components/player/player-ticket-desk";
 import { supportMetadata } from "@/lib/seo/metadata";
-import { loadPlayerTickets } from "@/lib/actions/player-tickets";
 import { getPublishedFaqs } from "@/lib/data/faqs-public";
 import { getAuthUser } from "@/lib/supabase/session";
 import Link from "next/link";
@@ -31,11 +29,10 @@ export default async function SupportPage({
 }: {
   searchParams: Promise<{ q?: string }>;
 }) {
-  const [{ q }, user, dbFaqs, desk] = await Promise.all([
+  const [{ q }, user, dbFaqs] = await Promise.all([
     searchParams,
     getAuthUser(),
     getPublishedFaqs(),
-    loadPlayerTickets(),
   ]);
   const chatHref = user ? "/support/chat" : "/login?redirect=/support/chat";
   const topicHref = (id: string) => {
@@ -59,7 +56,7 @@ export default async function SupportPage({
         <section className="space-y-3">
           <h1 className="text-3xl font-black">Contact us</h1>
           <p className="text-sm leading-6 text-[#b9b3c6]">
-            An automated assistant answers first and identifies itself. You can request a person at any time.
+            Private chat goes to the store or sub-creator on your account.
           </p>
           <Link
             href={chatHref}
@@ -70,29 +67,7 @@ export default async function SupportPage({
             </span>
             <ChevronRight className="h-5 w-5" />
           </Link>
-          <Link
-            href={user ? "#create-ticket" : "/login?redirect=/support"}
-            className="flex h-14 items-center justify-between rounded-2xl border border-white/15 px-4 text-base font-black"
-          >
-            <span>Submit Ticket</span>
-            <ChevronRight className="h-5 w-5" />
-          </Link>
-          <p className="text-sm text-[#b9b3c6]">
-            Submit Ticket goes to Super Admin. Private chat goes to your sub-creator.
-          </p>
         </section>
-
-        {desk ? (
-          <div className="mt-6">
-            <PlayerTicketDesk
-              total={desk.total}
-              pending={desk.pending}
-              resolved={desk.resolved}
-              openSlotsLeft={desk.openSlotsLeft}
-              tickets={desk.tickets}
-            />
-          </div>
-        ) : null}
 
         <form action="/support" className="mt-6">
           <p className="mb-2 font-bold">Search support topics</p>

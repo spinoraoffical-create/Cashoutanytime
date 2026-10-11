@@ -15,15 +15,7 @@ export default async function AdminChatPage({
 }) {
   const { userId } = await searchParams;
   const { allowed, isSub, isStore } = await platformTicketAccess();
-  if (isSub) redirect("/admin/agent-inbox");
-  if (isStore) {
-    return (
-      <div className={CHAT_PAGE_SHELL_CLASS}>
-        <h1 className="text-2xl font-bold">Customer Chat</h1>
-        <p className="text-sm text-muted-foreground">Players assigned to you are in Player chat. A sub-creator&apos;s players stay in that sub-creator&apos;s chat.</p>
-      </div>
-    );
-  }
+  if (isStore || isSub) redirect("/admin/agent-inbox");
   if (!allowed) redirect("/admin");
   const [conversations, initialUnreads] = await Promise.all([
     getAdminChatConversations(),

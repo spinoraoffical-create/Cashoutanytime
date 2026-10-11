@@ -15,7 +15,7 @@ import { addTicketMessage, assignStoredTicket, setStoredTicketStatus } from "@/l
 
 async function refuseStoreOrSub(): Promise<string | null> {
   const access = await platformTicketAccess();
-  if (!access.allowed) return "Tickets stay with Super Admin.";
+  if (!access.tickets) return "Tickets stay with Super Admin.";
   return null;
 }
 

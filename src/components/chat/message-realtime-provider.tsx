@@ -28,7 +28,8 @@ import {
 import { getDepositMethod, type DepositPaymentMethodId } from "@/lib/payments/methods";
 import { subscribeToConversationInserts, subscribeToMessageInserts } from "@/lib/chat/subscribe-messages";
 import { isAdminOutgoingMessage } from "@/lib/chat/admin-outgoing";
-import { UserQuickChat } from "@/components/chat/user-quick-chat";
+import { AgentThread } from "@/components/agents/agent-thread";
+import { loadMyParentAgent } from "@/lib/actions/player-tickets";
 import {
   MessageRealtimeContext,
 } from "@/lib/chat/message-realtime-context";
@@ -38,8 +39,6 @@ import {
   resumeMessageNotificationAudio,
   unlockMessageNotificationSound,
 } from "@/lib/chat/message-notification-sound";
-import { ensureUserConversation } from "@/lib/actions/messages";
-import { ensureUserConversationClient } from "@/lib/chat/ensure-user-conversation-client";
 import { FloatingSocialLinks } from "@/components/layout/social-links";
 import { messagePreview } from "@/lib/chat/message-preview";
 import type { GameRequest, Message } from "@/types/database";
@@ -82,7 +81,7 @@ export function MessageRealtimeProvider({ children }: { children: ReactNode }) {
   const [isLoggedIn, setIsLoggedIn] = useState(false);
   const [popup, setPopup] = useState<ActivityPopup | null>(null);
   const [quickChatOpen, setQuickChatOpen] = useState(false);
-  const [quickChatConvId, setQuickChatConvId] = useState<string | null>(null);
+  const [parentAgentId, setParentAgentId] = useState<string | null>(null);
   const [activeUserId, setActiveUserId] = useState<string | null>(null);
   const [conversationIds, setConversationIds] = useState<string[]>([]);
   const userIdRef = useRef<string | null>(null);
@@ -140,9 +139,6 @@ export function MessageRealtimeProvider({ children }: { children: ReactNode }) {
     const { data: conversations } = await query;
     const ids = conversations?.map((c) => c.id) ?? [];
     setConversationIds(ids);
-    if (!admin && ids[0]) {
-      setQuickChatConvId((prev) => prev ?? ids[0]);
-    }
 
     void (admin ? getAdminUnreadMessageCount() : getUnreadMessageCount()).then((total) => {
       setCount(total);
@@ -219,12 +215,9 @@ export function MessageRealtimeProvider({ children }: { children: ReactNode }) {
       }
 
       if (!adminView) {
-        setQuickChatConvId(msg.conversation_id);
+        void loadMyParentAgent().then(({ agentId }) => setParentAgentId(agentId));
         setQuickChatOpen(true);
-        void showMessagePopup(
-          msg,
-          `/dashboard/messages?conversation=${msg.conversation_id}`
-        );
+        void showMessagePopup(msg, "/dashboard/messages");
         return;
       }
 
@@ -248,7 +241,7 @@ export function MessageRealtimeProvider({ children }: { children: ReactNode }) {
       openingChatRef.current = true;
 
       try {
-        let msgHref = adminView ? "/admin/chat" : `/dashboard/messages?conversation=${msg.conversation_id}`;
+        let msgHref = adminView ? "/admin/chat" : "/dashboard/messages";
 
         if (adminView) {
           const supabase = createClient();
@@ -468,7 +461,7 @@ export function MessageRealtimeProvider({ children }: { children: ReactNode }) {
         setActiveUserId(null);
         setConversationIds([]);
         setQuickChatOpen(false);
-        setQuickChatConvId(null);
+        setParentAgentId(null);
         setCount(0);
         setIsAdmin(false);
         setIsLoggedIn(false);
@@ -647,8 +640,7 @@ export function MessageRealtimeProvider({ children }: { children: ReactNode }) {
     setPopup(null);
 
     if (item.kind === "message" && !item.isAdminView) {
-      const match = item.href.match(/conversation=([^&]+)/);
-      if (match?.[1]) setQuickChatConvId(match[1]);
+      void loadMyParentAgent().then(({ agentId }) => setParentAgentId(agentId));
       setQuickChatOpen(true);
       return;
     }
@@ -718,25 +710,8 @@ export function MessageRealtimeProvider({ children }: { children: ReactNode }) {
                   router.push("/dashboard/messages");
                   return;
                 }
-
-                let convId = quickChatConvId;
-                if (!convId) {
-                  const supabase = createClient();
-                  if (supabase) {
-                    convId = await ensureUserConversationClient(supabase, uid);
-                  }
-                  if (!convId) {
-                    const ensured = await ensureUserConversation();
-                    convId = ensured.conversationId ?? null;
-                  }
-                }
-
-                if (!convId) {
-                  router.push("/dashboard/messages");
-                  return;
-                }
-
-                setQuickChatConvId(convId);
+                const { agentId } = await loadMyParentAgent();
+                setParentAgentId(agentId);
                 setQuickChatOpen(true);
               } catch {
                 router.push("/dashboard/messages");
@@ -756,13 +731,22 @@ export function MessageRealtimeProvider({ children }: { children: ReactNode }) {
         </div>
       )}
 
-      {!onAdminRoute && !onInboxPage && isLoggedIn && quickChatOpen && quickChatConvId && activeUserId && (
-        <UserQuickChat
-          open={quickChatOpen}
-          conversationId={quickChatConvId}
-          userId={activeUserId}
-          onClose={() => setQuickChatOpen(false)}
-        />
+      {!onAdminRoute && !onInboxPage && isLoggedIn && quickChatOpen && activeUserId && (
+        <div className="fixed bottom-[5.5rem] right-4 z-[140] flex h-[min(70vh,28rem)] w-[min(100vw-2rem,22rem)] flex-col overflow-hidden rounded-2xl border border-white/10 bg-[#121212] shadow-2xl sm:right-6">
+          <div className="flex items-center justify-between border-b border-white/10 px-3 py-2">
+            <p className="text-sm font-black text-white">Private chat</p>
+            <button type="button" aria-label="Close chat" onClick={() => setQuickChatOpen(false)} className="text-white">
+              <X className="h-4 w-4" />
+            </button>
+          </div>
+          <div className="min-h-0 flex-1 p-2">
+            {parentAgentId ? (
+              <AgentThread playerId={activeUserId} agentId={parentAgentId} selfId={activeUserId} compact />
+            ) : (
+              <p className="p-3 text-sm text-[#b9b3c6]">You are not assigned.</p>
+            )}
+          </div>
+        </div>
       )}
 
       {popup && (

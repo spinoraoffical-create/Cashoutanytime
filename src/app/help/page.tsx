@@ -2,8 +2,6 @@ import Link from "next/link";
 import { VipPageLayout } from "@/components/layout/vip-page-layout";
 import { getPublishedFaqs } from "@/lib/data/faqs-public";
 import { HelpFaqList } from "@/components/player/help-faq-list";
-import { PlayerTicketDesk } from "@/components/player/player-ticket-desk";
-import { loadPlayerTickets } from "@/lib/actions/player-tickets";
 import { GAME_BONUS_RULES } from "@/lib/games";
 
 export const metadata = { title: "Help & Support | Sweepstakes Hub" };
@@ -74,7 +72,6 @@ const FALLBACK = [
 export default async function HelpPage() {
   const published = await getPublishedFaqs();
   const faqs = published.length ? published : FALLBACK;
-  const desk = await loadPlayerTickets();
 
   return (
     <VipPageLayout>
@@ -85,22 +82,6 @@ export default async function HelpPage() {
           </Link>
           <h1 className="mt-2 text-3xl font-black">Help &amp; Support</h1>
         </div>
-        {desk ? (
-          <PlayerTicketDesk
-            total={desk.total}
-            pending={desk.pending}
-            resolved={desk.resolved}
-            openSlotsLeft={desk.openSlotsLeft}
-            tickets={desk.tickets}
-          />
-        ) : (
-          <p className="text-sm text-[#b9b3c6]">
-            <Link href="/login" className="font-bold text-white">
-              Sign in
-            </Link>{" "}
-            to create a ticket.
-          </p>
-        )}
         <HelpFaqList faqs={faqs} />
       </main>
     </VipPageLayout>

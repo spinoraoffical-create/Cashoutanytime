@@ -92,9 +92,8 @@ export const ADMIN_NAV: AdminNavSection[] = [
     label: "Support",
     icon: "LifeBuoy",
     permission: "support.manage",
-    roleAny: ["store_creator"],
     children: [
-      { href: "/admin/support", label: "Tickets", permission: "support.manage", roleAny: ["store_creator"] },
+      { href: "/admin/support", label: "Tickets", permission: null, superOnly: true },
       { href: "/admin/chat", label: "Live chat", permission: "support.manage" },
     ],
   },
@@ -225,6 +224,12 @@ export function visibleAdminNav(access: StaffNavAccess): AdminNavSection[] {
   for (const section of ADMIN_NAV) {
     if (section.superOnly && !access.isSuperAdmin) continue;
     if (section.operatorOnly && !isOperator(access)) continue;
+    if (
+      section.href === "/admin/support" &&
+      (access.roles.includes("store_creator") || access.roles.includes("sub_creator"))
+    ) {
+      continue;
+    }
 
     const children = section.children.filter((child) => canSeeNavItem(access, child));
     const listed =

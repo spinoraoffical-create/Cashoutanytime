@@ -1,4 +1,3 @@
-import Link from "next/link";
 import { redirect } from "next/navigation";
 
 import { AgentThread } from "@/components/agents/agent-thread";
@@ -34,15 +33,12 @@ export default async function PlayerAgentPage() {
       <h1 className="text-3xl font-black">Your agent</h1>
       {agentId ? (
         <>
-          <p className="text-sm text-muted-foreground">Chat with {agentName}. A ticket to the platform still goes to support, not to this chat.</p>
+          <p className="text-sm text-muted-foreground">Chat with {agentName}.</p>
           <AgentThread playerId={user.id} agentId={agentId} selfId={user.id} />
         </>
       ) : (
         <p className="text-sm text-muted-foreground">You are not assigned to an agent yet.</p>
       )}
-      <Link href="/support" className="inline-flex text-sm font-semibold text-[#ff6b89]">
-        Open a ticket to the platform
-      </Link>
     </div>
   );
 }

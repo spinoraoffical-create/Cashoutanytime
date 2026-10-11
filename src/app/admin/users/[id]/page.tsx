@@ -100,7 +100,7 @@ export default async function AdminUserDetailPage({
       .eq("user_id", id)
       .order("created_at", { ascending: false }),
   ]);
-  const ticketsRes = ticketAccess.allowed
+  const ticketsRes = ticketAccess.tickets
     ? { data: await listPlayerTickets(id) }
     : { data: [] };
 
@@ -174,7 +174,7 @@ export default async function AdminUserDetailPage({
               </span>
             )}
           </TabsTrigger>
-          {ticketAccess.allowed ? (
+          {ticketAccess.tickets ? (
             <TabsTrigger value="support">
               Support
               {tickets.length > 0 && (
@@ -428,7 +428,7 @@ export default async function AdminUserDetailPage({
         </TabsContent>
 
         {/* ── Support History tab ── */}
-        {ticketAccess.allowed ? <TabsContent value="support">
+        {ticketAccess.tickets ? <TabsContent value="support">
           {tickets.length === 0 ? (
             <GlassCard className="py-10 text-center text-sm text-muted-foreground">
               No support tickets found for this player.

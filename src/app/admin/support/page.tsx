@@ -11,14 +11,13 @@ import {
 import { EmptyState } from "@/components/shared/empty-state";
 import { GlassCard } from "@/components/shared/glass-card";
 import { profileDisplayName } from "@/lib/admin/spinora-profile";
-import { getAdminChatConversations } from "@/lib/actions/messages";
 import { platformTicketAccess } from "@/lib/support/ticket-access";
 import { listAdminTickets } from "@/lib/support/ticket-store";
 import { redirect } from "next/navigation";
 import type { TicketStatus } from "@/lib/database.types";
 import { cn } from "@/lib/utils";
 
-export const metadata: Metadata = { title: "Chat" };
+export const metadata: Metadata = { title: "Tickets" };
 
 const FILTERS: { key: string; label: string; statuses: TicketStatus[] }[] = [
   { key: "active", label: "Active", statuses: ["open", "pending", "in_progress"] },
@@ -31,24 +30,20 @@ export default async function AdminSupportPage({
 }: {
   searchParams: Promise<{ filter?: string }>;
 }) {
-  const { allowed, isSub, isStore } = await platformTicketAccess();
-  if (isSub) redirect("/admin/agent-inbox");
-  if (!allowed && !isStore) redirect("/admin");
+  const { tickets: canOpenTickets, isSub, isStore } = await platformTicketAccess();
+  if (isStore || isSub) redirect("/admin/agent-inbox");
+  if (!canOpenTickets) redirect("/admin");
   const params = await searchParams;
   const filterKey = params.filter ?? "active";
   const filter = FILTERS.find((f) => f.key === filterKey) ?? FILTERS[0];
 
-  const tickets = allowed ? await listAdminTickets(filter.statuses) : [];
-  const liveChats = allowed ? await getAdminChatConversations() : [];
-  const visibleChats = liveChats.filter((chat) =>
-    filterKey === "resolved" ? chat.supportResolved === true : filterKey === "active" ? chat.supportResolved !== true : false
-  );
+  const tickets = await listAdminTickets(filter.statuses);
 
   return (
     <div className="mx-auto max-w-5xl">
       <AdminPageHeader
-        title="Chat"
-        description="Member chat inbox. Reply, triage and resolve conversations."
+        title="Tickets"
+        description="Player tickets. Only Super Admin can open them."
       />
 
       <div
@@ -77,42 +72,11 @@ export default async function AdminSupportPage({
         })}
       </div>
 
-      {visibleChats.length > 0 && (
-        <GlassCard className="mb-4 overflow-hidden">
-          <p className="border-b border-foreground/8 px-4 py-3 text-sm font-semibold sm:px-6">
-            Live chats
-          </p>
-          <ul className="divide-y divide-foreground/8">
-            {visibleChats.map((chat) => {
-              const name = chat.user?.full_name?.trim() || chat.user?.email || "Customer";
-              return (
-                <li key={chat.id}>
-                  <Link
-                    href={`/admin/chat?userId=${chat.user_id}`}
-                    className="flex items-center gap-4 px-4 py-4 transition-colors hover:bg-foreground/[0.03] sm:px-6"
-                  >
-                    <div className="min-w-0 flex-1">
-                      <p className="truncate text-sm font-semibold">{name}</p>
-                      <p className="text-xs text-muted-foreground">
-                        {chat.supportResolved
-                          ? `Resolved${chat.supportRating ? ` · rated ${chat.supportRating}/5` : ""}`
-                          : "Open chat"}
-                      </p>
-                    </div>
-                    <ChevronRight className="size-4 shrink-0 text-muted-foreground" aria-hidden />
-                  </Link>
-                </li>
-              );
-            })}
-          </ul>
-        </GlassCard>
-      )}
-
-      {tickets.length === 0 && visibleChats.length === 0 ? (
+      {tickets.length === 0 ? (
         <EmptyState
           icon={<LifeBuoy />}
-          title={`No ${filter.label.toLowerCase()} chats`}
-          description="When members start chats, they'll show up here."
+          title={`No ${filter.label.toLowerCase()} tickets`}
+          description="When players open tickets, they show up here."
         />
       ) : (
         <GlassCard className="overflow-hidden">

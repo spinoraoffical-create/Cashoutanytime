@@ -1,7 +1,6 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { MessageCircle, X } from "lucide-react";
 
@@ -22,7 +21,7 @@ const TABS = ["Home", "Live Chat", "FAQs"] as const;
 const FAQS = [
   { q: "How do I add money?", a: "Open Wallet, choose an amount, and pay with Paydora." },
   { q: "How do cash outs work?", a: "Cash out uses the Cash out ready balance after your ID is verified." },
-  { q: "Who answers a ticket?", a: "Submit Ticket goes to Super Admin. Live Chat goes to your sub-creator." },
+  { q: "Who gets Live Chat?", a: "Live Chat goes to the store or sub-creator on your account." },
 ];
 
 export function PlayerSupportWidget() {
@@ -83,7 +82,7 @@ export function PlayerSupportWidget() {
           <div className="min-h-0 flex-1 overflow-hidden">
             {tab === "Home" ? (
               <div className="h-full space-y-2 overflow-y-auto p-3">
-                <p className="text-sm text-[#b9b3c6]">Pick a topic. This does not open a ticket.</p>
+                <p className="text-sm text-[#b9b3c6]">Pick a topic.</p>
                 {Object.entries(SUPPORT_TOPIC_PROMPTS).map(([id, prompt]) => (
                   <button
                     key={id}
@@ -119,9 +118,6 @@ export function PlayerSupportWidget() {
               </ul>
             ) : null}
           </div>
-          <Link href="/help#create-ticket" className="border-t border-white/10 px-3 py-3 text-center text-sm font-black">
-            Submit Ticket
-          </Link>
         </section>
       ) : null}
       <button

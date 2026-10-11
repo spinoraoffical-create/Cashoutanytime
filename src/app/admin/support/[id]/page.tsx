@@ -33,9 +33,9 @@ export default async function AdminTicketDetailPage({
 }: {
   params: Promise<{ id: string }>;
 }) {
-  const { allowed, isSub } = await platformTicketAccess();
-  if (isSub) redirect("/admin/agent-inbox");
-  if (!allowed) notFound();
+  const { tickets: canOpenTickets, isSub, isStore } = await platformTicketAccess();
+  if (isStore || isSub) redirect("/admin/agent-inbox");
+  if (!canOpenTickets) redirect("/admin");
   const { id } = await params;
   const ticket = await getAdminTicket(id);
   if (!ticket) notFound();
