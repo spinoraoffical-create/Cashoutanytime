@@ -77,6 +77,42 @@ export const getCrmOverviewStats = unstable_cache(
   { revalidate: 90 }
 );
 
+export async function getCrmOverviewForParents(parentIds: readonly string[]): Promise<CrmOverviewStats> {
+  if (!parentIds.length) {
+    return { totalPlayers: 0, newThisWeek: 0, activeLast7d: 0, totalFulfilled: 0 };
+  }
+  const db = adminDb();
+  const since = since7dIso();
+  const parents = [...parentIds];
+  const [totalResult, newResult, activeResult, owned] = await Promise.all([
+    db.from("profiles").select("id", { count: "exact", head: true }).in("parent_agent_id", parents),
+    db.from("profiles").select("id", { count: "exact", head: true }).in("parent_agent_id", parents).gte("created_at", since),
+    db.from("profiles").select("id", { count: "exact", head: true }).in("parent_agent_id", parents).gte("last_seen_at", since),
+    db.from("profiles").select("id").in("parent_agent_id", parents).limit(1000),
+  ]);
+  if (totalResult.error || newResult.error || activeResult.error || owned.error) {
+    throw new Error(totalResult.error?.message || newResult.error?.message || activeResult.error?.message || owned.error?.message || "Could not load this creator's CRM.");
+  }
+  const ids = ((owned.data ?? []) as { id: string }[]).map((row) => row.id);
+  let totalFulfilled = 0;
+  if (ids.length) {
+    const fulfilled = await db
+      .from("deposit_requests")
+      .select("amount")
+      .in("user_id", ids)
+      .eq("status", "completed")
+      .limit(5000);
+    if (fulfilled.error) throw new Error(fulfilled.error.message);
+    totalFulfilled = (fulfilled.data ?? []).reduce((sum, row) => sum + Number(row.amount ?? 0), 0);
+  }
+  return {
+    totalPlayers: totalResult.count ?? 0,
+    newThisWeek: newResult.count ?? 0,
+    activeLast7d: activeResult.count ?? 0,
+    totalFulfilled,
+  };
+}
+
 async function depositStatsForUsers(
   userIds: string[]
 ): Promise<Map<string, { fulfilledCount: number; totalDeposited: number }>> {
@@ -118,11 +154,15 @@ async function depositStatsForUsers(
 
 export async function getCrmPlayersPage(
   segment: CrmSegment,
-  page: number
+  page: number,
+  parentIds?: readonly string[]
 ): Promise<CrmPlayersPage> {
+  const safePage = Math.max(1, page);
+  if (parentIds && parentIds.length === 0) {
+    return { rows: [], total: 0, page: safePage, totalPages: 1 };
+  }
   const db = adminDb();
   const since = since7dIso();
-  const safePage = Math.max(1, page);
   const from = (safePage - 1) * CRM_PAGE_SIZE;
   const to = from + CRM_PAGE_SIZE - 1;
 
@@ -135,6 +175,8 @@ export async function getCrmPlayersPage(
       { count: "exact" }
     )
     .order("created_at", { ascending: false });
+
+  if (parentIds?.length) profileQuery = profileQuery.in("parent_agent_id", [...parentIds]);
 
   if (segment === "new") profileQuery = profileQuery.gte("created_at", since);
   else if (segment === "active") profileQuery = profileQuery.gte("last_seen_at", since);

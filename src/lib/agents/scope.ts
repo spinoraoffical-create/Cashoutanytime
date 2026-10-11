@@ -22,9 +22,14 @@ function missing(error: { message?: string } | null) {
   return /agent_accounts|schema cache|does not exist/i.test(message);
 }
 
-export async function getAgentScope(): Promise<AgentScope | null> {
+export type AgentScopeRead =
+  | { status: "unavailable"; scope: null }
+  | { status: "missing"; scope: null }
+  | { status: "ok"; scope: AgentScope | null };
+
+export async function readAgentScope(): Promise<AgentScopeRead> {
   const ctx = await getStaffContext();
-  if (!ctx) return null;
+  if (!ctx) return { status: "unavailable", scope: null };
 
   const db = adminDb();
   const { data, error } = await db
@@ -34,27 +39,33 @@ export async function getAgentScope(): Promise<AgentScope | null> {
   if (error) {
     if (ctx.isSuperAdmin && missing(error)) {
       return {
-        level: "platform",
-        userId: ctx.userId,
-        email: ctx.email,
-        subCreatorIds: [],
-        parentIds: [],
-        approveLimit: null,
-        missingTable: true,
+        status: "ok",
+        scope: {
+          level: "platform",
+          userId: ctx.userId,
+          email: ctx.email,
+          subCreatorIds: [],
+          parentIds: [],
+          approveLimit: null,
+          missingTable: true,
+        },
       };
     }
     if (ctx.isSuperAdmin) {
       return {
-        level: "platform",
-        userId: ctx.userId,
-        email: ctx.email,
-        subCreatorIds: [],
-        parentIds: [],
-        approveLimit: null,
-        missingTable: false,
+        status: "ok",
+        scope: {
+          level: "platform",
+          userId: ctx.userId,
+          email: ctx.email,
+          subCreatorIds: [],
+          parentIds: [],
+          approveLimit: null,
+          missingTable: false,
+        },
       };
     }
-    return null;
+    return { status: "missing", scope: null };
   }
 
   const rows = (data ?? []) as {
@@ -72,42 +83,57 @@ export async function getAgentScope(): Promise<AgentScope | null> {
       .filter((row) => row.tier === "sub_creator" && row.parent_id === ctx.userId)
       .map((row) => row.user_id);
     return {
-      level: "store",
-      userId: ctx.userId,
-      email: ctx.email,
-      subCreatorIds: subs,
-      parentIds: [ctx.userId, ...subs],
-      approveLimit: null,
-      missingTable: false,
+      status: "ok",
+      scope: {
+        level: "store",
+        userId: ctx.userId,
+        email: ctx.email,
+        subCreatorIds: subs,
+        parentIds: [ctx.userId, ...subs],
+        approveLimit: null,
+        missingTable: false,
+      },
     };
   }
 
   if (mine?.tier === "sub_creator") {
     return {
-      level: "sub",
-      userId: ctx.userId,
-      email: ctx.email,
-      subCreatorIds: [],
-      parentIds: [ctx.userId],
-      approveLimit: mine.approve_limit == null ? 0 : Number(mine.approve_limit),
-      missingTable: false,
+      status: "ok",
+      scope: {
+        level: "sub",
+        userId: ctx.userId,
+        email: ctx.email,
+        subCreatorIds: [],
+        parentIds: [ctx.userId],
+        approveLimit: mine.approve_limit == null ? 0 : Number(mine.approve_limit),
+        missingTable: false,
+      },
     };
   }
 
   if (ctx.isSuperAdmin) {
     const subs = rows.filter((row) => row.tier === "sub_creator").map((row) => row.user_id);
     return {
-      level: "platform",
-      userId: ctx.userId,
-      email: ctx.email,
-      subCreatorIds: subs,
-      parentIds: rows.map((row) => row.user_id),
-      approveLimit: null,
-      missingTable: false,
+      status: "ok",
+      scope: {
+        level: "platform",
+        userId: ctx.userId,
+        email: ctx.email,
+        subCreatorIds: subs,
+        parentIds: rows.map((row) => row.user_id),
+        approveLimit: null,
+        missingTable: false,
+      },
     };
   }
 
-  return null;
+  return { status: "ok", scope: null };
+}
+
+export async function getAgentScope(): Promise<AgentScope | null> {
+  const result = await readAgentScope();
+  if (result.status !== "ok") return null;
+  return result.scope;
 }
 
 export async function requireAgentScope() {

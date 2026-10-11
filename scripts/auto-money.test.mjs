@@ -20,9 +20,12 @@ assert.match(webhook, /verifyPaydoraSignature/);
 const payout = readFileSync(new URL("../src/app/api/payments/paydora/payout/route.ts", import.meta.url), "utf8");
 assert.equal(payout.includes("body.idempotencyKey"), false);
 assert.equal(payout.includes("creditPaydoraDeposit"), false);
+assert.equal(payout.includes("randomUUID"), false);
 assert.match(payout, /cashout_wallet/);
-assert.match(payout, /credit_cashout_payout_void/);
+assert.match(payout, /reserve_paydora_payout/);
+assert.match(payout, /fail_paydora_payout/);
 assert.match(payout, /already submitted/);
+assert.ok(payout.indexOf('outcome !== "rejected"') < payout.indexOf("fail_paydora_payout"));
 
 const sql = readFileSync(
   new URL("../supabase/migrations/20261008000190_auto_money.sql", import.meta.url),
@@ -31,6 +34,7 @@ const sql = readFileSync(
 assert.match(sql, /load_type NOT IN \('load', 'reload'\)/);
 assert.match(sql, /game_api_debited/);
 assert.match(sql, /cashout_wallet = cashout_wallet - v_amount/);
+assert.match(sql, /credit_cashout_payout_void/);
 assert.match(sql, /unpaid_remainder/);
 assert.match(sql, /vip_tier/);
 assert.match(sql, /is_suspended/);

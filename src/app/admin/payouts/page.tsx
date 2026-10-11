@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { redirect } from "next/navigation";
 
 import { AdminPageHeader } from "@/components/admin/admin-page-header";
 import { PayoutForm } from "@/components/admin/payout-form";
@@ -12,6 +13,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { adminDb } from "@/lib/actions/admin/core";
+import { adminListScope, idsOrNone } from "@/lib/admin/list-scope";
 import {
   ADMIN_PROFILE_SELECT,
   profileDisplayName,
@@ -19,7 +21,8 @@ import {
   profileNum,
   type ProfileRow,
 } from "@/lib/admin/spinora-profile";
-import { requirePermission } from "@/lib/data/admin";
+import { readAgentScope } from "@/lib/agents/scope";
+import { can, getStaffContext } from "@/lib/data/admin";
 
 export const metadata: Metadata = { title: "Cash-out Payouts" };
 
@@ -33,24 +36,45 @@ function formatDate(iso: string) {
 }
 
 export default async function AdminPayoutsPage() {
-  await requirePermission("requests.manage");
+  const ctx = await getStaffContext();
+  const scopeResult = await readAgentScope();
+  const decision = adminListScope({
+    isSuperAdmin: Boolean(ctx?.isSuperAdmin),
+    hasStaffPermission: Boolean(ctx && can(ctx, "requests.manage")),
+    scopeStatus: scopeResult.status,
+    scope: scopeResult.scope
+      ? { level: scopeResult.scope.level, parentIds: scopeResult.scope.parentIds }
+      : null,
+  });
+  if (decision.mode === "deny") redirect("/admin");
   const db = adminDb();
 
-  const [{ data: owed }, { data: history }] = await Promise.all([
-    db
-      .from("profiles")
-      .select(ADMIN_PROFILE_SELECT)
-      .gt("cashout_wallet", 0)
-      .order("cashout_wallet", { ascending: false })
-      .limit(200),
-    db
-      .from("wallet_transactions")
-      .select("id, user_id, amount, wallet_type, transaction_type, description, created_at")
-      .eq("wallet_type", "cashout")
-      .eq("transaction_type", "debit")
-      .order("created_at", { ascending: false })
-      .limit(25),
-  ]);
+  let owedQuery = db
+    .from("profiles")
+    .select(ADMIN_PROFILE_SELECT)
+    .gt("cashout_wallet", 0)
+    .order("cashout_wallet", { ascending: false })
+    .limit(200);
+  let historyQuery = db
+    .from("wallet_transactions")
+    .select("id, user_id, amount, wallet_type, transaction_type, description, created_at")
+    .eq("wallet_type", "cashout")
+    .eq("transaction_type", "debit")
+    .order("created_at", { ascending: false })
+    .limit(25);
+  if (decision.mode === "network") {
+    const parents = idsOrNone(decision.parentIds);
+    owedQuery = owedQuery.in("parent_agent_id", parents);
+    const { data: owned } = decision.parentIds.length
+      ? await db.from("profiles").select("id").in("parent_agent_id", decision.parentIds).limit(1000)
+      : { data: [] as { id: string }[] };
+    historyQuery = historyQuery.in(
+      "user_id",
+      idsOrNone(((owned ?? []) as { id: string }[]).map((row) => row.id))
+    );
+  }
+
+  const [{ data: owed }, { data: history }] = await Promise.all([owedQuery, historyQuery]);
 
   const players = (owed ?? []) as ProfileRow[];
   const ledger = history ?? [];

@@ -1,12 +1,16 @@
 import type { Metadata } from "next";
+import { redirect } from "next/navigation";
 import { DollarSign, TrendingUp, UserCheck, Users } from "lucide-react";
 
 import { CrmPlayersPanel } from "@/components/admin/crm-players-panel";
 import { AdminPageHeader } from "@/components/admin/admin-page-header";
 import { GlassCard } from "@/components/shared/glass-card";
 import { StatCard } from "@/components/shared/stat-card";
-import { requirePermission } from "@/lib/data/admin";
+import { adminListScope } from "@/lib/admin/list-scope";
+import { readAgentScope } from "@/lib/agents/scope";
+import { can, getStaffContext } from "@/lib/data/admin";
 import {
+  getCrmOverviewForParents,
   getCrmOverviewStats,
   getCrmPlayersPage,
   type CrmSegment,
@@ -27,15 +31,30 @@ export default async function AdminCrmPage({
 }: {
   searchParams: Promise<{ segment?: string; page?: string }>;
 }) {
-  await requirePermission("users.manage");
+  const ctx = await getStaffContext();
+  const scopeResult = await readAgentScope();
+  const decision = adminListScope({
+    isSuperAdmin: Boolean(ctx?.isSuperAdmin),
+    hasStaffPermission: Boolean(ctx && can(ctx, "users.manage")),
+    scopeStatus: scopeResult.status,
+    scope: scopeResult.scope
+      ? { level: scopeResult.scope.level, parentIds: scopeResult.scope.parentIds }
+      : null,
+  });
+  if (decision.mode === "deny") redirect("/admin");
   const params = await searchParams;
   const segment = (SEGMENTS.find((s) => s.key === params.segment)?.key ?? "all") as CrmSegment;
   const page = Math.max(1, Number(params.page) || 1);
 
-  const [stats, playersPage] = await Promise.all([
-    getCrmOverviewStats(),
-    getCrmPlayersPage(segment, page),
-  ]);
+  const [stats, playersPage] = decision.mode === "network"
+    ? await Promise.all([
+        getCrmOverviewForParents(decision.parentIds),
+        getCrmPlayersPage(segment, page, decision.parentIds),
+      ])
+    : await Promise.all([
+        getCrmOverviewStats(),
+        getCrmPlayersPage(segment, page),
+      ]);
 
   return (
     <div className="mx-auto max-w-7xl">

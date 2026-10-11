@@ -1,4 +1,5 @@
 import { NextResponse, type NextRequest } from "next/server";
+import { isRestrictedUsRegion, restrictedStateCodes } from "@/lib/compliance/restricted-state";
 import { updateSession } from "@/lib/supabase/middleware";
 
 export async function middleware(request: NextRequest) {
@@ -16,15 +17,11 @@ export async function middleware(request: NextRequest) {
   }
 
   // 1. Geo-Blocking Compliance Guard (Vercel Edge headers)
-  const restrictedStates = (process.env.RESTRICTED_STATES || "WA,ID,NV,MI").split(",");
+  const restrictedStates = restrictedStateCodes();
   const country = request.headers.get("x-vercel-ip-country") || "";
   const region = request.headers.get("x-vercel-ip-country-region") || ""; // State code, e.g. "WA"
 
-  if (
-    path !== "/restricted" &&
-    country === "US" &&
-    restrictedStates.includes(region)
-  ) {
+  if (path !== "/restricted" && isRestrictedUsRegion(country, region, restrictedStates)) {
     const url = request.nextUrl.clone();
     url.pathname = "/restricted";
     return NextResponse.redirect(url);

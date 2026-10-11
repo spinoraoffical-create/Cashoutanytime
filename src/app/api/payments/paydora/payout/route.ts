@@ -1,13 +1,43 @@
 import { NextResponse } from "next/server";
-import crypto from "crypto";
 import { createPaydoraWithdrawal, getPaydoraPaymentMethods } from "@/lib/payments/paydora";
+import {
+  classifyProviderFailure,
+  payoutAmount,
+  payoutDestinationKey,
+} from "@/lib/payments/payout-reservation";
+import { isRestrictedPaymentRequest } from "@/lib/compliance/restricted-state";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { checkRateLimit, rateLimitUserMessage } from "@/lib/rate-limit";
 import { playerPaymentError } from "@/lib/player-safe-error";
 
+type ReservedPayout = {
+  reused?: boolean;
+  debited?: boolean;
+  promoted?: boolean;
+  idempotency_key?: string;
+  status?: string;
+  amount?: number;
+  provider_withdrawal_id?: string | null;
+  provider_reference_id?: string | null;
+  provider_status?: string | null;
+};
+
+type ProviderAttempt = {
+  call_provider?: boolean;
+  in_progress?: boolean;
+  status?: string;
+  idempotency_key?: string;
+  provider_withdrawal_id?: string | null;
+  provider_reference_id?: string | null;
+};
+
 export async function POST(req: Request) {
   try {
+    if (isRestrictedPaymentRequest(req.headers)) {
+      return NextResponse.json({ error: "Cash outs are unavailable in your state." }, { status: 403 });
+    }
+
     const supabase = await createClient();
     const {
       data: { user },
@@ -21,7 +51,7 @@ export async function POST(req: Request) {
 
     const body = await req.json();
     const methodValue = String(body.method || body.payoutType || "").trim().toLowerCase();
-    const amount = Number(body.amount);
+    const amount = payoutAmount(Number(body.amount));
     const address = String(body.address || body.accountNo || "").trim();
     const chimePhoneEmail = String(body.chimePhoneEmail || "").trim();
 
@@ -50,27 +80,20 @@ export async function POST(req: Request) {
     }
 
     const currentBalance = Number((profile as { cashout_wallet?: number } | null)?.cashout_wallet || 0);
-    if (currentBalance < amount) {
-      return NextResponse.json(
-        { error: `Insufficient cash-out balance ($${currentBalance.toFixed(2)})` },
-        { status: 400 }
-      );
-    }
-
     const methods = await getPaydoraPaymentMethods();
-    const method = methods.withdrawals.find((m) => m.value.toLowerCase() === methodValue);
+    const method = methods.withdrawals.find((item) => item.value.toLowerCase() === methodValue);
     if (!method) {
       return NextResponse.json({ error: "That payout method is not enabled." }, { status: 400 });
     }
 
-    const idempotencyKey = `wd_${crypto.randomUUID()}`;
-    if (idempotencyKey.startsWith("refund:")) {
-      return NextResponse.json({ error: "Could not reserve that payout. Try again." }, { status: 400 });
-    }
+    const admin = createAdminClient();
+    if (!admin) return NextResponse.json({ error: "Payouts are temporarily unavailable." }, { status: 503 });
 
-    const adminForRules = createAdminClient();
-    if (!adminForRules) return NextResponse.json({ error: "Payouts are temporarily unavailable." }, { status: 503 });
-    const { data: ops, error: opsError } = await adminForRules.from("platform_ops").select("cashout_auto_limit").eq("key", "cashout").maybeSingle();
+    const { data: ops, error: opsError } = await admin
+      .from("platform_ops")
+      .select("cashout_auto_limit")
+      .eq("key", "cashout")
+      .maybeSingle();
     if (opsError || !ops) {
       return NextResponse.json({
         held: true,
@@ -78,7 +101,7 @@ export async function POST(req: Request) {
       }, { status: 202 });
     }
     const autoLimit = Number((ops as { cashout_auto_limit?: number } | null)?.cashout_auto_limit ?? 0);
-    const { data: fraud, error: fraudError } = await adminForRules
+    const { data: fraud, error: fraudError } = await admin
       .from("fraud_scores")
       .select("user_id, blocked, rewards_blocked, manual_review, risk_score")
       .eq("user_id", user.id)
@@ -93,13 +116,48 @@ export async function POST(req: Request) {
     const flagged = Boolean(
       risk && (risk.blocked || risk.rewards_blocked || risk.manual_review || Number(risk.risk_score ?? 0) >= 50)
     );
-    if (autoLimit <= 0 || amount > autoLimit || flagged) {
-      await adminForRules.from("cashout_holds").upsert(
+    const hold = autoLimit <= 0 || amount > autoLimit || flagged;
+    const holdReason = flagged
+      ? "Risk review"
+      : amount > autoLimit && autoLimit > 0
+        ? "Above the automatic cash-out limit"
+        : "Automatic cash out is off until a limit is set";
+
+    const destinationKey = payoutDestinationKey({
+      method: methodValue,
+      amount,
+      address,
+      chimePhoneEmail,
+      cardNumber: body.cardNumber ? String(body.cardNumber) : "",
+      cardValid: body.cardValid ? String(body.cardValid) : "",
+    });
+    const { data: reservedRaw, error: reserveError } = await admin.rpc("reserve_paydora_payout", {
+      p_user_id: user.id,
+      p_amount: amount,
+      p_method: methodValue,
+      p_destination_key: destinationKey,
+      p_hold: hold,
+      p_hold_reason: hold ? holdReason : null,
+    });
+    if (reserveError) {
+      const message = /insufficient/i.test(reserveError.message)
+        ? `Insufficient cash-out balance ($${currentBalance.toFixed(2)})`
+        : "Could not reserve that payout. Try again.";
+      return NextResponse.json({ error: message }, { status: 400 });
+    }
+    const reserved = (reservedRaw ?? {}) as ReservedPayout;
+    const idempotencyKey = reserved.idempotency_key || "";
+    if (!idempotencyKey || idempotencyKey.startsWith("refund:")) {
+      return NextResponse.json({ error: "Could not reserve that payout. Try again." }, { status: 400 });
+    }
+
+    if (reserved.status === "manual_review") {
+      await admin.from("cashout_holds").upsert(
         {
           payout_key: idempotencyKey,
           user_id: user.id,
           amount,
-          reason: flagged ? "Risk review" : amount > autoLimit && autoLimit > 0 ? "Above the automatic cash-out limit" : "Automatic cash out is off until a limit is set",
+          reason: holdReason,
           status: "held",
         },
         { onConflict: "payout_key", ignoreDuplicates: true }
@@ -109,26 +167,48 @@ export async function POST(req: Request) {
         error: "This cash out is waiting for a Super Admin. Your wallet was not charged.",
       }, { status: 202 });
     }
-    const admin = createAdminClient();
-    if (!admin) return NextResponse.json({ error: "Payouts are temporarily unavailable." }, { status: 503 });
 
-    const { data: debit, error: debitError } = await admin.rpc("debit_paydora_payout", {
+    if (reserved.promoted) {
+      await admin
+        .from("cashout_holds")
+        .update({ status: "released", resolved_at: new Date().toISOString() })
+        .eq("payout_key", idempotencyKey)
+        .eq("status", "held");
+    }
+
+    if (reserved.status === "submitted" || reserved.status === "paid") {
+      return NextResponse.json({
+        success: true,
+        duplicate: true,
+        status: reserved.status === "paid" ? "paid" : "already_submitted",
+        withdrawalId: reserved.provider_withdrawal_id,
+        referenceId: reserved.provider_reference_id,
+      });
+    }
+
+    if (reserved.status !== "reserved") {
+      return NextResponse.json({ success: true, status: "pending", error: "pending" });
+    }
+
+    const { data: attemptRaw, error: attemptError } = await admin.rpc("begin_paydora_provider_attempt", {
       p_user_id: user.id,
-      p_amount: amount,
-      p_payout_key: idempotencyKey,
+      p_idempotency_key: idempotencyKey,
     });
-    if (debitError) {
-      const message = /insufficient/i.test(debitError.message)
-        ? `Insufficient cash-out balance ($${currentBalance.toFixed(2)})`
-        : "Could not reserve that payout. Try again.";
-      return NextResponse.json({ error: message }, { status: 400 });
+    if (attemptError) {
+      return NextResponse.json({ success: true, status: "pending", error: "pending" });
     }
-    const debitRow = (debit ?? {}) as { debited?: boolean; duplicate?: boolean };
-    if (debitRow.duplicate) {
-      return NextResponse.json({ success: true, duplicate: true, status: "already_submitted" });
-    }
-    if (!debitRow.debited) {
-      return NextResponse.json({ error: "Could not reserve that payout. Try again." }, { status: 400 });
+    const attempt = (attemptRaw ?? {}) as ProviderAttempt;
+    if (!attempt.call_provider) {
+      if (attempt.status === "submitted" || attempt.status === "paid") {
+        return NextResponse.json({
+          success: true,
+          duplicate: true,
+          status: attempt.status === "paid" ? "paid" : "already_submitted",
+          withdrawalId: attempt.provider_withdrawal_id,
+          referenceId: attempt.provider_reference_id,
+        });
+      }
+      return NextResponse.json({ success: true, status: "pending", error: "pending" });
     }
 
     let withdrawal;
@@ -145,30 +225,38 @@ export async function POST(req: Request) {
       });
     } catch (err) {
       const status = (err as { status?: number }).status;
-      const message = err instanceof Error ? err.message.toLowerCase() : "";
-      const duplicate = status === 409 || /duplicate|already/.test(message);
-      const explicitReject =
-        typeof status === "number" &&
-        status >= 400 &&
-        status < 500 &&
-        status !== 408 &&
-        status !== 409 &&
-        status !== 429 &&
-        !/duplicate|already|timeout|timed out/.test(message);
-      if (!explicitReject) {
+      const message = err instanceof Error ? err.message : "";
+      const outcome = classifyProviderFailure(status, message);
+      if (outcome !== "rejected") {
+        if (outcome === "duplicate") {
+          await admin.rpc("record_paydora_payout_submitted", {
+            p_user_id: user.id,
+            p_idempotency_key: idempotencyKey,
+            p_withdrawal_id: null,
+            p_reference_id: null,
+            p_provider_status: "submitted",
+          });
+        }
         return NextResponse.json({
           success: true,
-          status: duplicate ? "already_submitted" : "pending",
-          error: duplicate ? "already submitted" : "pending",
+          status: outcome === "duplicate" ? "already_submitted" : "pending",
+          error: outcome === "duplicate" ? "already submitted" : "pending",
         });
       }
-      await admin.rpc("credit_cashout_payout_void", {
+      await admin.rpc("fail_paydora_payout", {
         p_user_id: user.id,
-        p_amount: amount,
-        p_payout_key: idempotencyKey,
+        p_idempotency_key: idempotencyKey,
       });
       throw err;
     }
+
+    await admin.rpc("record_paydora_payout_submitted", {
+      p_user_id: user.id,
+      p_idempotency_key: idempotencyKey,
+      p_withdrawal_id: withdrawal.id,
+      p_reference_id: withdrawal.referenceId,
+      p_provider_status: withdrawal.status,
+    });
 
     return NextResponse.json({
       success: true,

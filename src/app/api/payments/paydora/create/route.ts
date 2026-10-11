@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { amountsForMethod, createPaydoraDeposit, getPaydoraPaymentMethods, isRemovedCheckoutMethod } from "@/lib/payments/paydora";
+import { isRestrictedPaymentRequest } from "@/lib/compliance/restricted-state";
 import { rememberPaymentIntent } from "@/lib/payments/auto-settle";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
@@ -9,6 +10,10 @@ import { responsibleBlock } from "@/lib/responsible/play-guard";
 
 export async function POST(req: Request) {
   try {
+    if (isRestrictedPaymentRequest(req.headers)) {
+      return NextResponse.json({ error: "Deposits are unavailable in your state." }, { status: 403 });
+    }
+
     const supabase = await createClient();
     const {
       data: { user },

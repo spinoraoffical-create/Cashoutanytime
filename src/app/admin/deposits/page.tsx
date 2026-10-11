@@ -2,7 +2,8 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 
 import { adminDb } from "@/lib/actions/admin/core";
-import { getAgentScope } from "@/lib/agents/scope";
+import { adminListScope, idsOrNone } from "@/lib/admin/list-scope";
+import { readAgentScope } from "@/lib/agents/scope";
 import { can, getStaffContext } from "@/lib/data/admin";
 import { createClient } from "@/lib/supabase/server";
 import { Card, CardContent } from "@/components/ui/card";
@@ -37,10 +38,16 @@ export default async function AdminDepositsPage({
   const { status } = await searchParams;
   const activeFilter = status ?? "all";
   const ctx = await getStaffContext();
-  const scope = await getAgentScope();
-  const platform = Boolean(ctx && (ctx.isSuperAdmin || can(ctx, "requests.manage")));
-  const network = scope && (scope.level === "store" || scope.level === "sub");
-  if (!platform && !network) redirect("/admin");
+  const scopeResult = await readAgentScope();
+  const decision = adminListScope({
+    isSuperAdmin: Boolean(ctx?.isSuperAdmin),
+    hasStaffPermission: Boolean(ctx && can(ctx, "requests.manage")),
+    scopeStatus: scopeResult.status,
+    scope: scopeResult.scope
+      ? { level: scopeResult.scope.level, parentIds: scopeResult.scope.parentIds }
+      : null,
+  });
+  if (decision.mode === "deny") redirect("/admin");
 
   type DepositCard = {
     id: string;
@@ -54,23 +61,21 @@ export default async function AdminDepositsPage({
     user: { full_name?: string; email?: string } | null;
   };
   let deposits: DepositCard[] = [];
-  if (network && !platform) {
+  if (decision.mode === "network") {
     const db = adminDb();
-    const { data: owned } = scope.parentIds.length
-      ? await db.from("profiles").select("id").in("parent_agent_id", scope.parentIds).limit(1000)
+    const { data: owned } = decision.parentIds.length
+      ? await db.from("profiles").select("id").in("parent_agent_id", decision.parentIds).limit(1000)
       : { data: [] as { id: string }[] };
-    const ids = ((owned ?? []) as { id: string }[]).map((row) => row.id);
-    if (ids.length) {
-      let query = db
-        .from("deposit_requests")
-        .select("*, user:profiles!deposit_requests_user_id_fkey(full_name, email)")
-        .in("user_id", ids)
-        .order("created_at", { ascending: false })
-        .limit(100);
-      if (status && status !== "all") query = query.eq("status", status);
-      const result = await query;
-      deposits = (result.data ?? []) as typeof deposits;
-    }
+    const ids = idsOrNone(((owned ?? []) as { id: string }[]).map((row) => row.id));
+    let query = db
+      .from("deposit_requests")
+      .select("*, user:profiles!deposit_requests_user_id_fkey(full_name, email)")
+      .in("user_id", ids)
+      .order("created_at", { ascending: false })
+      .limit(100);
+    if (status && status !== "all") query = query.eq("status", status);
+    const result = await query;
+    deposits = (result.data ?? []) as typeof deposits;
   } else {
     const supabase = await createClient();
     let query = supabase
