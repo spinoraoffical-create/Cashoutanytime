@@ -17,12 +17,15 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { adminDb } from "@/lib/actions/admin/core";
+import { authPhonesFor, shownPhone } from "@/lib/admin/member-phone";
 import {
   ADMIN_PROFILE_SELECT,
+  missingProfileColumn,
   profileDisplayName,
   profileHandle,
   profileIsBanned,
   profileNum,
+  type ProfileRow,
 } from "@/lib/admin/spinora-profile";
 import { requirePermission } from "@/lib/data/admin";
 import { cn } from "@/lib/utils";
@@ -44,18 +47,74 @@ export default async function AdminUsersPage({
   const to = from + PAGE_SIZE - 1;
 
   const db = adminDb();
-  let query = db.from("profiles").select(ADMIN_PROFILE_SELECT, { count: "exact" });
+  const fields = [
+    ...new Set(
+      `${ADMIN_PROFILE_SELECT}, phone`
+        .split(",")
+        .map((part) => part.trim())
+        .filter(Boolean)
+    ),
+  ];
+  let users: (ProfileRow & { phone?: string | null })[] = [];
+  let total = 0;
+  let loaded = false;
 
-  if (q) {
-    query = query.or(`email.ilike.%${q}%,full_name.ilike.%${q}%`);
+  for (let attempt = 0; attempt < fields.length; attempt += 1) {
+    let query = db.from("profiles").select(fields.join(", "), { count: "exact" });
+    if (q) query = query.or(`email.ilike.%${q}%,full_name.ilike.%${q}%`);
+    const { data, error, count } = await query.order("created_at", { ascending: false }).range(from, to);
+    if (!error) {
+      users = (data ?? []) as typeof users;
+      total = count ?? users.length;
+      loaded = true;
+      break;
+    }
+    const column = missingProfileColumn(error.message);
+    if (column && fields.includes(column) && column !== "id") {
+      fields.splice(fields.indexOf(column), 1);
+      continue;
+    }
+    break;
   }
 
-  const { data, count } = await query
-    .order("created_at", { ascending: false })
-    .range(from, to);
+  if (!loaded) {
+    const safe = ["id", "email", "full_name", "created_at", "is_suspended", "wallet_balance", "cashout_wallet", "coins_balance", "phone"];
+    for (let attempt = 0; attempt < safe.length; attempt += 1) {
+      let query = db.from("profiles").select(safe.join(", "), { count: "exact" });
+      if (q) query = query.or(`email.ilike.%${q}%,full_name.ilike.%${q}%`);
+      const { data, error, count } = await query.order("created_at", { ascending: false }).range(from, to);
+      if (!error) {
+        users = (data ?? []) as typeof users;
+        total = count ?? users.length;
+        loaded = true;
+        break;
+      }
+      const column = missingProfileColumn(error.message);
+      if (column && safe.includes(column) && column !== "id") {
+        safe.splice(safe.indexOf(column), 1);
+        continue;
+      }
+      break;
+    }
+  }
 
-  const users = data ?? [];
-  const total = count ?? 0;
+  if (!loaded) {
+    let probe = db.from("profiles").select("id", { count: "exact", head: true });
+    if (q) probe = probe.or(`email.ilike.%${q}%,full_name.ilike.%${q}%`);
+    const { count } = await probe;
+    total = count ?? 0;
+  }
+
+  if (total === 0 && users.length > 0) total = users.length;
+
+  const phones = await authPhonesFor(
+    db,
+    users.filter((user) => !user.phone?.trim()).map((user) => user.id ?? "").filter(Boolean)
+  );
+  const rows = users.map((user) => ({
+    ...user,
+    phoneLabel: shownPhone(user.phone, phones.get(user.id ?? "")),
+  }));
   const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE));
 
   return (
@@ -99,14 +158,14 @@ export default async function AdminUsersPage({
               </TableRow>
             </TableHeader>
             <TableBody>
-              {users.length === 0 ? (
+              {rows.length === 0 ? (
                 <TableRow>
                   <TableCell colSpan={7} className="py-8 text-center text-muted-foreground">
                     No members match “{q}”.
                   </TableCell>
                 </TableRow>
               ) : (
-                users.map((u) => (
+                rows.map((u) => (
                   <TableRow key={u.id} className="border-foreground/8">
                     <TableCell>
                       <Link
@@ -115,7 +174,11 @@ export default async function AdminUsersPage({
                       >
                         {profileDisplayName(u)}
                       </Link>
-                      <p className="text-xs text-muted-foreground">{profileHandle(u)}</p>
+                      <p className="text-xs text-muted-foreground">
+                        {profileHandle(u)}
+                        {" · "}
+                        {u.phoneLabel}
+                      </p>
                     </TableCell>
                     <TableCell className="tnum text-right">{profileNum(u.level, 1)}</TableCell>
                     <TableCell className="tnum text-right text-ws-green-deep dark:text-ws-green">

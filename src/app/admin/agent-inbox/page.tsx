@@ -14,10 +14,10 @@ export default async function AgentInboxPage({
   searchParams: Promise<{ player?: string }>;
 }) {
   const scope = await requireAgentScope();
-  if (scope.level !== "sub") {
+  if (scope.level !== "sub" && scope.level !== "store") {
     return (
       <div className="mx-auto max-w-3xl">
-        <AdminPageHeader title="Player chat" description="Players message the sub-creator on their account, not the store." />
+        <AdminPageHeader title="Player chat" description="Live chat stays with the creator on the player's account. Tickets stay with Super Admin." />
       </div>
     );
   }

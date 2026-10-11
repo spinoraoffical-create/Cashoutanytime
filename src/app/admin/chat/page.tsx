@@ -20,7 +20,7 @@ export default async function AdminChatPage({
     return (
       <div className={CHAT_PAGE_SHELL_CLASS}>
         <h1 className="text-2xl font-bold">Customer Chat</h1>
-        <p className="text-sm text-muted-foreground">Player chats stay with the sub-creator on that account.</p>
+        <p className="text-sm text-muted-foreground">Players assigned to you are in Player chat. A sub-creator's players stay in that sub-creator's chat.</p>
       </div>
     );
   }

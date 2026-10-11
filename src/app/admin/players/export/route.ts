@@ -13,8 +13,22 @@ export async function GET(request: Request) {
     parentId: url.searchParams.get("parent") ?? undefined,
     exportAll: true,
   });
+  const showIp = scope.level === "platform";
   const csv = toCsv(
-    ["Name", "Phone", "Email", "Sub-creator", "Store", "Wallet", "Cash-out", "Coins", "Level", "Joined", "Status"],
+    [
+      "Name",
+      "Phone",
+      "Email",
+      "Sub-creator",
+      "Store",
+      "Wallet",
+      "Cash-out",
+      "Coins",
+      "Level",
+      "Joined",
+      "Status",
+      ...(showIp ? ["Signup IP", "Last seen IP"] : []),
+    ],
     loaded.rows.map((row) => [
       row.name,
       row.phone,
@@ -27,6 +41,7 @@ export async function GET(request: Request) {
       row.level == null ? "—" : String(row.level),
       row.createdAt,
       row.status,
+      ...(showIp ? [row.signupIp ?? "—", row.lastSeenIp ?? "—"] : []),
     ])
   );
   return new NextResponse(csv, {

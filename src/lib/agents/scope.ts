@@ -26,14 +26,13 @@ export async function getAgentScope(): Promise<AgentScope | null> {
   const ctx = await getStaffContext();
   if (!ctx) return null;
 
-  const platform = ctx.isSuperAdmin || ctx.permissions.has("users.manage");
   const db = adminDb();
   const { data, error } = await db
     .from("agent_accounts")
     .select("user_id, tier, parent_id, active, approve_limit");
 
   if (error) {
-    if (platform && missing(error)) {
+    if (ctx.isSuperAdmin && missing(error)) {
       return {
         level: "platform",
         userId: ctx.userId,
@@ -44,7 +43,7 @@ export async function getAgentScope(): Promise<AgentScope | null> {
         missingTable: true,
       };
     }
-    if (platform) {
+    if (ctx.isSuperAdmin) {
       return {
         level: "platform",
         userId: ctx.userId,
@@ -66,23 +65,9 @@ export async function getAgentScope(): Promise<AgentScope | null> {
     approve_limit: number | null;
   }[];
 
-  if (platform) {
-    const subs = rows.filter((row) => row.tier === "sub_creator").map((row) => row.user_id);
-    return {
-      level: "platform",
-      userId: ctx.userId,
-      email: ctx.email,
-      subCreatorIds: subs,
-      parentIds: rows.map((row) => row.user_id),
-      approveLimit: null,
-      missingTable: false,
-    };
-  }
-
   const mine = rows.find((row) => row.user_id === ctx.userId && row.active);
-  if (!mine) return null;
 
-  if (mine.tier === "store_creator") {
+  if (mine?.tier === "store_creator") {
     const subs = rows
       .filter((row) => row.tier === "sub_creator" && row.parent_id === ctx.userId)
       .map((row) => row.user_id);
@@ -97,7 +82,7 @@ export async function getAgentScope(): Promise<AgentScope | null> {
     };
   }
 
-  if (mine.tier === "sub_creator") {
+  if (mine?.tier === "sub_creator") {
     return {
       level: "sub",
       userId: ctx.userId,
@@ -105,6 +90,19 @@ export async function getAgentScope(): Promise<AgentScope | null> {
       subCreatorIds: [],
       parentIds: [ctx.userId],
       approveLimit: mine.approve_limit == null ? 0 : Number(mine.approve_limit),
+      missingTable: false,
+    };
+  }
+
+  if (ctx.isSuperAdmin) {
+    const subs = rows.filter((row) => row.tier === "sub_creator").map((row) => row.user_id);
+    return {
+      level: "platform",
+      userId: ctx.userId,
+      email: ctx.email,
+      subCreatorIds: subs,
+      parentIds: rows.map((row) => row.user_id),
+      approveLimit: null,
       missingTable: false,
     };
   }

@@ -10,6 +10,7 @@ import {
 import { isEmailIdentifier, normalizeEmail, formatAuthErrorMessage, maskEmail } from "@/lib/auth/identifier";
 import { buildAuthCallbackUrl } from "@/lib/auth/callback-url";
 import { createClient } from "@/lib/supabase/server";
+import { missingProfileColumn } from "@/lib/admin/spinora-profile";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { rateLimit } from "@/lib/rate-limit";
 import { headers } from "next/headers";
@@ -225,6 +226,80 @@ async function persistContactOnProfile(
   return persistContactViaSession(userId, contact);
 }
 
+async function rememberPhoneOnAuthUser(
+  admin: NonNullable<ReturnType<typeof createAdminClient>>,
+  userId: string,
+  contact: { phone: string; fullName: string; email: string }
+) {
+  const { data: authUser } = await admin.auth.admin.getUserById(userId);
+  const existingMeta = authUser?.user?.user_metadata ?? {};
+  const user_metadata = {
+    ...existingMeta,
+    phone: contact.phone,
+    full_name: contact.fullName,
+    auth_method: "email",
+  };
+  const saved = await admin.auth.admin.updateUserById(userId, {
+    phone: contact.phone,
+    user_metadata,
+  });
+  if (saved.error) {
+    await admin.auth.admin.updateUserById(userId, { user_metadata });
+  }
+}
+
+async function writeProfileContact(
+  db: {
+    from: (table: string) => {
+      update: (fields: Record<string, string>) => {
+        eq: (column: string, value: string) => {
+          select: (columns: string) => {
+            maybeSingle: () => PromiseLike<{ data: unknown; error: { message: string } | null }>;
+          };
+        };
+      };
+    };
+  },
+  userId: string,
+  contact: { phone: string; fullName: string; email: string }
+): Promise<{ ok: boolean; error?: string; phoneOnProfile: boolean }> {
+  const fields: Record<string, string> = {
+    phone: contact.phone,
+    full_name: contact.fullName,
+    email: contact.email,
+  };
+  let selectFields = ["id", "phone"];
+
+  for (let attempt = 0; attempt < 6; attempt += 1) {
+    const { data, error } = await db
+      .from("profiles")
+      .update(fields)
+      .eq("id", userId)
+      .select(selectFields.join(", "))
+      .maybeSingle();
+
+    if (!error) {
+      const savedPhone = (data as { phone?: string | null } | null)?.phone?.trim();
+      if (!("phone" in fields)) return { ok: true, phoneOnProfile: false };
+      if (savedPhone) return { ok: true, phoneOnProfile: true };
+      return { ok: false, error: "Profile update did not save phone", phoneOnProfile: false };
+    }
+
+    const missing = missingProfileColumn(error.message);
+    if (missing && (missing in fields || selectFields.includes(missing))) {
+      delete fields[missing];
+      selectFields = selectFields.filter((field) => field !== missing);
+      if (!selectFields.length) selectFields = ["id"];
+      if (Object.keys(fields).length === 0) return { ok: true, phoneOnProfile: false };
+      continue;
+    }
+
+    return { ok: false, error: error.message, phoneOnProfile: false };
+  }
+
+  return { ok: false, error: "Could not save phone number to profile", phoneOnProfile: false };
+}
+
 async function persistContactViaAdmin(
   admin: NonNullable<ReturnType<typeof createAdminClient>>,
   userId: string,
@@ -235,43 +310,9 @@ async function persistContactViaAdmin(
     return { ok: false, error: "Profile was not ready yet" };
   }
 
-  const { data: updated, error } = await admin
-    .from("profiles")
-    .update({
-      phone: contact.phone,
-      full_name: contact.fullName,
-      email: contact.email,
-    })
-    .eq("id", userId)
-    .select("id, phone")
-    .maybeSingle();
-
-  if (error) {
-    if (error.message.includes("phone") && error.message.includes("column")) {
-      return {
-        ok: false,
-        error: "Phone column missing in database. Run supabase/signup-email-phone.sql in Supabase.",
-      };
-    }
-    return { ok: false, error: error.message };
-  }
-
-  if (!updated?.phone) {
-    return { ok: false, error: "Profile update did not save phone" };
-  }
-
-  const { data: authUser } = await admin.auth.admin.getUserById(userId);
-  const existingMeta = authUser?.user?.user_metadata ?? {};
-  await admin.auth.admin.updateUserById(userId, {
-    phone: contact.phone,
-    user_metadata: {
-      ...existingMeta,
-      phone: contact.phone,
-      full_name: contact.fullName,
-      auth_method: "email",
-    },
-  });
-
+  await rememberPhoneOnAuthUser(admin, userId, contact);
+  const saved = await writeProfileContact(admin, userId, contact);
+  if (!saved.ok) return { ok: false, error: saved.error };
   return { ok: true };
 }
 
@@ -304,31 +345,8 @@ async function persistContactViaSession(
     return { ok: false, error: "Account created but profile was not ready. Try adding phone from dashboard." };
   }
 
-  const { data: updated, error } = await supabase
-    .from("profiles")
-    .update({
-      phone: contact.phone,
-      full_name: contact.fullName,
-      email: contact.email,
-    })
-    .eq("id", userId)
-    .select("id, phone")
-    .maybeSingle();
-
-  if (error) {
-    if (error.message.includes("phone") && error.message.includes("column")) {
-      return {
-        ok: false,
-        error: "Phone column missing in database. Run supabase/signup-email-phone.sql in Supabase.",
-      };
-    }
-    return { ok: false, error: "Could not save phone number to profile" };
-  }
-
-  if (!updated?.phone) {
-    return { ok: false, error: "Phone number was not saved to profile" };
-  }
-
+  const saved = await writeProfileContact(supabase, userId, contact);
+  if (!saved.ok) return { ok: false, error: saved.error ?? "Could not save phone number to profile" };
   return { ok: true };
 }
 

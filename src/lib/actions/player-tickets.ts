@@ -15,7 +15,7 @@ export type PlayerTicketRow = {
   ticketNo: number;
   subject: string;
   status: TicketStatus;
-  messages: string[];
+  messages: { is_staff: boolean; body: string }[];
 };
 
 export async function loadPlayerTickets(): Promise<{
@@ -37,7 +37,9 @@ export async function loadPlayerTickets(): Promise<{
     ticketNo: row.ticket_no,
     subject: row.subject,
     status: row.status,
-    messages: row.messages.map((message) => message.body),
+    messages: [...row.messages]
+      .sort((a, b) => a.created_at.localeCompare(b.created_at))
+      .map((message) => ({ is_staff: message.is_staff, body: message.body })),
   }));
 
   const pending = tickets.filter((ticket) => OPEN_STATUSES.includes(ticket.status)).length;

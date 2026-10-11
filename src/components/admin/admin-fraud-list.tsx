@@ -111,6 +111,13 @@ export function AdminFraudList({ users }: AdminFraudListProps) {
                         <p className="text-sm text-muted-foreground">{user.phone}</p>
                       )}
                       <p className="text-xs text-muted-foreground mt-2">
+                        Signup IP {user.signupIp} · Last seen IP {user.lastSeenIp}
+                      </p>
+                      <p className="text-xs text-muted-foreground mt-1">
+                        Risk score {user.risk_score}
+                        {user.flags.length ? ` · ${user.flags.join(", ")}` : ""}
+                      </p>
+                      <p className="text-xs text-muted-foreground mt-2">
                         Joined {formatDate(user.created_at)} · {user.device_count} linked device
                         {user.device_count === 1 ? "" : "s"} · Updated{" "}
                         {formatDate(user.last_calculated_at)}

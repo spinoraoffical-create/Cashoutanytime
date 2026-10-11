@@ -34,6 +34,7 @@ export default async function NetworkPlayersPage({
         parents={loaded.parents}
         canMove={scope.level !== "sub"}
         showParentFilter={scope.level !== "sub"}
+        showIp={scope.level === "platform"}
         query={{ q: params.q, parent: params.parent }}
       />
     </div>

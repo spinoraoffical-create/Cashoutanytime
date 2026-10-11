@@ -28,18 +28,18 @@ export function PlayerTicketDesk({
   const [query, setQuery] = useState("");
   const [status, setStatus] = useState("");
   const [pendingSave, startSave] = useTransition();
-  const listReady = query.trim().length > 0 || status.length > 0;
 
   const visible = useMemo(() => {
-    if (!listReady) return [];
     const needle = query.trim().toLowerCase();
     return tickets.filter((ticket) => {
       if (status && ticket.status !== status) return false;
       if (!needle) return true;
-      const haystack = [`#${ticket.ticketNo}`, ticket.subject, ...ticket.messages].join(" ").toLowerCase();
+      const haystack = [`#${ticket.ticketNo}`, ticket.subject, ...ticket.messages.map((message) => message.body)]
+        .join(" ")
+        .toLowerCase();
       return haystack.includes(needle);
     });
-  }, [listReady, query, status, tickets]);
+  }, [query, status, tickets]);
 
   function submit() {
     startSave(async () => {
@@ -135,6 +135,14 @@ export function PlayerTicketDesk({
                 #{ticket.ticketNo} · {ticket.subject}
               </p>
               <p className="text-xs uppercase text-[#b9b3c6]">{ticket.status.replace("_", " ")}</p>
+              <ul className="mt-2 space-y-2">
+                {ticket.messages.map((message, index) => (
+                  <li key={`${ticket.id}-${index}`} className="text-sm">
+                    <p className="text-xs font-bold text-[#b9b3c6]">{message.is_staff ? "Support" : "You"}</p>
+                    <p className="whitespace-pre-wrap">{message.body}</p>
+                  </li>
+                ))}
+              </ul>
             </li>
           ))}
         </ul>

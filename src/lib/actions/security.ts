@@ -8,10 +8,10 @@ const DEVICE_COOKIE = "spinora_did";
 
 function getClientIp(h: Headers): string {
   return (
-    h.get("x-forwarded-for")?.split(",")[0]?.trim() ??
-    h.get("x-real-ip") ??
-    h.get("cf-connecting-ip") ??
-    "0.0.0.0"
+    h.get("x-forwarded-for")?.split(",")[0]?.trim() ||
+    h.get("x-real-ip")?.trim() ||
+    h.get("cf-connecting-ip")?.trim() ||
+    ""
   );
 }
 
@@ -52,7 +52,7 @@ export async function checkSignupAllowed(
 ): Promise<{ allowed: true } | { allowed: false; error: string }> {
   const admin = createAdminClient();
   if (!admin) {
-    return { allowed: true };
+    return { allowed: false, error: "Signup checks are unavailable." };
   }
 
   const h = await headers();
@@ -64,7 +64,7 @@ export async function checkSignupAllowed(
 
   if (error) {
     console.error("check_signup_allowed:", error.message);
-    return { allowed: true };
+    return { allowed: false, error: error.message };
   }
 
   const result = data as GateResult;
@@ -75,30 +75,45 @@ export async function checkSignupAllowed(
   return { allowed: true };
 }
 
-/** After new user is created — link device + IP and apply freeplay flags. */
-export async function linkSignupSecurity(deviceId?: string | null): Promise<void> {
+/** After new user is created — log the client IP, device id, and user agent. */
+export async function linkSignupSecurity(
+  deviceId?: string | null
+): Promise<{ ok: true } | { ok: false; error: string }> {
   const supabase = await createClient();
   const {
     data: { user },
   } = await supabase.auth.getUser();
-  if (!user) return;
+  if (!user) return { ok: false, error: "Not authenticated" };
 
   const admin = createAdminClient();
-  if (!admin) return;
+  if (!admin) return { ok: false, error: "Signup checks are unavailable." };
 
   const h = await headers();
   const did = await readDeviceId(deviceId);
+  const ip = getClientIp(h);
+  let lastError = "Signup could not read the network address.";
 
-  const { error } = await admin.rpc("link_user_signup", {
-    p_user_id: user.id,
-    p_ip: getClientIp(h),
-    p_device_id: did,
-    p_user_agent: getUserAgent(h),
-  });
-
-  if (error) {
-    console.error("link_user_signup:", error.message);
+  for (let attempt = 0; attempt < 5; attempt += 1) {
+    const { data, error } = await admin.rpc("link_user_signup", {
+      p_user_id: user.id,
+      p_ip: ip,
+      p_device_id: did,
+      p_user_agent: getUserAgent(h),
+    });
+    if (!error) {
+      const result = data as { ok?: boolean; message?: string } | null;
+      if (result?.ok === false) {
+        return { ok: false, error: result.message || lastError };
+      }
+      return { ok: true };
+    }
+    lastError = error.message;
+    if (!/foreign key|profiles|violates/i.test(error.message)) break;
+    await new Promise((resolve) => setTimeout(resolve, 200));
   }
+
+  console.error("link_user_signup:", lastError);
+  return { ok: false, error: lastError };
 }
 
 /** Blocks daily spin + task cash for multi-account / flagged users. */
@@ -110,7 +125,7 @@ export async function assertFreeplayAllowed(): Promise<{ ok: true } | { ok: fals
   if (!user) return { ok: false, error: "Not authenticated" };
 
   const admin = createAdminClient();
-  if (!admin) return { ok: true };
+  if (!admin) return { ok: false, error: "Reward checks are unavailable." };
 
   const { data, error } = await admin.rpc("assert_freeplay_allowed", {
     p_user_id: user.id,
@@ -118,7 +133,7 @@ export async function assertFreeplayAllowed(): Promise<{ ok: true } | { ok: fals
 
   if (error) {
     console.error("assert_freeplay_allowed:", error.message);
-    return { ok: true };
+    return { ok: false, error: error.message };
   }
 
   const result = data as GateResult;

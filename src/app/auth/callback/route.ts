@@ -77,7 +77,8 @@ export async function GET(request: NextRequest) {
 
   if (type === "signup" || searchParams.get("verified") === "1") {
     try {
-      await linkSignupSecurity();
+      const linked = await linkSignupSecurity();
+      if (!linked.ok) console.error("auth callback linkSignupSecurity:", linked.error);
     } catch (err) {
       console.error("auth callback linkSignupSecurity:", err);
     }
@@ -89,7 +90,8 @@ export async function GET(request: NextRequest) {
       const created = new Date(user.created_at).getTime();
       if (Date.now() - created < 5 * 60 * 1000) {
         try {
-          await linkSignupSecurity();
+          const linked = await linkSignupSecurity();
+          if (!linked.ok) console.error("auth callback linkSignupSecurity (oauth):", linked.error);
         } catch (err) {
           console.error("auth callback linkSignupSecurity (oauth):", err);
         }

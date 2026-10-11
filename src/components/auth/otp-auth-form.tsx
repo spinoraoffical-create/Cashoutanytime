@@ -203,7 +203,12 @@ export function OtpAuthForm({ mode, redirect = "/", referralCodeFromUrl }: OtpAu
         toast.error(saved.error ?? "Account created but phone was not saved");
         return;
       }
-      await linkSignupSecurity();
+      const linked = await linkSignupSecurity();
+      if (!linked.ok) {
+        setLoading(false);
+        toast.error(linked.error);
+        return;
+      }
     }
 
     setLoading(false);

@@ -12,13 +12,13 @@ export const revalidate = 0;
 export default async function AdminGameLoadsPage() {
   const ctx = await getStaffContext();
   const scope = await getAgentScope();
-  const platform = Boolean(ctx && (ctx.isSuperAdmin || can(ctx, "requests.manage")));
   const network = scope && (scope.level === "store" || scope.level === "sub");
+  const platform = Boolean(ctx && (ctx.isSuperAdmin || can(ctx, "requests.manage")) && !network);
   if (!platform && !network) redirect("/admin");
 
   const db = platform ? await createClient() : adminDb();
   let userIds: string[] | null = null;
-  if (network && !platform && scope) {
+  if (network && scope) {
     const { data: owned } = scope.parentIds.length
       ? await adminDb().from("profiles").select("id").in("parent_agent_id", scope.parentIds).limit(1000)
       : { data: [] as { id: string }[] };

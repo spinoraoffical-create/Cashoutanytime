@@ -19,10 +19,10 @@ import { unsubscribeToken } from "@/lib/offers/tokens";
 export async function offerScopeForCurrentUser(): Promise<OfferScope | null> {
   const ctx = await getStaffContext();
   if (!ctx) return null;
-  if (ctx.isSuperAdmin) return { all: true, parentIds: [] };
   const scope = await getAgentScope();
   if (scope?.level === "sub") return { all: false, parentIds: [scope.userId] };
   if (scope?.level === "store") return { all: false, parentIds: scope.parentIds };
+  if (ctx.isSuperAdmin || scope?.level === "platform") return { all: true, parentIds: [] };
   return null;
 }
 

@@ -81,7 +81,7 @@ export const ADMIN_NAV: AdminNavSection[] = [
         href: "/admin/agent-inbox",
         label: "Player chat",
         permission: null,
-        roleAny: ["sub_creator"],
+        roleAny: ["store_creator", "sub_creator"],
       },
       { href: "/admin/kyc", label: "Identity review", permission: "cms.manage" },
       { href: "/admin/crm", label: "CRM", permission: "users.manage" },

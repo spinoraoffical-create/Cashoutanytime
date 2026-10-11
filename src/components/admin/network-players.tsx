@@ -15,12 +15,14 @@ export function NetworkPlayers({
   parents,
   canMove,
   showParentFilter,
+  showIp,
   query,
 }: {
   rows: NetworkPlayer[];
   parents: { id: string; name: string }[];
   canMove: boolean;
   showParentFilter: boolean;
+  showIp: boolean;
   query: { q?: string; parent?: string };
 }) {
   const router = useRouter();
@@ -94,13 +96,14 @@ export function NetworkPlayers({
               <TableHead>Level</TableHead>
               <TableHead>Joined</TableHead>
               <TableHead>Status</TableHead>
+              {showIp ? <TableHead>IP</TableHead> : null}
               <TableHead />
             </TableRow>
           </TableHeader>
           <TableBody>
             {rows.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={canMove ? 13 : 12} className="py-8 text-center text-muted-foreground">
+                <TableCell colSpan={(canMove ? 13 : 12) + (showIp ? 1 : 0)} className="py-8 text-center text-muted-foreground">
                   No players in this view.
                 </TableCell>
               </TableRow>
@@ -132,6 +135,18 @@ export function NetworkPlayers({
                   <TableCell>{row.level ?? "—"}</TableCell>
                   <TableCell>{row.createdAt ? new Date(row.createdAt).toLocaleDateString() : "—"}</TableCell>
                   <TableCell>{row.status}</TableCell>
+                  {showIp ? (
+                    <TableCell className="text-xs">
+                      {row.signupIp === "—" && row.lastSeenIp === "—" ? (
+                        "—"
+                      ) : (
+                        <span className="block">
+                          <span className="block">Signup {row.signupIp ?? "—"}</span>
+                          <span className="block">Last seen {row.lastSeenIp ?? "—"}</span>
+                        </span>
+                      )}
+                    </TableCell>
+                  ) : null}
                   <TableCell>
                     <Button size="sm" variant="outline" asChild>
                       <Link href={`/admin/users/${row.id}`}>Open</Link>

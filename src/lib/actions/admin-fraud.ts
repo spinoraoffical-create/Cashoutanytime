@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { writeAudit } from "@/lib/actions/admin/core";
 import { getStaffContext } from "@/lib/data/admin";
+import { latestIpsFor } from "@/lib/admin/signup-ips";
 import { createAdminClient } from "@/lib/supabase/admin";
 
 export interface AdminFraudRow {
@@ -19,6 +20,8 @@ export interface AdminFraudRow {
   is_suspended: boolean;
   created_at: string;
   device_count: number;
+  signupIp: string;
+  lastSeenIp: string;
 }
 
 async function requireAdmin() {
@@ -66,12 +69,13 @@ export async function getFlaggedFraudUsers(): Promise<{
 
   const userIds = scores.map((s) => s.user_id);
 
-  const [{ data: profiles }, { data: devices }] = await Promise.all([
+  const [{ data: profiles }, { data: devices }, ips] = await Promise.all([
     admin
       .from("profiles")
       .select("id, full_name, email, phone, is_suspended, created_at")
       .in("id", userIds),
     admin.from("device_map").select("user_id, device_id").in("user_id", userIds),
+    latestIpsFor(admin, userIds),
   ]);
 
   const profileById = new Map(profiles?.map((p) => [p.id, p]) ?? []);
@@ -102,6 +106,8 @@ export async function getFlaggedFraudUsers(): Promise<{
         is_suspended: Boolean(profile.is_suspended),
         created_at: profile.created_at,
         device_count: deviceCountByUser.get(score.user_id)?.size ?? 0,
+        signupIp: ips.signup.get(score.user_id)?.trim() || "—",
+        lastSeenIp: ips.seen.get(score.user_id)?.trim() || "—",
       };
     })
     .filter((row): row is AdminFraudRow => row !== null);

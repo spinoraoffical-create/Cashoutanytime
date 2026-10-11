@@ -18,11 +18,20 @@ export type ProfileRow = {
   vip_tier?: string | null;
   current_streak?: number | null;
   role?: string | null;
+  phone?: string | null;
 };
 
 /** Columns safe to select from Sweepstakes Hub profiles in admin queries. */
 export const ADMIN_PROFILE_SELECT =
   "id, email, full_name, avatar_url, xp, level, coins_balance, wallet_balance, cashout_wallet, is_suspended, created_at, last_seen_at, referral_code, vip_points, vip_tier, current_streak, role";
+
+/** Same missing-column match loadNetworkPlayers uses. */
+export function missingProfileColumn(message: string) {
+  const named = message.match(/column profiles\.([a-z_]+) does not exist/i);
+  if (named) return named[1];
+  const cache = message.match(/Could not find the '([a-z_]+)' column/i);
+  return cache?.[1] ?? null;
+}
 
 export const ADMIN_PROFILE_EMBED = "email, full_name";
 

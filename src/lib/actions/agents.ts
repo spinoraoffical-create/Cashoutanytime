@@ -4,6 +4,8 @@ import { revalidatePath } from "next/cache";
 import { z } from "zod";
 
 import { writeAudit, adminDb } from "@/lib/actions/admin/core";
+import { authPhonesFor } from "@/lib/admin/member-phone";
+import { latestIpsFor } from "@/lib/admin/signup-ips";
 import { getAgentScope, playerInScope, type AgentScope } from "@/lib/agents/scope";
 
 export type AgentRow = {
@@ -40,6 +42,8 @@ export type NetworkPlayer = {
   parentId: string | null;
   parentName: string;
   suspended: boolean;
+  signupIp?: string;
+  lastSeenIp?: string;
 };
 
 function code() {
@@ -444,6 +448,16 @@ export async function loadNetworkPlayers(input: {
     if (!failed) break;
   }
 
+  const missingPhone = people.filter((row) => !row.phone?.trim()).map((row) => row.id);
+  if (missingPhone.length) {
+    const authPhones = await authPhonesFor(db, missingPhone);
+    for (const row of people) {
+      if (row.phone?.trim()) continue;
+      const authPhone = authPhones.get(row.id);
+      if (authPhone) row.phone = authPhone;
+    }
+  }
+
   const parentIds = [...new Set(people.map((row) => row.parent_agent_id).filter(Boolean) as string[])];
   const { data: agentRows } = parentIds.length
     ? await db.from("agent_accounts").select("user_id, tier, parent_id").in("user_id", parentIds)
@@ -482,6 +496,9 @@ export async function loadNetworkPlayers(input: {
     })
   );
 
+  const ips =
+    scope.level === "platform" ? await latestIpsFor(db, people.map((row) => row.id)) : null;
+
   const shaped = people.map((row) => {
     const agent = row.parent_agent_id ? agents.get(row.parent_agent_id) : undefined;
     const parentLabel = row.parent_agent_id ? parentName.get(row.parent_agent_id) || "Agent" : "—";
@@ -509,6 +526,12 @@ export async function loadNetworkPlayers(input: {
       parentId: row.parent_agent_id,
       parentName: parentLabel,
       suspended,
+      ...(ips
+        ? {
+            signupIp: dash(ips.signup.get(row.id)),
+            lastSeenIp: dash(ips.seen.get(row.id)),
+          }
+        : {}),
     };
   });
 

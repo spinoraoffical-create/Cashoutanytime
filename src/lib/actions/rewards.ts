@@ -1,6 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import { assertFreeplayAllowed } from "@/lib/actions/security";
 import { createClient } from "@/lib/supabase/server";
 
 export async function claimRewardAction(ruleKey: string) {
@@ -9,6 +10,9 @@ export async function claimRewardAction(ruleKey: string) {
     data: { user },
   } = await supabase.auth.getUser();
   if (!user) return { ok: false as const, error: "Not signed in." };
+
+  const freeplay = await assertFreeplayAllowed();
+  if (!freeplay.ok) return { ok: false as const, error: freeplay.error };
 
   const { data, error } = await supabase.rpc("claim_reward", { rule_key: ruleKey });
   if (error) {

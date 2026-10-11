@@ -78,13 +78,21 @@ export async function POST(req: Request) {
       }, { status: 202 });
     }
     const autoLimit = Number((ops as { cashout_auto_limit?: number } | null)?.cashout_auto_limit ?? 0);
-    const { data: fraud } = await adminForRules
+    const { data: fraud, error: fraudError } = await adminForRules
       .from("fraud_scores")
-      .select("user_id, blocked, manual_review, risk_score")
+      .select("user_id, blocked, rewards_blocked, manual_review, risk_score")
       .eq("user_id", user.id)
       .maybeSingle();
-    const risk = fraud as { blocked?: boolean; manual_review?: boolean; risk_score?: number } | null;
-    const flagged = Boolean(risk && (risk.blocked || risk.manual_review || Number(risk.risk_score ?? 0) >= 50));
+    if (fraudError) {
+      return NextResponse.json({
+        held: true,
+        error: "This cash out is waiting for a Super Admin. Your wallet was not charged.",
+      }, { status: 202 });
+    }
+    const risk = fraud as { blocked?: boolean; rewards_blocked?: boolean; manual_review?: boolean; risk_score?: number } | null;
+    const flagged = Boolean(
+      risk && (risk.blocked || risk.rewards_blocked || risk.manual_review || Number(risk.risk_score ?? 0) >= 50)
+    );
     if (autoLimit <= 0 || amount > autoLimit || flagged) {
       await adminForRules.from("cashout_holds").upsert(
         {
