@@ -52,6 +52,12 @@ export const ADMIN_NAV: AdminNavSection[] = [
         roleAny: ["store_creator", "sub_creator"],
       },
       { href: "/admin/game-loads", label: "Wallet Loads & Redeems", permission: "requests.manage" },
+      {
+        href: "/admin/player-transactions",
+        label: "Player transactions",
+        permission: null,
+        roleAny: ["super_admin", "store_creator", "sub_creator"],
+      },
       { href: "/admin/payouts", label: "Cash-out / Payouts", permission: "requests.manage" },
       { href: "/admin/transactions", label: "Transaction History", permission: "requests.manage" },
       { href: "/admin/cashout-holds", label: "Held cash outs", permission: "requests.manage" },
