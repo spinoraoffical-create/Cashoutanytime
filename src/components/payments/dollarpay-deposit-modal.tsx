@@ -87,7 +87,7 @@ export function DollarPayDepositSection({
     }
 
     const params = new URLSearchParams(window.location.search);
-    const promoCode = params.get("promo") || params.get("ref") || "";
+    const promoCode = params.get("promo") || params.get("ref") || params.get("agent") || "";
 
     setLoading(true);
     try {

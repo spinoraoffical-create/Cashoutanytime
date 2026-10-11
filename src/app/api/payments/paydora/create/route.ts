@@ -34,7 +34,7 @@ export async function POST(req: Request) {
     const fingerprint = String(body.deviceFingerprint || "").trim();
     const gameSlug = String(body.gameSlug || "").trim();
     const gameName = String(body.gameName || "").trim();
-    const promoCode = String(body.promoCode || body.ref || "").trim();
+    let promoCode = String(body.promoCode || body.ref || body.agent || "").trim();
 
     if (!Number.isFinite(amount) || amount <= 0) {
       return NextResponse.json({ error: "Choose a deposit amount." }, { status: 400 });
@@ -78,6 +78,25 @@ export async function POST(req: Request) {
     const admin = createAdminClient();
     if (!admin || !deposit.id) {
       return NextResponse.json({ error: "Could not save this payment. Try again." }, { status: 500 });
+    }
+    if (!promoCode) {
+      const { data: profile } = await admin
+        .from("profiles")
+        .select("parent_agent_id")
+        .eq("id", user.id)
+        .maybeSingle();
+      const parentId = (profile as { parent_agent_id?: string | null } | null)?.parent_agent_id;
+      if (parentId) {
+        const { data: agent } = await admin
+          .from("agent_accounts")
+          .select("promo_code, active")
+          .eq("user_id", parentId)
+          .maybeSingle();
+        const store = agent as { promo_code?: string | null; active?: boolean } | null;
+        if (store?.active !== false && store?.promo_code?.trim()) {
+          promoCode = store.promo_code.trim();
+        }
+      }
     }
     await rememberPaymentIntent(admin, {
       provider: "paydora",

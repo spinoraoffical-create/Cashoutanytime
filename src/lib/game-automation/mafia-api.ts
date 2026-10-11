@@ -88,6 +88,7 @@ export class MafiaApiClient {
   private password: string;
   private token: string | null = null;
   private tokenExpiresAt: number = 0;
+  private storeCoins: number | null = null;
 
   constructor(config: MafiaConfig = {}) {
     this.baseUrl = (
@@ -134,7 +135,13 @@ export class MafiaApiClient {
 
     this.token = json.data.token;
     this.tokenExpiresAt = json.data.expires_time || now + 3600;
+    const money = Number(json.data.money);
+    this.storeCoins = Number.isFinite(money) ? money : null;
     return this.token;
+  }
+
+  getStoreCoins(): number | null {
+    return this.storeCoins;
   }
 
   public async getPlayerList(page = 1, limit = 50, searchAccount?: string): Promise<MafiaPlayer[]> {

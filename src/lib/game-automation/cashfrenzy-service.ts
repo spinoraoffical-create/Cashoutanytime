@@ -112,8 +112,11 @@ export async function autoFulfillCashFrenzyRequest(
 
     if (loadType === "load" || loadType === "reload") {
       const username = input.gameUsername?.trim();
-      const amount = input.amount || 0;
+      const amount = Number(input.amount || 0);
       if (!username) throw new Error("Game username missing");
+      if (!Number.isInteger(amount) || amount <= 0) {
+        throw new Error("The balance must be an integer.");
+      }
 
       const cleanRemark = `job${requestId.replace(/[^a-zA-Z0-9]/g, "")}`.slice(0, 50);
       await rechargeCashFrenzyAccount({ usernameOrId: username, amount, remark: cleanRemark });
@@ -153,9 +156,10 @@ export async function autoFulfillCashFrenzyRequest(
     const userError = formatGameAutomationError(err, input.amount);
 
     if (loadType === "load" || loadType === "reload") {
-      try {
-        await admin.rpc("refund_game_load_wallet", { p_request_id: requestId });
-      } catch {}
+      const refunded = await admin.rpc("refund_game_load_wallet", { p_request_id: requestId });
+      if (refunded.error) {
+        console.error("[cashfrenzy] wallet refund failed", refunded.error.message);
+      }
     }
 
     await admin

@@ -5,6 +5,7 @@ import { writeAudit } from "@/lib/actions/admin/core";
 import { fulfillTrackedRequest } from "@/lib/actions/game-loads";
 import { assignPlayerToAgentByCode } from "@/lib/agents/assign";
 import { bonusForPercent, depositKind } from "@/lib/payments/bonus-math";
+import { wholeCoinAmount } from "@/lib/payments/whole-coin";
 import { ensureGameAccountUsername, generateGamePassword } from "@/lib/game-automation/account-username";
 import { isJuwaApiConfigured } from "@/lib/game-automation/juwa-api";
 import { isVegasApiConfigured } from "@/lib/game-automation/vegas-api";
@@ -454,11 +455,22 @@ async function loadGameOnce(
   }
 
   const sourceKey = `auto:${input.depositId}`;
+  const sent = wholeCoinAmount(input.quote.gameSlug, input.quote.finalCredit);
+  if (!(sent > 0)) {
+    await admin
+      .from("deposit_bonus_ledger")
+      .update({
+        game_load_status: "skipped",
+        game_load_error: "This game accepts whole coins only. The deposit stays in the wallet.",
+      })
+      .eq("deposit_key", input.depositId);
+    return;
+  }
   const { data: requestId, error } = await admin.rpc("request_auto_game_load", {
     p_user_id: input.userId,
     p_game_slug: input.quote.gameSlug,
     p_game_name: input.quote.gameName || input.quote.gameSlug,
-    p_amount: input.quote.finalCredit,
+    p_amount: sent,
     p_game_username: username,
     p_source_key: sourceKey,
   });
@@ -479,6 +491,7 @@ async function loadGameOnce(
       game_load_status: loaded.success ? "loaded" : "failed",
       game_load_request_id: String(requestId),
       game_load_error: loaded.success ? null : loaded.error || "Game load failed.",
+      ...(loaded.success && sent !== input.quote.finalCredit ? { final_credit: sent } : {}),
     })
     .eq("deposit_key", input.depositId);
 }

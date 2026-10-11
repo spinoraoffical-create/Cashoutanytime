@@ -102,6 +102,7 @@ export class CashFrenzyApiClient {
   private agentPassword: string;
   private token: string | null = null;
   private expiresTime: number | null = null;
+  private storeCoins: number | null = null;
 
   constructor(config: CashFrenzyApiConfig = {}) {
     this.baseUrl = (
@@ -198,7 +199,13 @@ export class CashFrenzyApiClient {
 
     this.token = res.data.token;
     this.expiresTime = res.data.expires_time || Math.floor(Date.now() / 1000) + 3600;
+    const money = Number(res.data.money);
+    this.storeCoins = Number.isFinite(money) ? money : null;
     return this.token;
+  }
+
+  getStoreCoins(): number | null {
+    return this.storeCoins;
   }
 
   async getPlayerList(

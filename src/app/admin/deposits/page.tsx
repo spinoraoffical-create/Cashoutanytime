@@ -5,7 +5,6 @@ import { adminDb } from "@/lib/actions/admin/core";
 import { adminListScope, idsOrNone } from "@/lib/admin/list-scope";
 import { readAgentScope } from "@/lib/agents/scope";
 import { can, getStaffContext } from "@/lib/data/admin";
-import { createClient } from "@/lib/supabase/server";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { DepositActions } from "@/components/admin/deposit-actions";
@@ -21,6 +20,27 @@ const statusVariant: Record<RequestStatus, "default" | "warning" | "success" | "
   completed: "success",
   rejected: "destructive",
 };
+
+async function attachStoreNames<T extends { user_id?: string; storeName?: string | null }>(deposits: T[]) {
+  const userIds = [...new Set(deposits.map((row) => row.user_id).filter((id): id is string => Boolean(id)))];
+  if (!userIds.length) return deposits;
+  const db = adminDb();
+  const { data: players } = await db.from("profiles").select("id, parent_agent_id").in("id", userIds);
+  const parentByUser = new Map(
+    ((players ?? []) as { id: string; parent_agent_id: string | null }[]).map((row) => [row.id, row.parent_agent_id])
+  );
+  const parentIds = [...new Set([...parentByUser.values()].filter((id): id is string => Boolean(id)))];
+  const { data: parents } = parentIds.length
+    ? await db.from("profiles").select("id, full_name").in("id", parentIds)
+    : { data: [] as { id: string; full_name: string | null }[] };
+  const names = new Map(
+    ((parents ?? []) as { id: string; full_name: string | null }[]).map((row) => [row.id, row.full_name])
+  );
+  return deposits.map((row) => {
+    const parentId = row.user_id ? parentByUser.get(row.user_id) : null;
+    return { ...row, storeName: parentId ? names.get(parentId) ?? null : null };
+  });
+}
 
 const FILTER_TABS: { id: string; label: string; href: string }[] = [
   { id: "pending", label: "Pending", href: "/admin/deposits?status=pending" },
@@ -51,6 +71,7 @@ export default async function AdminDepositsPage({
 
   type DepositCard = {
     id: string;
+    user_id?: string;
     game_name: string;
     payment_method: Parameters<typeof getDepositMethod>[0];
     status: RequestStatus;
@@ -58,6 +79,7 @@ export default async function AdminDepositsPage({
     proof_url: string;
     admin_notes: string | null;
     created_at: string;
+    storeName?: string | null;
     user: { full_name?: string; email?: string } | null;
   };
   let deposits: DepositCard[] = [];
@@ -77,8 +99,8 @@ export default async function AdminDepositsPage({
     const result = await query;
     deposits = (result.data ?? []) as typeof deposits;
   } else {
-    const supabase = await createClient();
-    let query = supabase
+    const db = adminDb();
+    let query = db
       .from("deposit_requests")
       .select("*, user:profiles!deposit_requests_user_id_fkey(full_name, email)")
       .order("created_at", { ascending: false })
@@ -87,6 +109,7 @@ export default async function AdminDepositsPage({
     const result = await query;
     deposits = (result.data ?? []) as typeof deposits;
   }
+  deposits = await attachStoreNames(deposits);
 
   return (
     <div className="mx-auto max-w-7xl">
@@ -138,6 +161,7 @@ export default async function AdminDepositsPage({
                       </div>
                       <p className="text-sm text-muted-foreground">
                         {user?.full_name} ({user?.email})
+                        {dep.storeName ? ` · ${dep.storeName}` : ""}
                         {dep.amount != null && dep.amount > 0 && (
                           <span className="text-emerald-400 font-semibold"> · ${Number(dep.amount).toFixed(2)}</span>
                         )}

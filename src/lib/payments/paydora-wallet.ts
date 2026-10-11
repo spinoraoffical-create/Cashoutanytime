@@ -81,14 +81,22 @@ async function ensureDepositRequest(
     .maybeSingle();
 
   if (existing?.id) {
-    const { error } = await admin
-      .from("deposit_requests")
-      .update({
-        status: "completed",
-        wallet_credited: true,
-        amount: input.amount,
-      })
-      .eq("id", existing.id);
+    const patch: {
+      status: string;
+      wallet_credited: boolean;
+      amount: number;
+      game_name?: string;
+      game_slug?: string;
+      admin_notes?: string;
+    } = {
+      status: "completed",
+      wallet_credited: true,
+      amount: input.amount,
+    };
+    if (input.gameName?.trim()) patch.game_name = input.gameName.trim();
+    if (input.gameSlug?.trim()) patch.game_slug = input.gameSlug.trim();
+    if (input.referenceId) patch.admin_notes = `Paid online · ${input.referenceId}`;
+    const { error } = await admin.from("deposit_requests").update(patch).eq("id", existing.id);
     if (error) throw new Error(error.message);
     return;
   }
