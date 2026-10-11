@@ -27,7 +27,8 @@ import { CHAT_INCOMING_EVENT, type ChatIncomingDetail } from "@/lib/chat/events"
 import { playIncomingMessageSound } from "@/lib/chat/message-notification-sound";
 import { subscribeToConversationInserts, subscribeToMessageInserts } from "@/lib/chat/subscribe-messages";
 import { isAdminOutgoingMessage, markAdminOutgoing, markAdminOutgoingSoon } from "@/lib/chat/admin-outgoing";
-import { appendMessage } from "@/lib/chat/merge-messages";
+import { appendMessage, mergeMessagesById } from "@/lib/chat/merge-messages";
+import { messagePreview } from "@/lib/chat/message-preview";
 import { isUserOnline } from "@/lib/presence/utils";
 import { toast } from "sonner";
 import { ArrowLeft, MessageCircle } from "lucide-react";
@@ -248,7 +249,7 @@ export function AdminChatInbox({
   const scrollRef = useRef<HTMLDivElement>(null);
   const initialUserHandled = useRef(false);
   const selectedIdRef = useRef(selectedId);
-  const unreadsDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const seenMessageIdsRef = useRef<Set<string>>(new Set());
   const supabase = useMemo(() => createClient(), []);
   const { refresh: refreshGlobalUnread } = useUnreadMessages();
 
@@ -317,12 +318,27 @@ export function AdminChatInbox({
     setUnreads(map);
   }, []);
 
-  const scheduleLoadUnreads = useCallback(() => {
-    if (unreadsDebounceRef.current) clearTimeout(unreadsDebounceRef.current);
-    unreadsDebounceRef.current = setTimeout(() => {
-      void loadUnreads();
-    }, 150);
-  }, [loadUnreads]);
+  const rememberMessage = useCallback((message: Message) => {
+    const seen = seenMessageIdsRef.current;
+    if (seen.has(message.id)) return false;
+    seen.add(message.id);
+    return true;
+  }, []);
+
+  const setChatBadge = useCallback((conversationId: string, unreadCount: number, message?: Message) => {
+    setUnreads((prev) => {
+      const current = prev[conversationId];
+      return {
+        ...prev,
+        [conversationId]: {
+          conversationId,
+          unreadCount,
+          lastMessage: message ? messagePreview(message) : (current?.lastMessage ?? "No messages yet"),
+          lastMessageAt: message?.created_at ?? current?.lastMessageAt ?? new Date().toISOString(),
+        },
+      };
+    });
+  }, []);
 
   const loadMessages = useCallback(
     async (conversationId: string) => {
@@ -331,11 +347,21 @@ export function AdminChatInbox({
         .from("messages")
         .select("*")
         .eq("conversation_id", conversationId)
-        .order("created_at", { ascending: true });
+        .order("created_at", { ascending: false })
+        .limit(50);
 
       if (error || selectedIdRef.current !== conversationId) return;
 
-      setMessages(data ?? []);
+      const latest = [...(data ?? [])].reverse();
+      for (const message of latest) seenMessageIdsRef.current.add(message.id);
+      setMessages((prev) =>
+        mergeMessagesById(
+          latest,
+          prev.filter((message) => message.conversation_id === conversationId)
+        )
+      );
+      const last = latest[latest.length - 1];
+      setChatBadge(conversationId, 0, last);
 
       const {
         data: { user },
@@ -350,10 +376,9 @@ export function AdminChatInbox({
         .neq("sender_id", user?.id ?? "")
         .eq("is_read", false);
 
-      await loadUnreads();
       await refreshGlobalUnread();
     },
-    [supabase, loadUnreads, refreshGlobalUnread]
+    [supabase, refreshGlobalUnread, setChatBadge]
   );
 
   useEffect(() => {
@@ -367,13 +392,13 @@ export function AdminChatInbox({
 
   const handleIncomingMessage = useCallback(
     (msg: Message) => {
-      if (!supabase || !adminId || isAdminOutgoingMessage(msg)) return;
+      if (!supabase || !adminId || isAdminOutgoingMessage(msg) || !rememberMessage(msg)) return;
 
       playIncomingMessageSound(msg.sender_id, adminId);
-      scheduleLoadUnreads();
 
       if (msg.conversation_id === selectedIdRef.current) {
         setMessages((prev) => appendMessage(prev, msg));
+        setChatBadge(msg.conversation_id, 0, msg);
         setMobileChatOpen(true);
         void supabase
           .from("messages")
@@ -383,9 +408,21 @@ export function AdminChatInbox({
         return;
       }
 
-      selectConversation(msg.conversation_id);
+      setUnreads((prev) => {
+        const current = prev[msg.conversation_id];
+        return {
+          ...prev,
+          [msg.conversation_id]: {
+            conversationId: msg.conversation_id,
+            unreadCount: (current?.unreadCount ?? 0) + 1,
+            lastMessage: messagePreview(msg),
+            lastMessageAt: msg.created_at,
+          },
+        };
+      });
+      void refreshGlobalUnread();
     },
-    [supabase, adminId, scheduleLoadUnreads, refreshGlobalUnread, selectConversation]
+    [supabase, adminId, refreshGlobalUnread, rememberMessage, setChatBadge]
   );
 
   useEffect(() => {
@@ -416,35 +453,6 @@ export function AdminChatInbox({
       }
     );
   }, [supabase, selectedId, adminId, handleIncomingMessage]);
-
-  useEffect(() => {
-    if (!supabase || !selectedId) return;
-
-    const poll = () => {
-      if (document.visibilityState !== "visible") return;
-      void supabase
-        .from("messages")
-        .select("*")
-        .eq("conversation_id", selectedId)
-        .order("created_at", { ascending: true })
-        .then(({ data }) => {
-          if (selectedIdRef.current !== selectedId) return;
-          if (data) setMessages(data);
-        });
-    };
-
-    poll();
-    const interval = setInterval(poll, 800);
-    return () => clearInterval(interval);
-  }, [supabase, selectedId]);
-
-  useEffect(() => {
-    const interval = setInterval(() => {
-      if (document.visibilityState !== "visible") return;
-      void loadUnreads();
-    }, 2000);
-    return () => clearInterval(interval);
-  }, [loadUnreads]);
 
   useEffect(() => {
     let cancelled = false;

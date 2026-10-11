@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { canSeeNavItem } from "../src/lib/admin/nav.ts";
 import {
+  buildDailyReport,
   filterTransactions,
   parentIdsForStore,
   parseTransactionQuery,
@@ -177,4 +178,106 @@ assert.equal(data.includes("agent_commissions"), false);
 assert.match(page, /Credit spent/);
 assert.match(page, /Collected/);
 
+const day = "2026-10-11";
+const player = {
+  userId: "player-1",
+  playerName: "Anthony",
+  parentAgentId: sub,
+  createdAt: "2026-10-11T15:00:00.000Z",
+};
+const juwaDeposit = {
+  ...player,
+  id: "dep-1",
+  key: "dep-1",
+  completed: true,
+  baseAmount: 10,
+  finalCredit: 15,
+  game: "Juwa",
+  loadRequestId: "load-1",
+};
+const juwaLoad = {
+  ...player,
+  id: "load-1",
+  status: "completed",
+  loadType: "reload",
+  amount: 15,
+  game: "Juwa",
+  sourceKey: "auto:dep-1",
+};
+const paidLoad = buildDailyReport({
+  day,
+  parentIds: storeParents,
+  deposits: [juwaDeposit, { ...juwaDeposit, id: "dep-1-copy" }],
+  loads: [juwaLoad],
+  payouts: [],
+});
+assert.equal(paidLoad.rows.length, 1);
+assert.equal(paidLoad.moneyReceived, 10);
+assert.equal(paidLoad.games.find((game) => game.game === "Juwa")?.coinsLoaded, 15);
+assert.equal(paidLoad.profit, 10);
+assert.equal(paidLoad.rows[0].coinsRedeemed, 0);
+assert.equal(paidLoad.rows[0].cashPaidOut, 0);
+
+const failedLoad = buildDailyReport({
+  day,
+  parentIds: null,
+  deposits: [],
+  loads: [{ ...juwaLoad, id: "load-failed", status: "failed", sourceKey: null, amount: 15 }],
+  payouts: [],
+});
+assert.equal(failedLoad.rows.length, 0);
+assert.equal(failedLoad.moneyReceived, 0);
+assert.equal(failedLoad.games.length, 0);
+
+const otherPlayer = buildDailyReport({
+  day,
+  parentIds: storeParents,
+  deposits: [{ ...juwaDeposit, id: "dep-other", key: "dep-other", parentAgentId: other, userId: "player-2" }],
+  loads: [],
+  payouts: [],
+});
+assert.equal(otherPlayer.rows.length, 0);
+
+const loss = buildDailyReport({
+  day,
+  parentIds: null,
+  deposits: [{ ...juwaDeposit, id: "dep-cash", key: "dep-cash", baseAmount: 100, finalCredit: null, loadRequestId: null }],
+  loads: [],
+  payouts: [{ ...player, id: "pay-1", amount: 350, completed: true }],
+});
+assert.equal(loss.moneyReceived, 100);
+assert.equal(loss.cashPaidOut, 350);
+assert.equal(loss.profit, -250);
+assert.equal(loss.rows.reduce((sum, row) => sum + row.moneyReceived, 0), loss.moneyReceived);
+assert.equal(loss.rows.reduce((sum, row) => sum + row.cashPaidOut, 0), loss.cashPaidOut);
+
+const held = buildDailyReport({
+  day,
+  parentIds: null,
+  deposits: [],
+  loads: [{ ...juwaLoad, id: "redeem-1", loadType: "redeem", amount: 40, sourceKey: null }],
+  payouts: [{ ...player, id: "held-1", amount: 40, completed: false }],
+});
+assert.equal(held.cashPaidOut, 0);
+assert.equal(held.games[0]?.coinsRedeemed, 40);
+assert.equal(held.profit, 0);
+
+const inbox = readFileSync(new URL("../src/components/admin/admin-chat-inbox.tsx", import.meta.url), "utf8");
+assert.equal(inbox.includes("setInterval(poll, 800)"), false);
+assert.equal(inbox.includes(", 2000)"), false);
+assert.match(inbox, /\.limit\(50\)/);
+
+console.log(
+  JSON.stringify({
+    paidTenLoadedFifteen: {
+      moneyReceived: paidLoad.moneyReceived,
+      juwaCoinsLoaded: paidLoad.games[0]?.coinsLoaded,
+      profit: paidLoad.profit,
+      rows: paidLoad.rows.length,
+    },
+    failedLoad: { rows: failedLoad.rows.length, moneyReceived: failedLoad.moneyReceived },
+    otherStore: { rows: otherPlayer.rows.length },
+    loss: { profit: loss.profit },
+  })
+);
 console.log("player transaction checks passed");
