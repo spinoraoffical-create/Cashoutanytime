@@ -4,7 +4,7 @@ import { useState, useEffect, useRef, useCallback, useMemo } from "react";
 import { usePathname } from "next/navigation";
 import Link from "next/link";
 import { motion, AnimatePresence } from "framer-motion";
-import { MessageCircle, X, Minimize2 } from "lucide-react";
+import { X, Minimize2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { createClient } from "@/lib/supabase/client";
 import { uploadChatAttachment } from "@/lib/chat/attachments";
@@ -14,7 +14,6 @@ import {
 } from "@/lib/chat/send-message-client";
 import { ChatComposer } from "@/components/chat/chat-composer";
 import { ChatMessageContent } from "@/components/chat/chat-message-content";
-import { FloatingSocialLinks } from "@/components/layout/social-links";
 import { formatRelativeTime } from "@/lib/utils";
 import { CHAT_SCROLL_CLASS } from "@/lib/chat/chat-layout";
 import { useChatAutoScroll } from "@/lib/chat/use-chat-auto-scroll";
@@ -263,21 +262,6 @@ export function ChatWidget() {
         )}
       </AnimatePresence>
 
-      {!open && (
-        <div className="fixed bottom-5 right-4 sm:bottom-6 sm:right-6 z-50 flex flex-col items-center gap-2 pointer-events-none">
-          <FloatingSocialLinks />
-          <motion.button
-            type="button"
-            whileHover={{ scale: 1.05 }}
-            whileTap={{ scale: 0.95 }}
-            onClick={() => setOpen(true)}
-            className="w-14 h-14 rounded-full gradient-bg flex items-center justify-center shadow-lg glow-purple pointer-events-auto relative"
-            aria-label="Open chat"
-          >
-            <MessageCircle className="h-6 w-6 text-white" />
-          </motion.button>
-        </div>
-      )}
     </>
   );
 }

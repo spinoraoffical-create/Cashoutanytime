@@ -211,6 +211,18 @@ export async function sendUserMessage(
     return { error: "Unauthorized" };
   }
 
+  const admin = createAdminClient();
+  if (admin) {
+    const { data: profile } = await admin
+      .from("profiles")
+      .select("parent_agent_id")
+      .eq("id", user.id)
+      .maybeSingle();
+    if ((profile as { parent_agent_id?: string | null } | null)?.parent_agent_id) {
+      return { error: "This chat goes to the creator on your account." };
+    }
+  }
+
   const { error, data: inserted } = await supabase
     .from("messages")
     .insert({
@@ -229,25 +241,6 @@ export async function sendUserMessage(
   if (error) {
     console.error("[messages] send:", error.message);
     return { error: "Could not send that message. Try again." };
-  }
-
-  const admin = createAdminClient();
-  const body = content.trim().slice(0, 2000);
-  if (admin && body) {
-    const { data: profile } = await admin
-      .from("profiles")
-      .select("parent_agent_id")
-      .eq("id", user.id)
-      .maybeSingle();
-    const agentId = (profile as { parent_agent_id?: string | null } | null)?.parent_agent_id ?? null;
-    if (agentId) {
-      await admin.from("agent_messages").insert({
-        player_id: user.id,
-        agent_id: agentId,
-        sender_id: user.id,
-        body,
-      });
-    }
   }
 
   void notifyAdminOfCustomerMessage({
@@ -478,6 +471,7 @@ export interface AdminChatConversationRow {
   user: {
     full_name?: string | null;
     email?: string | null;
+    phone?: string | null;
     last_seen_at?: string | null;
   } | null;
 }
@@ -547,37 +541,55 @@ export async function getAdminChatConversations(): Promise<AdminChatConversation
   }
 
   const ids = [...new Set(rows.map((row) => row.user_id).filter(Boolean))];
-  const { data: profiles } = await profileDb
+  const withSeen = await profileDb
     .from("profiles")
-    .select("id, full_name, email, last_seen_at")
+    .select("id, full_name, email, phone, last_seen_at, parent_agent_id")
     .in("id", ids);
+  const fallback = withSeen.error
+    ? await profileDb.from("profiles").select("id, full_name, email, phone").in("id", ids)
+    : null;
+  const profiles = withSeen.error ? fallback?.data : withSeen.data;
+  const parents = await profileDb.from("profiles").select("id, parent_agent_id").in("id", ids);
+  const parentById = new Map(
+    ((parents.data ?? []) as { id: string; parent_agent_id?: string | null }[]).map((profile) => [
+      profile.id,
+      profile.parent_agent_id ?? null,
+    ])
+  );
   const byId = new Map(
     ((profiles ?? []) as {
       id: string;
       full_name?: string | null;
       email?: string | null;
+      phone?: string | null;
       last_seen_at?: string | null;
+      parent_agent_id?: string | null;
     }[]).map((profile) => [profile.id, profile])
   );
 
-  return rows.map((row) => {
+  return rows.flatMap((row) => {
     const profile = byId.get(row.user_id);
+    const parentId = profile?.parent_agent_id ?? parentById.get(row.user_id) ?? null;
+    if (parentId) return [];
     const storedResolved = (row as { support_resolved?: boolean | null }).support_resolved;
     const storedRating = (row as { support_rating?: number | null }).support_rating;
-    return {
-      id: row.id,
-      user_id: row.user_id,
-      updated_at: row.updated_at,
-      supportResolved: typeof storedResolved === "boolean" ? storedResolved : (notedStatus.get(row.id) ?? null),
-      supportRating: storedRating ?? notedRating.get(row.id) ?? null,
-      user: profile
-        ? {
-            full_name: profile.full_name ?? null,
-            email: profile.email ?? null,
-            last_seen_at: profile.last_seen_at ?? null,
-          }
-        : null,
-    };
+    return [
+      {
+        id: row.id,
+        user_id: row.user_id,
+        updated_at: row.updated_at,
+        supportResolved: typeof storedResolved === "boolean" ? storedResolved : (notedStatus.get(row.id) ?? null),
+        supportRating: storedRating ?? notedRating.get(row.id) ?? null,
+        user: profile
+          ? {
+              full_name: profile.full_name ?? null,
+              email: profile.email ?? null,
+              phone: profile.phone ?? null,
+              last_seen_at: profile.last_seen_at ?? null,
+            }
+          : null,
+      },
+    ];
   });
 }
 

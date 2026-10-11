@@ -9,13 +9,12 @@ import {
   type ReactNode,
 } from "react";
 import { usePathname, useRouter } from "next/navigation";
-import { Headphones, MessageCircle, User, X, Gamepad2, CheckCircle, Banknote } from "lucide-react";
+import { Headphones, User, X, Gamepad2, CheckCircle, Banknote } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import {
   getAdminUnreadMessageCount,
   getUnreadMessageCount,
 } from "@/lib/actions/messages";
-import { UnreadBadge } from "@/components/ui/unread-badge";
 import { SitePresenceHeartbeat } from "@/components/presence/site-presence-heartbeat";
 import {
   CHAT_INCOMING_EVENT,
@@ -28,8 +27,6 @@ import {
 import { getDepositMethod, type DepositPaymentMethodId } from "@/lib/payments/methods";
 import { subscribeToConversationInserts, subscribeToMessageInserts } from "@/lib/chat/subscribe-messages";
 import { isAdminOutgoingMessage } from "@/lib/chat/admin-outgoing";
-import { AgentThread } from "@/components/agents/agent-thread";
-import { loadMyParentAgent } from "@/lib/actions/player-tickets";
 import {
   MessageRealtimeContext,
 } from "@/lib/chat/message-realtime-context";
@@ -39,7 +36,6 @@ import {
   resumeMessageNotificationAudio,
   unlockMessageNotificationSound,
 } from "@/lib/chat/message-notification-sound";
-import { FloatingSocialLinks } from "@/components/layout/social-links";
 import { messagePreview } from "@/lib/chat/message-preview";
 import type { GameRequest, Message } from "@/types/database";
 
@@ -80,8 +76,6 @@ export function MessageRealtimeProvider({ children }: { children: ReactNode }) {
   const [isAdmin, setIsAdmin] = useState(false);
   const [isLoggedIn, setIsLoggedIn] = useState(false);
   const [popup, setPopup] = useState<ActivityPopup | null>(null);
-  const [quickChatOpen, setQuickChatOpen] = useState(false);
-  const [parentAgentId, setParentAgentId] = useState<string | null>(null);
   const [activeUserId, setActiveUserId] = useState<string | null>(null);
   const [conversationIds, setConversationIds] = useState<string[]>([]);
   const userIdRef = useRef<string | null>(null);
@@ -215,8 +209,6 @@ export function MessageRealtimeProvider({ children }: { children: ReactNode }) {
       }
 
       if (!adminView) {
-        void loadMyParentAgent().then(({ agentId }) => setParentAgentId(agentId));
-        setQuickChatOpen(true);
         void showMessagePopup(msg, "/dashboard/messages");
         return;
       }
@@ -460,8 +452,6 @@ export function MessageRealtimeProvider({ children }: { children: ReactNode }) {
         userIdRef.current = null;
         setActiveUserId(null);
         setConversationIds([]);
-        setQuickChatOpen(false);
-        setParentAgentId(null);
         setCount(0);
         setIsAdmin(false);
         setIsLoggedIn(false);
@@ -639,12 +629,6 @@ export function MessageRealtimeProvider({ children }: { children: ReactNode }) {
     const item = popup;
     setPopup(null);
 
-    if (item.kind === "message" && !item.isAdminView) {
-      void loadMyParentAgent().then(({ agentId }) => setParentAgentId(agentId));
-      setQuickChatOpen(true);
-      return;
-    }
-
     router.push(item.href);
   }
 
@@ -671,12 +655,6 @@ export function MessageRealtimeProvider({ children }: { children: ReactNode }) {
     return "Tap to view request";
   }
 
-  const onAdminRoute = Boolean(pathname?.startsWith("/admin"));
-
-  const hideFab =
-    (onAdminRoute && pathname?.startsWith("/admin/chat")) ||
-    (!onAdminRoute && pathname?.startsWith("/dashboard/messages"));
-
   const contextValue = useMemo(
     () => ({ count, isAdmin, refresh }),
     [count, isAdmin, refresh]
@@ -686,68 +664,6 @@ export function MessageRealtimeProvider({ children }: { children: ReactNode }) {
     <MessageRealtimeContext.Provider value={contextValue}>
       {isLoggedIn && <SitePresenceHeartbeat />}
       {children}
-
-      {!hideFab && isLoggedIn && (
-        <div className="fixed bottom-[max(1.25rem,env(safe-area-inset-bottom))] right-[max(1rem,env(safe-area-inset-right))] sm:bottom-6 sm:right-6 z-[130] flex flex-col items-center gap-2 pointer-events-none">
-          <FloatingSocialLinks />
-          <button
-            type="button"
-            onClick={() => {
-            void unlockMessageNotificationSound();
-            if (onAdminRoute) {
-              setQuickChatOpen(false);
-              router.push("/admin/chat");
-              return;
-            }
-            if (quickChatOpen) {
-              setQuickChatOpen(false);
-              return;
-            }
-            void (async () => {
-              try {
-                const uid = activeUserId ?? userIdRef.current;
-                if (!uid) {
-                  router.push("/dashboard/messages");
-                  return;
-                }
-                const { agentId } = await loadMyParentAgent();
-                setParentAgentId(agentId);
-                setQuickChatOpen(true);
-              } catch {
-                router.push("/dashboard/messages");
-              }
-            })();
-          }}
-          className="relative w-14 h-14 rounded-full gradient-bg flex items-center justify-center shadow-lg glow-purple touch-manipulation pointer-events-auto"
-          aria-label={onAdminRoute ? "Open customer chat" : "Open live chat"}
-        >
-          <MessageCircle className="h-6 w-6 text-white" />
-          {count > 0 && (
-            <span className="absolute -top-0.5 -right-0.5">
-              <UnreadBadge count={count} className="ring-2 ring-[#121212]" />
-            </span>
-          )}
-        </button>
-        </div>
-      )}
-
-      {!onAdminRoute && !onInboxPage && isLoggedIn && quickChatOpen && activeUserId && (
-        <div className="fixed bottom-[5.5rem] right-4 z-[140] flex h-[min(70vh,28rem)] w-[min(100vw-2rem,22rem)] flex-col overflow-hidden rounded-2xl border border-white/10 bg-[#121212] shadow-2xl sm:right-6">
-          <div className="flex items-center justify-between border-b border-white/10 px-3 py-2">
-            <p className="text-sm font-black text-white">Private chat</p>
-            <button type="button" aria-label="Close chat" onClick={() => setQuickChatOpen(false)} className="text-white">
-              <X className="h-4 w-4" />
-            </button>
-          </div>
-          <div className="min-h-0 flex-1 p-2">
-            {parentAgentId ? (
-              <AgentThread playerId={activeUserId} agentId={parentAgentId} selfId={activeUserId} compact />
-            ) : (
-              <p className="p-3 text-sm text-[#b9b3c6]">You are not assigned.</p>
-            )}
-          </div>
-        </div>
-      )}
 
       {popup && (
         <button

@@ -36,6 +36,7 @@ import type { Message } from "@/types/database";
 interface ConversationUser {
   full_name?: string | null;
   email?: string | null;
+  phone?: string | null;
   is_online?: boolean;
   last_seen_at?: string | null;
 }
@@ -68,6 +69,8 @@ function customerTitle(user: ConversationUser | null | undefined) {
   if (name) return name;
   const email = user?.email?.trim() ?? "";
   if (email && !email.endsWith("@phone.spinora.local")) return email;
+  const phone = user?.phone?.trim();
+  if (phone) return phone;
   return "Customer";
 }
 

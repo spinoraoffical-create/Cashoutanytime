@@ -7,12 +7,15 @@ import { createClient } from "@/lib/supabase/server";
 const DEVICE_COOKIE = "spinora_did";
 
 function getClientIp(h: Headers): string {
-  return (
+  const forwarded =
     h.get("x-forwarded-for")?.split(",")[0]?.trim() ||
     h.get("x-real-ip")?.trim() ||
     h.get("cf-connecting-ip")?.trim() ||
-    ""
-  );
+    "";
+  if (forwarded) return forwarded;
+  const host = h.get("host") ?? "";
+  if (host.startsWith("localhost") || host.startsWith("127.0.0.1")) return "127.0.0.1";
+  return "";
 }
 
 function getUserAgent(h: Headers): string | null {
@@ -77,13 +80,23 @@ export async function checkSignupAllowed(
 
 /** After new user is created — log the client IP, device id, and user agent. */
 export async function linkSignupSecurity(
-  deviceId?: string | null
+  deviceId?: string | null,
+  newUserId?: string | null
 ): Promise<{ ok: true } | { ok: false; error: string }> {
   const supabase = await createClient();
   const {
     data: { user },
   } = await supabase.auth.getUser();
-  if (!user) return { ok: false, error: "Not authenticated" };
+  let userId = user?.id ?? null;
+  if (!userId && newUserId) {
+    const admin = createAdminClient();
+    const created = admin ? await admin.auth.admin.getUserById(newUserId) : null;
+    const createdAt = created?.data.user?.created_at;
+    const fresh = createdAt ? Date.now() - new Date(createdAt).getTime() < 15 * 60 * 1000 : false;
+    if (!fresh) return { ok: false, error: "Not authenticated" };
+    userId = newUserId;
+  }
+  if (!userId) return { ok: false, error: "Not authenticated" };
 
   const admin = createAdminClient();
   if (!admin) return { ok: false, error: "Signup checks are unavailable." };
@@ -95,7 +108,7 @@ export async function linkSignupSecurity(
 
   for (let attempt = 0; attempt < 5; attempt += 1) {
     const { data, error } = await admin.rpc("link_user_signup", {
-      p_user_id: user.id,
+      p_user_id: userId,
       p_ip: ip,
       p_device_id: did,
       p_user_agent: getUserAgent(h),

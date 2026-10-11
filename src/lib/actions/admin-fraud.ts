@@ -60,7 +60,9 @@ export async function getFlaggedFraudUsers(): Promise<{
 
   if (error) {
     if (error.message.includes("fraud_scores")) {
-      return { error: "Run supabase/anti-spam-multi-account.sql in Supabase SQL Editor first." };
+      return {
+        error: "Run supabase/migrations/20261011000260_anti_spam_multi_account.sql in the Supabase SQL editor first.",
+      };
     }
     return { error: error.message };
   }
@@ -69,16 +71,25 @@ export async function getFlaggedFraudUsers(): Promise<{
 
   const userIds = scores.map((s) => s.user_id);
 
-  const [{ data: profiles }, { data: devices }, ips] = await Promise.all([
-    admin
-      .from("profiles")
-      .select("id, full_name, email, phone, is_suspended, created_at")
-      .in("id", userIds),
+  const profileSelect = await admin
+    .from("profiles")
+    .select("id, full_name, email, phone, is_suspended, created_at")
+    .in("id", userIds);
+  const profileRows = profileSelect.error
+    ? (
+        await admin
+          .from("profiles")
+          .select("id, full_name, email, is_suspended, created_at")
+          .in("id", userIds)
+      ).data
+    : profileSelect.data;
+
+  const [{ data: devices }, ips] = await Promise.all([
     admin.from("device_map").select("user_id, device_id").in("user_id", userIds),
     latestIpsFor(admin, userIds),
   ]);
 
-  const profileById = new Map(profiles?.map((p) => [p.id, p]) ?? []);
+  const profileById = new Map((profileRows ?? []).map((p) => [p.id, p]));
   const deviceCountByUser = new Map<string, Set<string>>();
 
   for (const row of devices ?? []) {
@@ -102,7 +113,7 @@ export async function getFlaggedFraudUsers(): Promise<{
         last_calculated_at: score.last_calculated_at,
         full_name: profile.full_name,
         email: profile.email,
-        phone: profile.phone,
+        phone: "phone" in profile ? profile.phone : null,
         is_suspended: Boolean(profile.is_suspended),
         created_at: profile.created_at,
         device_count: deviceCountByUser.get(score.user_id)?.size ?? 0,
@@ -137,7 +148,9 @@ export async function clearUserFraudFlags(userId: string): Promise<{ success?: b
 
   if (fraudError) {
     if (fraudError.message.includes("fraud_scores")) {
-      return { error: "Run supabase/anti-spam-multi-account.sql in Supabase SQL Editor first." };
+      return {
+        error: "Run supabase/migrations/20261011000260_anti_spam_multi_account.sql in the Supabase SQL editor first.",
+      };
     }
     return { error: fraudError.message };
   }

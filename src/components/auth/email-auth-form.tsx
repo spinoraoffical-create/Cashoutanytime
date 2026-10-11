@@ -232,11 +232,14 @@ export function EmailAuthForm({ mode, redirect = "/", referralCodeFromUrl, agent
 
     if (needsConfirmation) {
       // Do not signOut — it clears PKCE cookies and breaks the confirmation link
-      const linked = await linkSignupSecurity(deviceId);
+      const linked = await linkSignupSecurity(deviceId, data.user.id);
       setLoading(false);
+      if (!linked.ok) {
+        toast.error(linked.error);
+        return;
+      }
       setPendingEmail(normalizedEmail);
       setAwaitingConfirmation(true);
-      if (!linked.ok && linked.error !== "Not authenticated") toast.error(linked.error);
       toast.success("Account created! Check your email and click the link to verify.");
       void finalizeRegistrationAfterSignUp({
         userId: data.user.id,
@@ -286,7 +289,7 @@ export function EmailAuthForm({ mode, redirect = "/", referralCodeFromUrl, agent
       return;
     }
 
-    const linked = await linkSignupSecurity(deviceId);
+    const linked = await linkSignupSecurity(deviceId, data.user.id);
     if (!linked.ok) {
       setLoading(false);
       toast.error(linked.error);

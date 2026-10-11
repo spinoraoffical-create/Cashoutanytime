@@ -2,6 +2,8 @@ import { VipPageLayout } from "@/components/layout/vip-page-layout";
 import { supportMetadata } from "@/lib/seo/metadata";
 import { getPublishedFaqs } from "@/lib/data/faqs-public";
 import { getAuthUser } from "@/lib/supabase/session";
+import { loadPlayerTickets } from "@/lib/actions/player-tickets";
+import { PlayerTicketDesk } from "@/components/player/player-ticket-desk";
 import Link from "next/link";
 import {
   ChevronRight,
@@ -34,6 +36,7 @@ export default async function SupportPage({
     getAuthUser(),
     getPublishedFaqs(),
   ]);
+  const desk = user ? await loadPlayerTickets() : null;
   const chatHref = user ? "/support/chat" : "/login?redirect=/support/chat";
   const topicHref = (id: string) => {
     const dest = `/support/chat?topic=${id}`;
@@ -56,7 +59,7 @@ export default async function SupportPage({
         <section className="space-y-3">
           <h1 className="text-3xl font-black">Contact us</h1>
           <p className="text-sm leading-6 text-[#b9b3c6]">
-            Private chat goes to the store or sub-creator on your account.
+            Live chat goes to the creator on your referral link. Submit Ticket goes to Super Admin.
           </p>
           <Link
             href={chatHref}
@@ -102,6 +105,12 @@ export default async function SupportPage({
             })}
           </div>
         </section>
+
+        {desk ? (
+          <div className="mt-8">
+            <PlayerTicketDesk {...desk} />
+          </div>
+        ) : null}
 
         <Link href="/help" className="mt-4 inline-flex items-center gap-2 text-sm font-bold text-[#ff6b89]">
           <CircleHelp className="h-4 w-4" /> Read frequently asked questions

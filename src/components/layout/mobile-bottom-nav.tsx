@@ -16,14 +16,19 @@ export function MobileBottomNav() {
     setMounted(true);
     const supabase = createClient();
     if (!supabase) return;
-    void supabase.auth.getUser().then(({ data: { user } }) => {
-      setIsLoggedIn(!!user);
+    const sessionIsActive = (session: { user?: { email?: string | null; email_confirmed_at?: string | null } } | null) => {
+      const user = session?.user;
+      if (!user) return false;
+      if (user.email && !user.email_confirmed_at) return false;
+      return true;
+    };
+    void supabase.auth.getSession().then(({ data: { session } }) => {
+      setIsLoggedIn(sessionIsActive(session));
     });
     const {
       data: { subscription },
-    } = supabase.auth.onAuthStateChange((event) => {
-      if (event === "SIGNED_OUT") setIsLoggedIn(false);
-      else if (event === "SIGNED_IN") setIsLoggedIn(true);
+    } = supabase.auth.onAuthStateChange((_event, session) => {
+      setIsLoggedIn(sessionIsActive(session));
     });
     return () => subscription.unsubscribe();
   }, []);

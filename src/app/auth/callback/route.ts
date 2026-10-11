@@ -79,9 +79,18 @@ export async function GET(request: NextRequest) {
   if (type === "signup" || searchParams.get("verified") === "1") {
     try {
       const linked = await linkSignupSecurity();
-      if (!linked.ok) console.error("auth callback linkSignupSecurity:", linked.error);
+      if (!linked.ok) {
+        const failUrl = new URL("/login", origin);
+        failUrl.searchParams.set("error", linked.error);
+        response.headers.set("location", failUrl.toString());
+        return response;
+      }
     } catch (err) {
-      console.error("auth callback linkSignupSecurity:", err);
+      const message = err instanceof Error ? err.message : "Signup checks are unavailable.";
+      const failUrl = new URL("/login", origin);
+      failUrl.searchParams.set("error", message);
+      response.headers.set("location", failUrl.toString());
+      return response;
     }
   } else {
     const {
@@ -92,7 +101,12 @@ export async function GET(request: NextRequest) {
       if (Date.now() - created < 5 * 60 * 1000) {
         try {
           const linked = await linkSignupSecurity();
-          if (!linked.ok) console.error("auth callback linkSignupSecurity (oauth):", linked.error);
+          if (!linked.ok) {
+            const failUrl = new URL("/login", origin);
+            failUrl.searchParams.set("error", linked.error);
+            response.headers.set("location", failUrl.toString());
+            return response;
+          }
         } catch (err) {
           console.error("auth callback linkSignupSecurity (oauth):", err);
         }
