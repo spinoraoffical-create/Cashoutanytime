@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import Link from "next/link";
 
 import { AdminPageHeader } from "@/components/admin/admin-page-header";
 import { GlassCard } from "@/components/shared/glass-card";
@@ -37,7 +38,7 @@ export default async function LiveGameBalancesPage() {
         description="Coins read from each game panel just now. Store coins are left on the agent login. On players are the coins sitting on player accounts."
         action={
           <Button variant="outline" asChild>
-            <a href="/admin/game-balances">Check again</a>
+            <Link href="/admin/game-balances">Check again</Link>
           </Button>
         }
       />
