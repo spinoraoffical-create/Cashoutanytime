@@ -7,7 +7,9 @@ import { VipPageLayout } from "@/components/layout/vip-page-layout";
 import { BlogCoverImage } from "@/components/marketing/blog-cover-image";
 import { Breadcrumbs } from "@/components/seo/breadcrumbs";
 import { SITE_NAME, SITE_URL } from "@/lib/constants";
-import { getBlogPost } from "@/lib/data/marketing";
+import { getBlogPost, getPublishedBlogPosts } from "@/lib/data/marketing";
+import { articleCtas, gamesInText, keepInternalHtml } from "@/lib/seo/blog-links";
+import { InternalCtas, RelatedGuides } from "@/components/blog/internal-ctas";
 
 // Heavy Traffic Optimization: 1-Hour Edge Caching for Sub-30ms Global Response Time
 export const revalidate = 3600;
@@ -82,6 +84,19 @@ export default async function BlogPostPage({
     mainEntityOfPage: `${SITE_URL}/blog/${slug}`,
   };
 
+  const body = keepInternalHtml(post.content ?? post.excerpt ?? "");
+  const topic = `${post.title} ${post.excerpt ?? ""} ${(post.tags ?? []).join(" ")}`;
+  const mentioned = gamesInText(topic);
+  const allPosts = await getPublishedBlogPosts();
+  const related = allPosts
+    .filter((item) => item.slug !== post.slug)
+    .filter((item) => {
+      const itemText = `${item.title} ${(item.tags ?? []).join(" ")}`.toLowerCase();
+      return mentioned.some((game) => itemText.includes(game.label.toLowerCase()));
+    });
+  const moreGuides = (related.length ? related : allPosts.filter((item) => item.slug !== post.slug)).slice(0, 3);
+  const primaryGame = mentioned[0];
+
   return (
     <>
       <script
@@ -120,9 +135,26 @@ export default async function BlogPostPage({
           </header>
 
           <div
-            className="prose prose-invert max-w-none prose-p:text-muted-foreground prose-headings:text-white"
-            dangerouslySetInnerHTML={{ __html: post.content ?? post.excerpt ?? "" }}
+            className="prose prose-invert max-w-none prose-p:text-muted-foreground prose-headings:text-white prose-a:font-semibold prose-a:text-primary"
+            dangerouslySetInnerHTML={{ __html: body }}
           />
+          <p className="mt-8 text-base leading-7 text-muted-foreground">
+            {primaryGame ? (
+              <>
+                Play <Link href={primaryGame.href} className="font-semibold text-primary hover:underline">{primaryGame.label}</Link> in{" "}
+                <Link href="/play" className="font-semibold text-primary hover:underline">Game Rooms</Link>.
+              </>
+            ) : (
+              <>
+                Open <Link href="/play" className="font-semibold text-primary hover:underline">Game Rooms</Link> to pick a game.
+              </>
+            )}{" "}
+            <Link href="/register" className="font-semibold text-primary hover:underline">Create an account</Link>, then review{" "}
+            <Link href="/promotions" className="font-semibold text-primary hover:underline">promotions</Link> and{" "}
+            <Link href="/help" className="font-semibold text-primary hover:underline">wallet help</Link>.
+          </p>
+          <InternalCtas links={articleCtas(topic)} />
+          <RelatedGuides posts={moreGuides.map((item) => ({ slug: item.slug, title: item.title }))} />
           </article>
         </main>
       </VipPageLayout>

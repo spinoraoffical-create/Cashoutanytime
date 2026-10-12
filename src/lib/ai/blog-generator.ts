@@ -570,11 +570,12 @@ Strict Content Requirements:
 1. Length: Ensure the article is extremely detailed and informative, at least 800 to 1200 words of rich content. Do not output thin content.
 2. Headings: Use a clean heading hierarchy with <h2> and <h3> tags. Ensure the target keywords are naturally integrated into some of these headings.
 3. Formatting: Use <strong> tags to highlight important terms, keywords, and player benefits.
-4. Internal Conversion Links (CRITICAL): You MUST naturally weave 2 to 3 HTML links using the following exact URLs to convert readers into players:
-   - For new player registration: <a href="/register">Sign up for a free Sweepstakes Hub account</a> (or similar conversion call-to-action).
-   - For daily wheel spins: <a href="/spin">Spin our daily fortune wheel</a>.
-   - For bonuses: <a href="/promotions">View active deposit bonuses</a>.
-   - For game downloads: <a href="/games">Browse game platforms</a> (or mention specific platforms like <a href="/games/orion-stars">play Orion Stars</a>, <a href="/games/juwa">Juwa download</a>, or <a href="/games/game-vault">Game Vault login</a>).
+4. Internal links only (CRITICAL): Every link must be a path on this site, starting with /. Never use http, https, or any other website.
+   - For new player registration: <a href="/register">Create an account</a>.
+   - For the lobby: <a href="/play">Browse Game Rooms</a>.
+   - For bonuses: <a href="/promotions">See promotions</a>.
+   - For a named game: <a href="/games/juwa">Juwa</a>, <a href="/games/game-vault">Game Vault</a>, <a href="/games/orion-stars">Orion Stars</a>, or <a href="/games/fire-kirin">Fire Kirin</a>.
+   - For help: <a href="/faq">FAQ</a> and <a href="/help">wallet help</a>.
 5. Structure:
    - A catchy intro with a hook.
    - A key takeaways summary box using a styled div block (with bullet points).

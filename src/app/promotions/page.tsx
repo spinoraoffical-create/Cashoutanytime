@@ -26,6 +26,12 @@ export default async function PromotionsPage() {
             <p className="text-muted-foreground max-w-2xl text-lg">
               Live offers from Sweepstakes Hub — updated from the admin panel.
             </p>
+            <div className="mt-6 flex flex-wrap gap-3 text-sm font-semibold">
+              <Link href="/play" className="text-primary hover:underline">Game Rooms</Link>
+              <Link href="/register" className="text-primary hover:underline">Create an account</Link>
+              <Link href="/blog" className="text-primary hover:underline">Guides</Link>
+              <Link href="/faq" className="text-primary hover:underline">FAQ</Link>
+            </div>
           </div>
 
           {promotions.length === 0 ? (

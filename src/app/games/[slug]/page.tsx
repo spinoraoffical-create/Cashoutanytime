@@ -5,7 +5,7 @@ import { getGameSeoDescription, getGameSeoKeywords, getGameSeoTitle } from "@/li
 import { BreadcrumbSchema, GamePageSchema } from "@/lib/seo/json-ld";
 import { SITE_URL } from "@/lib/constants";
 import { canonicalGameSlug, getGameBySlug, type Game } from "@/lib/games";
-import { getGames } from "@/lib/data/marketing";
+import { getGames, getRelatedPosts } from "@/lib/data/marketing";
 import { marketingGamesToCards } from "@/lib/games-marketing";
 import { isWalletLoadEnabledForGame } from "@/lib/game-automation/config";
 import { gameIsActive, getMyGameAccount } from "@/lib/actions/game-loads";
@@ -47,6 +47,10 @@ export default async function GamePage({ params, searchParams }: GamePageProps) 
 
   const walletLoadEnabled = isWalletLoadEnabledForGame(game.slug);
   const initialGameAccount = walletLoadEnabled ? await getMyGameAccount(game.slug) : null;
+  const guides = (await getRelatedPosts(game.name, 3)).map((post) => ({
+    slug: post.slug,
+    title: post.title,
+  }));
 
   return (
     <>
@@ -62,6 +66,7 @@ export default async function GamePage({ params, searchParams }: GamePageProps) 
         autoCreate={create === "1"}
         walletLoadEnabled={walletLoadEnabled}
         initialGameAccount={initialGameAccount}
+        guides={guides}
       />
     </>
   );

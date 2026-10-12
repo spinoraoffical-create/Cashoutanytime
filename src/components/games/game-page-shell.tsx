@@ -12,6 +12,7 @@ interface GamePageShellProps {
     game_username: string;
     game_password: string | null;
   } | null;
+  guides?: { slug: string; title: string }[];
 }
 
 export function GamePageShell({
@@ -19,6 +20,7 @@ export function GamePageShell({
   autoCreate,
   walletLoadEnabled,
   initialGameAccount,
+  guides,
 }: GamePageShellProps) {
   return (
     <VipGamePageShellWithWallet>
@@ -27,6 +29,7 @@ export function GamePageShell({
         autoCreate={autoCreate}
         walletLoadEnabled={walletLoadEnabled}
         initialGameAccount={initialGameAccount}
+        guides={guides}
       />
     </VipGamePageShellWithWallet>
   );

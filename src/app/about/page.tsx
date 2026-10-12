@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { VipPageLayout } from "@/components/layout/vip-page-layout";
 import { Breadcrumbs } from "@/components/seo/breadcrumbs";
 import { Card, CardContent } from "@/components/ui/card";
@@ -52,6 +53,13 @@ export default function AboutPage() {
               <p className="text-muted-foreground leading-relaxed">
                 We believe every gamer deserves premium support and seamless access to their favorite platforms. Sweepstakes Hub was founded to bridge the gap between players and gaming platforms, offering a trusted, transparent, and rewarding experience. From account requests to VIP perks and referral bonuses, we are committed to elevating your gaming journey.
               </p>
+              <div className="mt-6 flex flex-wrap gap-3 text-sm font-semibold">
+                <Link href="/play" className="text-primary hover:underline">Game Rooms</Link>
+                <Link href="/register" className="text-primary hover:underline">Create an account</Link>
+                <Link href="/blog" className="text-primary hover:underline">Guides</Link>
+                <Link href="/faq" className="text-primary hover:underline">FAQ</Link>
+                <Link href="/promotions" className="text-primary hover:underline">Promotions</Link>
+              </div>
             </CardContent>
           </Card>
         </div>

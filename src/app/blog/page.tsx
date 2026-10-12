@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import Link from "next/link";
 import { BookOpen } from "lucide-react";
 import { VipPageLayout } from "@/components/layout/vip-page-layout";
 import { Breadcrumbs } from "@/components/seo/breadcrumbs";
@@ -32,6 +33,13 @@ export default async function BlogPage() {
             <p className="text-muted-foreground text-lg">
               Everything you need to know about playing at Sweepstakes Hub — account setup, deposits, bonus claims and winning strategies.
             </p>
+            <div className="mt-6 flex flex-wrap gap-3 text-sm font-semibold">
+              <Link href="/play" className="rounded-full border border-white/10 px-4 py-2 hover:border-orange-500/40">Game Rooms</Link>
+              <Link href="/register" className="rounded-full border border-white/10 px-4 py-2 hover:border-orange-500/40">Create an account</Link>
+              <Link href="/promotions" className="rounded-full border border-white/10 px-4 py-2 hover:border-orange-500/40">Promotions</Link>
+              <Link href="/faq" className="rounded-full border border-white/10 px-4 py-2 hover:border-orange-500/40">FAQ</Link>
+              <Link href="/help" className="rounded-full border border-white/10 px-4 py-2 hover:border-orange-500/40">Wallet help</Link>
+            </div>
           </div>
 
           {posts.length === 0 ? (

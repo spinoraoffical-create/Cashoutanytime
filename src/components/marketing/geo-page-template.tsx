@@ -104,7 +104,13 @@ export function GeoPageTemplate({ state, city }: GeoPageTemplateProps) {
               <Link href="/register">Create free account</Link>
             </Button>
             <Button asChild variant="outline">
-              <Link href="/games">Browse games</Link>
+              <Link href="/play">Game Rooms</Link>
+            </Button>
+            <Button asChild variant="outline">
+              <Link href="/blog">Guides</Link>
+            </Button>
+            <Button asChild variant="outline">
+              <Link href="/faq">FAQ</Link>
             </Button>
           </div>
         </section>
@@ -136,9 +142,17 @@ export function GeoPageTemplate({ state, city }: GeoPageTemplateProps) {
         <section className="mx-auto max-w-7xl px-4 py-12 text-center sm:px-6">
           <h2 className="text-2xl font-bold">Ready to play from {locationName}?</h2>
           <p className="mt-2 text-muted-foreground">Instant accounts · Fast deposits · 24/7 support</p>
-          <Button asChild className="mt-6">
-            <Link href="/dashboard/deposit">Add funds &amp; play</Link>
-          </Button>
+          <div className="mt-6 flex flex-wrap justify-center gap-3">
+            <Button asChild>
+              <Link href="/play">Game Rooms</Link>
+            </Button>
+            <Button asChild variant="outline">
+              <Link href="/blog">Guides</Link>
+            </Button>
+            <Button asChild variant="outline">
+              <Link href="/register">Create an account</Link>
+            </Button>
+          </div>
         </section>
       </main>
       <Footer />

@@ -20,6 +20,7 @@ interface GameLandingClientProps {
     game_username: string;
     game_password: string | null;
   } | null;
+  guides?: { slug: string; title: string }[];
 }
 
 export function GameLandingClient({
@@ -27,6 +28,7 @@ export function GameLandingClient({
   autoCreate,
   walletLoadEnabled,
   initialGameAccount,
+  guides = [],
 }: GameLandingClientProps) {
   const router = useRouter();
   const supabase = useMemo(() => createClient(), []);
@@ -237,6 +239,25 @@ export function GameLandingClient({
           <ChevronRight className="h-4 w-4" />
         </span>
       </Link>
+
+      {guides.length > 0 ? (
+        <section className="space-y-1 pt-2">
+          <h2 className="text-sm font-black">Guides</h2>
+          {guides.map((guide) => (
+            <Link
+              key={guide.slug}
+              href={`/blog/${guide.slug}`}
+              className="flex min-h-14 items-center justify-between border-b border-white/10 py-3 text-sm"
+            >
+              <span className="font-bold">{guide.title}</span>
+              <ChevronRight className="h-4 w-4 text-[#b9b3c6]" />
+            </Link>
+          ))}
+          <Link href="/blog" className="flex min-h-12 items-center text-sm font-bold text-[#f4c64e]">
+            All guides
+          </Link>
+        </section>
+      ) : null}
 
       {createModal}
     </div>
