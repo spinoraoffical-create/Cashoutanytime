@@ -18,7 +18,7 @@ function RegisterForm() {
         <p className="mt-1 text-sm text-zinc-500">
           {agentFromUrl
             ? `This signup uses code ${agentFromUrl}.`
-            : "We'll email a confirmation link before you can play."}
+            : "We'll email a 6-digit code before you can play."}
         </p>
       </div>
       <GoogleAuthButton redirect="/" referralCode={refFromUrl} agentCode={agentFromUrl} label="Continue with Google" />

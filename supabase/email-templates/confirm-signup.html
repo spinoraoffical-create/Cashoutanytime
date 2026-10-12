@@ -1,90 +1,51 @@
 <!--
-  Sweepstakes Hub — Confirm signup
-  Supabase → Authentication → Email Templates → Confirm signup
+  sweeptakehub.com — signup OTP
+  Supabase → Authentication → Email Templates → Confirm signup → Source
 
   Subject:
-  Confirm your Sweepstakes Hub email
+  Your sweeptakehub.com code
 
-  The photo is hosted on the live site. Paste this whole file into the template body.
+  Paste this in Source, not the visual editor.
+  The editor preview keeps the words {{ .Token }}.
+  A real signup email replaces that with the 6-digit code.
 -->
 <!DOCTYPE html>
-<html lang="en" xmlns="http://www.w3.org/1999/xhtml">
+<html lang="en">
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <meta http-equiv="X-UA-Compatible" content="IE=edge" />
-  <title>Confirm your Sweepstakes Hub email</title>
+  <title>Your sweeptakehub.com code</title>
 </head>
-<body style="margin:0;padding:0;width:100%;background-color:#07060c;font-family:Arial,Helvetica,sans-serif;">
-  <div style="display:none;max-height:0;overflow:hidden;mso-hide:all;opacity:0;color:transparent;font-size:1px;line-height:1px;">
-    Confirm {{ .Email }} to finish joining Sweepstakes Hub.
+<body style="margin:0;padding:0;background:#f4f4f5;font-family:Arial,Helvetica,sans-serif;">
+  <div style="display:none;max-height:0;overflow:hidden;opacity:0;color:transparent;font-size:1px;line-height:1px;">
+    Your sweeptakehub.com code is {{ .Token }}
   </div>
-  <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="background-color:#07060c;">
+  <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="background:#f4f4f5;">
     <tr>
-      <td align="center" style="padding:28px 12px;">
-        <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="max-width:520px;background-color:#120c18;border:1px solid #2a2033;border-radius:22px;overflow:hidden;">
+      <td align="center" style="padding:32px 16px;">
+        <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="max-width:480px;background:#ffffff;border-radius:16px;">
           <tr>
-            <td style="padding:0;line-height:0;font-size:0;">
-              <img
-                src="https://cashoutanytime.vercel.app/brand/sweepstakes-hub.jpg"
-                alt="Sweepstakes Hub"
-                width="520"
-                style="display:block;width:100%;max-width:520px;height:auto;border:0;"
-              />
-            </td>
-          </tr>
-          <tr>
-            <td align="center" style="padding:22px 28px 8px;">
-              <p style="margin:0;font-size:13px;font-weight:700;letter-spacing:0.16em;text-transform:uppercase;color:#f4c64e;">
-                Sweepstakes Hub
-              </p>
-              <h1 style="margin:10px 0 0;font-size:28px;line-height:1.15;font-weight:800;color:#ffffff;">
-                Confirm your email
-              </h1>
-              <p style="margin:12px 0 0;font-size:15px;line-height:1.6;color:#d5d0dc;">
-                Tap the button to verify this address and open your Sweepstakes Hub account.
-              </p>
-              <p style="margin:14px 0 0;font-size:14px;line-height:1.5;">
-                <span style="display:inline-block;padding:8px 12px;background-color:#1c1424;border:1px solid #3a2c44;border-radius:10px;color:#ffffff;font-weight:700;">
-                  {{ .Email }}
-                </span>
+            <td style="padding:32px 28px 8px;text-align:center;">
+              <p style="margin:0;font-size:14px;font-weight:700;color:#111111;">sweeptakehub.com</p>
+              <h1 style="margin:16px 0 0;font-size:24px;line-height:1.3;font-weight:700;color:#111111;">Verify your email</h1>
+              <p style="margin:12px 0 0;font-size:15px;line-height:1.6;color:#444444;">
+                Enter this code on sweeptakehub.com to finish creating your account.
               </p>
             </td>
           </tr>
           <tr>
-            <td align="center" style="padding:18px 28px 8px;">
-              <table role="presentation" cellspacing="0" cellpadding="0" border="0">
-                <tr>
-                  <td align="center" style="border-radius:999px;background-color:#f3264f;">
-                    <a
-                      href="{{ .SiteURL }}/auth/callback?token_hash={{ .TokenHash }}&amp;type=signup&amp;redirect=/dashboard"
-                      target="_blank"
-                      style="display:inline-block;padding:14px 28px;color:#ffffff;font-size:16px;font-weight:700;text-decoration:none;border-radius:999px;"
-                    >
-                      Confirm email
-                    </a>
-                  </td>
-                </tr>
-              </table>
+            <td style="padding:20px 28px 8px;text-align:center;">
+              <p style="margin:0;font-size:32px;font-weight:700;letter-spacing:0;color:#111111;">{{ .Token }}</p>
             </td>
           </tr>
           <tr>
-            <td align="center" style="padding:8px 28px 26px;">
-              <p style="margin:0 0 8px;font-size:12px;line-height:1.5;color:#a39aab;">
-                Button not working? Copy this link into your browser:
+            <td style="padding:8px 28px 32px;text-align:center;">
+              <p style="margin:0;font-size:13px;line-height:1.5;color:#666666;">This code expires soon and works once.</p>
+              <p style="margin:16px 0 0;font-size:13px;line-height:1.5;color:#666666;">
+                If you did not sign up, you can ignore this email.
               </p>
-              <p style="margin:0;font-size:12px;line-height:1.5;word-break:break-all;">
-                <a href="{{ .SiteURL }}/auth/callback?token_hash={{ .TokenHash }}&amp;type=signup&amp;redirect=/dashboard" target="_blank" style="color:#f4c64e;text-decoration:underline;">{{ .SiteURL }}/auth/callback?token_hash={{ .TokenHash }}&amp;type=signup&amp;redirect=/dashboard</a>
-              </p>
-            </td>
-          </tr>
-          <tr>
-            <td align="center" style="padding:0 28px 28px;">
-              <p style="margin:0;font-size:12px;line-height:1.5;color:#7d7488;">
-                If you did not create a Sweepstakes Hub account, you can ignore this email.
-              </p>
-              <p style="margin:8px 0 0;font-size:12px;color:#7d7488;">
-                Sweepstakes Hub · <a href="{{ .SiteURL }}" target="_blank" style="color:#f4c64e;text-decoration:none;">{{ .SiteURL }}</a>
+              <p style="margin:12px 0 0;font-size:13px;">
+                <a href="https://sweeptakehub.com" style="color:#111111;font-weight:700;text-decoration:none;">sweeptakehub.com</a>
               </p>
             </td>
           </tr>

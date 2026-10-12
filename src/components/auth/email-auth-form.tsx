@@ -9,7 +9,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { toast } from "sonner";
-import { parseTenDigitMobile } from "@/lib/auth/phone";
+import { isValidOtpCode, parseTenDigitMobile } from "@/lib/auth/phone";
 import { signupReady } from "@/lib/offers/audience";
 import { buildAuthCallbackUrl, getEmailAuthOrigin } from "@/lib/auth/callback-url";
 import { normalizeEmail, formatAuthErrorMessage } from "@/lib/auth/identifier";
@@ -28,48 +28,94 @@ interface EmailAuthFormProps {
   agentCode?: string | null;
 }
 
-function EmailConfirmationNotice({
-  email,
-  variant,
-}: {
-  email: string;
-  variant: "register" | "login";
-}) {
+function EmailCodeForm({ email, redirect }: { email: string; redirect: string }) {
+  const router = useRouter();
+  const [code, setCode] = useState("");
+  const [loading, setLoading] = useState(false);
+  const [sending, setSending] = useState(false);
+
+  async function verify(e: React.FormEvent) {
+    e.preventDefault();
+    if (!isValidOtpCode(code)) {
+      toast.error("Enter the 6-digit code from your email.");
+      return;
+    }
+
+    const supabase = createClient();
+    if (!supabase) {
+      toast.error("Sign-in is temporarily unavailable. Please try again later or contact support.");
+      return;
+    }
+
+    setLoading(true);
+    const { error } = await supabase.auth.verifyOtp({
+      email,
+      token: code.trim(),
+      type: "signup",
+    });
+    setLoading(false);
+
+    if (error) {
+      toast.error(formatAuthErrorMessage(error));
+      return;
+    }
+
+    toast.success("Email verified.");
+    router.push(redirect);
+    router.refresh();
+  }
+
+  async function resend() {
+    const supabase = createClient();
+    if (!supabase) return;
+    setSending(true);
+    const { error } = await supabase.auth.resend({ type: "signup", email });
+    setSending(false);
+    if (error) {
+      toast.error(formatAuthErrorMessage(error));
+      return;
+    }
+    toast.success("A new code was sent.");
+  }
+
   return (
-    <div className="space-y-4 text-center py-2">
-      <div className="mx-auto w-14 h-14 rounded-full bg-primary/15 flex items-center justify-center">
-        <Mail className="h-7 w-7 text-primary" />
-      </div>
-      <div>
-        <p className="text-lg font-semibold text-foreground">Check your email</p>
-        <p className="text-sm text-muted-foreground mt-2">
-          We sent a confirmation link to{" "}
-          <strong className="text-foreground">{email}</strong>
+    <form onSubmit={verify} className="space-y-4 py-2">
+      <div className="text-center">
+        <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-full bg-primary/15">
+          <Mail className="h-7 w-7 text-primary" />
+        </div>
+        <p className="mt-3 text-lg font-semibold text-foreground">Enter your code</p>
+        <p className="mt-2 text-sm text-muted-foreground">
+          We sent a 6-digit code to <strong className="text-foreground">{email}</strong>
         </p>
       </div>
-      <p className="text-sm text-muted-foreground rounded-lg bg-white/5 border border-white/10 p-3 text-left">
-        {variant === "register" ? (
-          <>
-            Your account was created but is <strong className="text-foreground">not active yet</strong>.
-            Open the email and click the confirmation link. You&apos;ll be redirected to Sweepstakes Hub and
-            signed in automatically once verified.
-          </>
-        ) : (
-          <>
-            Your email is not verified yet. We sent a new confirmation link — click it to verify
-            your account and you&apos;ll be signed in automatically.
-          </>
-        )}
-      </p>
-      <p className="text-xs text-muted-foreground">
-        Open the link in any browser on your phone or computer. Each link works once —
-        use Sign In to request a new one if it expired.
-      </p>
-      <p className="text-xs text-muted-foreground">Check spam if you don&apos;t see it in 1–2 minutes.</p>
-      <Link href="/login" className="inline-block text-sm text-primary hover:underline">
-        Go to sign in
-      </Link>
-    </div>
+      <div className="space-y-2">
+        <Label htmlFor="signup-code">Code</Label>
+        <Input
+          id="signup-code"
+          inputMode="numeric"
+          autoComplete="one-time-code"
+          maxLength={6}
+          value={code}
+          onChange={(event) => setCode(event.target.value.replace(/\D/g, "").slice(0, 6))}
+          placeholder="000000"
+          className="text-center text-2xl tracking-[0.3em]"
+          required
+        />
+      </div>
+      <Button type="submit" className="w-full" disabled={loading || code.length !== 6}>
+        {loading ? "Checking code..." : "Verify email"}
+      </Button>
+      <button
+        type="button"
+        onClick={() => void resend()}
+        disabled={sending}
+        className="w-full text-sm font-semibold text-primary hover:underline disabled:opacity-60"
+      >
+        {sending ? "Sending..." : "Send a new code"}
+      </button>
+      <p className="text-center text-xs text-muted-foreground">Check spam if the code is not there in a minute.</p>
+    </form>
   );
 }
 
@@ -120,7 +166,7 @@ export function EmailAuthForm({ mode, redirect = "/", referralCodeFromUrl, agent
       if (!result.loggedIn) {
         setPendingEmail(result.email);
         setAwaitingConfirmation(true);
-        toast.success("Confirmation email sent! Verify your email to continue.");
+        toast.success("We sent a 6-digit code. Enter it to verify your email.");
         return;
       }
 
@@ -240,7 +286,7 @@ export function EmailAuthForm({ mode, redirect = "/", referralCodeFromUrl, agent
       }
       setPendingEmail(normalizedEmail);
       setAwaitingConfirmation(true);
-      toast.success("Account created! Check your email and click the link to verify.");
+      toast.success("Account created. Enter the 6-digit code from your email.");
       void finalizeRegistrationAfterSignUp({
         userId: data.user.id,
         fullName,
@@ -303,7 +349,7 @@ export function EmailAuthForm({ mode, redirect = "/", referralCodeFromUrl, agent
   }
 
   if (awaitingConfirmation && pendingEmail) {
-    return <EmailConfirmationNotice email={pendingEmail} variant={mode} />;
+    return <EmailCodeForm email={pendingEmail} redirect={redirect} />;
   }
 
   return (
@@ -450,7 +496,7 @@ export function EmailAuthForm({ mode, redirect = "/", referralCodeFromUrl, agent
       </Button>
       {mode === "register" && (
         <p className="text-xs text-muted-foreground text-center">
-          After Sign Up, check your inbox and click the confirmation link to sign in.
+          After Sign Up, enter the 6-digit code from your email.
         </p>
       )}
       {mode === "login" && (
