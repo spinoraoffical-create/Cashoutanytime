@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 
-import { processCampaignBatch } from "@/lib/actions/admin/newsletters";
+import { processCampaignBatch } from "@/lib/email/newsletter-batch";
 import { verifyCronRequest } from "@/lib/cron/auth";
 import { createAdminClient } from "@/lib/supabase/admin";
 

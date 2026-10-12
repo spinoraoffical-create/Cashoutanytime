@@ -2,7 +2,6 @@ import { SITE_NAME, SITE_URL, SITE_DESCRIPTION, SOCIAL_LINKS } from "@/lib/const
 import type { Game } from "@/lib/games";
 import { getGames } from "@/lib/data/marketing";
 import { getGamePageUrl } from "@/lib/seo/game-seo";
-import { HOME_FAQS } from "@/lib/seo/faq-data";
 
 interface JsonLdProps {
   data: Record<string, unknown>;
@@ -91,13 +90,13 @@ export async function HomeGamesItemListSchema() {
   );
 }
 
-export function HomeFaqSchema() {
+export function HomeFaqSchema({ faqs }: { faqs: { q: string; a: string }[] }) {
   return (
     <JsonLd
       data={{
         "@context": "https://schema.org",
         "@type": "FAQPage",
-        mainEntity: HOME_FAQS.map((faq) => ({
+        mainEntity: faqs.map((faq) => ({
           "@type": "Question",
           name: faq.q,
           acceptedAnswer: {

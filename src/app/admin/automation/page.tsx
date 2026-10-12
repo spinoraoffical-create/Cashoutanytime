@@ -18,9 +18,6 @@ export default async function AutomationPage() {
     can(ctx, "cms.manage")
       ? { href: "/admin/ai-blog", title: "AI blog", body: "Draft and publish SEO posts from the existing blog tool." }
       : null,
-    can(ctx, "cms.manage")
-      ? { href: "/admin/telegram", title: "Telegram", body: "Control the Telegram bot and send a channel post." }
-      : null,
     can(ctx, "support.manage")
       ? { href: "/admin/ai-bot", title: "AI chatbot", body: "Adjust how the support bot replies before a person takes over." }
       : null,
@@ -32,7 +29,7 @@ export default async function AutomationPage() {
     <div className="mx-auto max-w-6xl">
       <AdminPageHeader
         title="Automation"
-        description="Blog, Telegram, and the support chatbot. Hidden from support agents."
+        description="Blog drafts and the support chatbot. Telegram is in Marketing."
       />
       <AdminToolGrid tools={tools} />
     </div>

@@ -1,6 +1,6 @@
 import type { Metadata, Viewport } from "next";
 import { Inter } from "next/font/google";
-import { OrganizationSchema, WebsiteSchema, HomeGamesItemListSchema, HomeFaqSchema } from "@/lib/seo/json-ld";
+import { OrganizationSchema, WebsiteSchema, HomeGamesItemListSchema } from "@/lib/seo/json-ld";
 import { homeMetadata } from "@/lib/seo/metadata";
 import { ClientProviders } from "@/components/providers/client-providers";
 import { MobileBottomNav } from "@/components/layout/mobile-bottom-nav";
@@ -29,7 +29,6 @@ export default async function RootLayout({ children }: { children: React.ReactNo
         <OrganizationSchema />
         <WebsiteSchema />
         <HomeGamesItemListSchema />
-        <HomeFaqSchema />
         <link rel="icon" href="/logo.webp" />
         <link rel="preload" href="/logo.webp" as="image" type="image/webp" />
       </head>

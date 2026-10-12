@@ -3,13 +3,10 @@
 import { useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { ChevronDown } from "lucide-react";
-import { HOME_FAQS } from "@/lib/seo/faq-data";
 import { HomeSection } from "@/components/home/home-section";
 import { cn } from "@/lib/utils";
 
-const FAQS = HOME_FAQS;
-
-export function FaqSection() {
+export function FaqSection({ faqs }: { faqs: { q: string; a: string }[] }) {
   const [open, setOpen] = useState<number | null>(0);
 
   return (
@@ -22,8 +19,11 @@ export function FaqSection() {
           <p className="text-muted-foreground text-sm">Have any questions? We&apos;ve got answers.</p>
         </div>
 
+        {faqs.length === 0 ? (
+          <p className="text-center text-sm text-muted-foreground">No questions are published yet.</p>
+        ) : (
         <div className="space-y-3">
-          {FAQS.map((faq, i) => (
+          {faqs.map((faq, i) => (
             <div key={i} className="rounded-xl overflow-hidden bg-[#1e1e1e] border border-white/5">
               <button
                 type="button"
@@ -55,6 +55,7 @@ export function FaqSection() {
             </div>
           ))}
         </div>
+        )}
       </div>
     </HomeSection>
   );

@@ -1,10 +1,12 @@
 import { redirect } from "next/navigation";
 
 import { HomeLandingShell } from "@/components/home/home-landing-shell";
+import { HomeFaqSchema } from "@/lib/seo/json-ld";
 import { signedInUsesAdminHome } from "@/lib/auth/account-home";
 import { createClient } from "@/lib/supabase/server";
 import { getLinkedGameSlugs } from "@/lib/data/dashboard";
 import { getGames } from "@/lib/data/marketing";
+import { getPublicFaqItems } from "@/lib/data/faqs-public";
 import { getActivePromotions } from "@/lib/data/promotions-public";
 import { buildLobbyCatalog } from "@/lib/games-marketing";
 import { DAILY_SPIN_ENABLED } from "@/lib/constants";
@@ -19,10 +21,11 @@ export default async function HomePage() {
     if (await signedInUsesAdminHome(supabase, user.id)) redirect("/admin");
   }
   const profile = user ? await getProfile() : null;
-  const [linkedGameSlugs, dbGames, promotions] = await Promise.all([
+  const [linkedGameSlugs, dbGames, promotions, faqs] = await Promise.all([
     user ? getLinkedGameSlugs(user.id) : Promise.resolve([] as string[]),
     getGames(),
     getActivePromotions().catch(() => [] as Awaited<ReturnType<typeof getActivePromotions>>),
+    getPublicFaqItems().catch(() => [] as Awaited<ReturnType<typeof getPublicFaqItems>>),
   ]);
 
   const lobbyCatalog = buildLobbyCatalog(dbGames);
@@ -45,7 +48,9 @@ export default async function HomePage() {
       : null;
 
   return (
-    <HomeLandingShell
+    <>
+      {!user ? <HomeFaqSchema faqs={faqs} /> : null}
+      <HomeLandingShell
       linkedGameSlugs={linkedGameSlugs}
       lobbyCatalog={lobbyCatalog}
       promotions={promotions}
@@ -56,7 +61,9 @@ export default async function HomePage() {
       }}
       verify={verify}
       dailySpinEnabled={DAILY_SPIN_ENABLED}
+      faqs={faqs}
       initialLoggedIn={Boolean(user)}
     />
+    </>
   );
 }

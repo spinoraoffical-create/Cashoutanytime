@@ -18,13 +18,23 @@ export const FREEPLAY_RULES = {
 
 /** VIP points awarded per successful referral */
 export const REFERRAL_REWARD_POINTS = 10;
-export const SITE_URL = (() => {
-  const configured = (process.env.NEXT_PUBLIC_SITE_URL || "").trim().replace(/\/$/, "");
-  if (configured.includes("sweeptakehub.com")) {
-    return configured.startsWith("http") ? configured : `https://${configured}`;
+const SITE_URL_FALLBACK = "https://www.sweeptakehub.com";
+
+/** Use a configured absolute http(s) URL. Empty or invalid values stay on the public site. */
+export function resolveSiteUrl(raw: string | undefined): string {
+  const configured = (raw || "").trim();
+  if (!configured) return SITE_URL_FALLBACK;
+  try {
+    const url = new URL(configured);
+    if (url.protocol !== "http:" && url.protocol !== "https:") return SITE_URL_FALLBACK;
+    const path = url.pathname === "/" ? "" : url.pathname.replace(/\/$/, "");
+    return `${url.origin}${path}${url.search}`;
+  } catch {
+    return SITE_URL_FALLBACK;
   }
-  return "https://www.sweeptakehub.com";
-})();
+}
+
+export const SITE_URL = resolveSiteUrl(process.env.NEXT_PUBLIC_SITE_URL);
 export const SITE_DESCRIPTION =
   "Sweepstakes Hub for Juwa, Game Vault, slot games, and fish games. Create game accounts fast, claim bonuses, earn VIP rewards, and get 24/7 live support.";
 

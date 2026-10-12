@@ -15,6 +15,7 @@ interface HomeLandingShellProps {
   wallet?: { balance: number; cashout: number; freeplay: number };
   verify?: { show: boolean; href: string; title: string; body?: string } | null;
   dailySpinEnabled?: boolean;
+  faqs?: { q: string; a: string }[];
 }
 
 export function HomeLandingShell({
@@ -25,6 +26,7 @@ export function HomeLandingShell({
   wallet = { balance: 0, cashout: 0, freeplay: 0 },
   verify = null,
   dailySpinEnabled = false,
+  faqs = [],
 }: HomeLandingShellProps) {
   const { isLoggedIn, ready: authReady } = useLobbyProfile();
   const loggedIn = authReady ? isLoggedIn : initialLoggedIn;
@@ -57,7 +59,7 @@ export function HomeLandingShell({
 
   return (
     <div className="min-h-screen bg-background px-4 pt-4">
-      <PublicHome games={lobbyCatalog} />
+      <PublicHome games={lobbyCatalog} faqs={faqs} />
     </div>
   );
 }

@@ -10,24 +10,18 @@ import {
   authorize,
   writeAudit,
 } from "@/lib/actions/admin/core";
-import { customCampaignEmail } from "@/lib/email/newsletter-templates";
 import {
   previewNewsletterAudiences,
   resolveNewsletterRecipients,
 } from "@/lib/email/newsletter-audience";
+import { buildCampaignEmail, processCampaignBatch } from "@/lib/email/newsletter-batch";
 import {
   isNewsletterSegment,
   NEWSLETTER_SEGMENTS,
   type AudienceCounts,
   type NewsletterSegmentId,
 } from "@/lib/email/newsletter-segments";
-import {
-  htmlToPlainText,
-  promoEmailFooterPlain,
-  promoEmailHeaders,
-  promoUnsubscribeUrl,
-  PROMO_REPLY_TO,
-} from "@/lib/email/deliverability";
+import { promoEmailHeaders, promoUnsubscribeUrl, PROMO_REPLY_TO } from "@/lib/email/deliverability";
 import { FROM, getResend } from "@/lib/email/resend";
 
 const campaignSchema = z.object({
@@ -218,63 +212,6 @@ export async function scheduleNewsletterCampaignAction(
   return { ok: true, message: "Campaign scheduled." };
 }
 
-const BATCH_SIZE = 100;
-const SEND_DELAY_MS = 130; // ~7.7/sec — under Resend's observed 10/sec limit
-
-function sleep(ms: number) {
-  return new Promise((resolve) => setTimeout(resolve, ms));
-}
-
-type CampaignStat = { value: string; label: string };
-
-type CampaignContent = {
-  subject: string;
-  eyebrow: string;
-  heading: string;
-  subhead: string;
-  body: string;
-  cta_label: string;
-  cta_href: string;
-  stat1_value: string | null;
-  stat1_label: string | null;
-  stat2_value: string | null;
-  stat2_label: string | null;
-  stat3_value: string | null;
-  stat3_label: string | null;
-};
-
-function buildCampaignEmail(campaign: CampaignContent) {
-  const stats = (
-    [
-      campaign.stat1_value && campaign.stat1_label
-        ? { value: campaign.stat1_value, label: campaign.stat1_label }
-        : null,
-      campaign.stat2_value && campaign.stat2_label
-        ? { value: campaign.stat2_value, label: campaign.stat2_label }
-        : null,
-      campaign.stat3_value && campaign.stat3_label
-        ? { value: campaign.stat3_value, label: campaign.stat3_label }
-        : null,
-    ] as (CampaignStat | null)[]
-  ).filter((s): s is CampaignStat => s !== null);
-
-  const { subject, html } = customCampaignEmail({
-    subject: campaign.subject,
-    eyebrow: campaign.eyebrow,
-    heading: campaign.heading,
-    subhead: campaign.subhead,
-    body: campaign.body,
-    stats: stats.length ? stats : undefined,
-    cta: { label: campaign.cta_label, href: campaign.cta_href },
-  });
-
-  return {
-    subject,
-    html,
-    text: htmlToPlainText(html) + promoEmailFooterPlain(),
-  };
-}
-
 export type NewsletterAudiencePreview = {
   ok: true;
   counts: Record<NewsletterSegmentId, AudienceCounts>;
@@ -341,108 +278,4 @@ export async function sendNewsletterTestAction(id: string): Promise<AdminActionR
   });
 
   return { ok: true, message: `Test sent to ${auth.staff.email}. The campaign is still a draft.` };
-}
-
-/**
- * Sends up to `limit` pending recipients for a campaign. Shared by
- * `scheduleNewsletterCampaignAction`'s immediate first batch and the
- * `/api/cron/newsletter-send` sweep — safe to call repeatedly since it only
- * ever claims rows still marked `'pending'`.
- */
-export async function processCampaignBatch(campaignId: string, limit = BATCH_SIZE) {
-  const admin = adminDb();
-  const resend = getResend();
-  if (!resend) {
-    await admin
-      .from("newsletter_campaigns")
-      .update({ status: "failed" })
-      .eq("id", campaignId);
-    await admin
-      .from("newsletter_campaign_recipients")
-      .update({ status: "failed", error: "RESEND_API_KEY is not configured in env." })
-      .eq("campaign_id", campaignId)
-      .eq("status", "pending");
-    return { sent: 0, failed: 0, remaining: -1 };
-  }
-
-  const { data: campaign } = await admin
-    .from("newsletter_campaigns")
-    .select("*")
-    .eq("id", campaignId)
-    .maybeSingle();
-  if (!campaign) return { sent: 0, failed: 0, remaining: 0 };
-
-  if (campaign.status === "scheduled") {
-    await admin.from("newsletter_campaigns").update({ status: "sending" }).eq("id", campaignId);
-  }
-
-  const { data: pending } = await admin
-    .from("newsletter_campaign_recipients")
-    .select("id, email, user_id")
-    .eq("campaign_id", campaignId)
-    .eq("status", "pending")
-    .limit(limit);
-
-  if (!pending || pending.length === 0) {
-    await admin
-      .from("newsletter_campaigns")
-      .update({ status: "sent", sent_at: new Date().toISOString() })
-      .eq("id", campaignId);
-    return { sent: 0, failed: 0, remaining: 0 };
-  }
-
-  const { subject, html, text } = buildCampaignEmail(campaign);
-
-  let sent = 0;
-  let failed = 0;
-
-  for (const recipient of pending) {
-    const { error } = await resend.emails.send({
-      from: FROM,
-      to: recipient.email,
-      replyTo: PROMO_REPLY_TO,
-      subject,
-      html,
-      text,
-      headers: promoEmailHeaders(promoUnsubscribeUrl(recipient.user_id)),
-      tags: [{ name: "category", value: "promo" }],
-    });
-    if (error) {
-      failed += 1;
-      await admin
-        .from("newsletter_campaign_recipients")
-        .update({ status: "failed", error: error.message })
-        .eq("id", recipient.id);
-    } else {
-      sent += 1;
-      await admin
-        .from("newsletter_campaign_recipients")
-        .update({ status: "sent", sent_at: new Date().toISOString() })
-        .eq("id", recipient.id);
-    }
-    await sleep(SEND_DELAY_MS);
-  }
-
-  await admin
-    .from("newsletter_campaigns")
-    .update({
-      sent_count: campaign.sent_count + sent,
-      failed_count: campaign.failed_count + failed,
-    })
-    .eq("id", campaignId);
-
-  const { count: stillPending } = await admin
-    .from("newsletter_campaign_recipients")
-    .select("id", { count: "exact", head: true })
-    .eq("campaign_id", campaignId)
-    .eq("status", "pending");
-
-  if (!stillPending) {
-    await admin
-      .from("newsletter_campaigns")
-      .update({ status: "sent", sent_at: new Date().toISOString() })
-      .eq("id", campaignId);
-  }
-
-  return { sent, failed, remaining: stillPending ?? 0 };
 }

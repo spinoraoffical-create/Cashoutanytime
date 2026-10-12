@@ -15,6 +15,7 @@ import { SITE_NAME } from "@/lib/constants";
 import { LobbySpotlight } from "@/components/player/lobby-spotlight";
 import { getGameRooms, type Game } from "@/lib/games";
 import { Button } from "@/components/ui/button";
+import { FaqSection } from "@/components/home/faq-section";
 
 function RoomCard({ game }: { game: Game }) {
   return (
@@ -33,7 +34,13 @@ function RoomCard({ game }: { game: Game }) {
   );
 }
 
-export function PublicHome({ games }: { games?: Game[] }) {
+export function PublicHome({
+  games,
+  faqs = [],
+}: {
+  games?: Game[];
+  faqs?: { q: string; a: string }[];
+}) {
   const rooms = (games ?? getGameRooms()).filter((g) => !g.upcoming);
   const slots = rooms.filter((g) => /slot/i.test(g.category));
   const fish = rooms.filter((g) => /fish/i.test(g.category));
@@ -219,6 +226,7 @@ export function PublicHome({ games }: { games?: Game[] }) {
           Eligibility, age, and location rules apply. 18+ only.
         </p>
       </section>
+      <FaqSection faqs={faqs} />
     </div>
   );
 }
