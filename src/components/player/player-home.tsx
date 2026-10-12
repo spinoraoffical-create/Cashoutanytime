@@ -1,8 +1,8 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import Image from "next/image";
 import { GameArt } from "@/components/games/game-art";
+import { LobbySpotlight } from "@/components/player/lobby-spotlight";
 import Link from "next/link";
 import { ChevronRight, Search, Shield, X } from "lucide-react";
 import { motion } from "framer-motion";
@@ -114,23 +114,7 @@ export function PlayerHome({
         />
       ) : null}
 
-      <section className="relative overflow-hidden rounded-[24px]">
-          <div className="relative h-48 w-full lg:h-64">
-            <Image src="/games/game-vault.webp" alt="" fill sizes="(min-width: 1024px) 1100px, 100vw" className="object-cover" priority />
-            <div className="absolute inset-0 bg-gradient-to-r from-[#030b26] via-[#100914]/85 to-[#100914]/20" />
-            <div className="absolute inset-0 flex items-end p-5">
-              <div>
-                <h2 className="text-3xl font-extrabold">Game Rooms</h2>
-                <Link
-                  href="/play"
-                  className="mt-3 inline-flex rounded-full bg-[#f3264f] px-4 py-2 text-sm font-bold text-white"
-                >
-                  Browse rooms →
-                </Link>
-              </div>
-            </div>
-          </div>
-        </section>
+      <LobbySpotlight />
 
       <div className="flex gap-5 px-1">
           {(

@@ -12,6 +12,7 @@ import {
   Wallet,
 } from "lucide-react";
 import { SITE_NAME } from "@/lib/constants";
+import { LobbySpotlight } from "@/components/player/lobby-spotlight";
 import { getGameRooms, type Game } from "@/lib/games";
 import { Button } from "@/components/ui/button";
 
@@ -39,7 +40,7 @@ export function PublicHome({ games }: { games?: Game[] }) {
 
   return (
     <div className="mx-auto max-w-lg space-y-10 pb-28 lg:max-w-3xl">
-      <section className="overflow-hidden rounded-[24px] bg-[#121826] text-center">
+      <section className="overflow-hidden rounded-[24px] bg-[#121826]">
         <div className="flex justify-between px-4 pt-4">
           <Link href="/" className="flex items-center gap-2">
             <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-primary text-[11px] font-black text-white">
@@ -58,20 +59,8 @@ export function PublicHome({ games }: { games?: Game[] }) {
             </Button>
           </div>
         </div>
-        <div className="space-y-3 px-6 pb-8 pt-10">
-          <p className="text-xs font-bold uppercase tracking-[0.18em] text-primary">{SITE_NAME}</p>
-          <h1 className="text-3xl font-extrabold tracking-tight">
-            Play sweepstakes games.
-            <br />
-            Keep money destinations clear.
-          </h1>
-          <p className="text-sm text-muted-foreground">
-            Load credits into Game Rooms, redeem winnings to cash out, and track every move in Activity.
-          </p>
-          <Button asChild size="lg" className="w-full rounded-full">
-            <Link href="/register">Join {SITE_NAME}</Link>
-          </Button>
-          <p className="text-xs text-muted-foreground">Encrypted · Secure · 18+</p>
+        <div className="px-3 pb-4 pt-4">
+          <LobbySpotlight heading="h1" />
         </div>
       </section>
 
