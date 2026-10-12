@@ -11,7 +11,6 @@ import {
   supportReferenceCode,
   threadRequestedHuman,
 } from "@/lib/chat/support-thread";
-import { SITE_NAME } from "@/lib/constants";
 import { cn, formatRelativeTime } from "@/lib/utils";
 import type { Message } from "@/types/database";
 
@@ -146,7 +145,7 @@ export function SupportThread({
 
       {messages.length === 0 ? (
         <p className="py-12 text-center text-sm text-muted-foreground">
-          An automated assistant answers first. Ask for a person at any time.
+          Send a message and a person from support will reply here.
         </p>
       ) : (
         groups.map((group) => (
@@ -159,7 +158,7 @@ export function SupportThread({
               const isOwn = message.sender_id === userId && !fromStaff;
               const isAssistant =
                 !isOwn && !fromStaff && (botSenderId ? message.sender_id === botSenderId : true);
-              const label = isOwn ? null : isAssistant ? `${SITE_NAME} AI` : "Owner";
+              const label = isOwn ? null : isAssistant ? "Support" : "Owner";
               const showWallet = !isOwn && isAssistant && messageMentionsWallet(message.content);
               return (
                 <div key={message.id} className={cn("flex", isOwn ? "justify-end" : "justify-start")}>

@@ -2,7 +2,6 @@ import { redirect } from "next/navigation";
 
 import { AdminChatInbox, type AdminConversation } from "@/components/admin/admin-chat-inbox";
 import { getAdminChatConversations, getAdminConversationUnreads } from "@/lib/actions/messages";
-import { repairPendingSupportReply } from "@/lib/chat/support-auto-reply";
 import { CHAT_PAGE_SHELL_CLASS } from "@/lib/chat/chat-layout";
 import { platformTicketAccess } from "@/lib/support/ticket-access";
 
@@ -21,9 +20,6 @@ export default async function AdminChatPage({
     getAdminChatConversations(),
     getAdminConversationUnreads(),
   ]);
-  await Promise.all(
-    conversations.slice(0, 12).map((conversation) => repairPendingSupportReply(conversation.user_id))
-  );
 
   return (
     <div className={CHAT_PAGE_SHELL_CLASS}>

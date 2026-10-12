@@ -199,7 +199,7 @@ function QuickChatPanel({
             {humanRequested ? "Human support" : "Sweepstakes Hub Support"}
           </p>
           <p className="text-[10px] text-emerald-300">
-            {humanRequested ? "Human support requested · updates stay here" : "Automated assistant answers first"}
+            {humanRequested ? "Human support requested · updates stay here" : "A person from support replies in this chat"}
           </p>
         </div>
         {!humanRequested && (

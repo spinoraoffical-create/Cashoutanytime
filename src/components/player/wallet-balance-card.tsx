@@ -73,7 +73,7 @@ export function WalletBalanceCard({
         </p>
         <p className="mt-1 text-5xl font-black tracking-wide tabular-nums">{shown(masked, main)}</p>
         <p className="mt-1 text-sm text-[#b9b3c6]">Cash and Freeplay in Main Wallet.</p>
-        <div className="mt-4 grid gap-3 sm:grid-cols-3">
+        <div className="mt-4 grid gap-3 sm:grid-cols-2">
           <div className="rounded-2xl border border-white/10 bg-[#160812] p-4">
             <p className="flex items-center gap-1.5 text-[11px] font-black uppercase tracking-[0.12em] text-emerald-300">
               <Shield className="h-3.5 w-3.5" /> Cash-out ready
@@ -88,13 +88,6 @@ export function WalletBalanceCard({
             <p className="mt-2 text-2xl font-black tabular-nums">{shown(masked, freeplay)}</p>
             <p className="text-xs text-[#b9b3c6]">Play only — not cash</p>
           </div>
-          <div className="rounded-2xl border border-white/10 bg-[#160812] p-4">
-            <p className="flex items-center gap-1.5 text-[11px] font-black uppercase tracking-[0.12em] text-[#ffb020]">
-              <Sparkles className="h-3.5 w-3.5" /> Instant play balance
-            </p>
-            <p className="mt-2 text-2xl font-black tabular-nums">{shown(masked, 0)}</p>
-            <p className="text-xs text-[#b9b3c6]">Shared across Instant Games</p>
-          </div>
         </div>
         <details className="mt-3 border-t border-white/10">
           <summary className="flex cursor-pointer list-none items-center gap-2 py-3 text-sm text-[#b9b3c6] [&::-webkit-details-marker]:hidden">
@@ -102,7 +95,7 @@ export function WalletBalanceCard({
             What do these mean?
           </summary>
           <p className="pb-3 text-sm text-[#b9b3c6]">
-            Main Wallet is cash plus freeplay. Cash-out ready is what you can request as a payout. Freeplay can be played and is not cash. Instant play is not on this floor, so that balance stays at zero.
+            Main Wallet is cash plus freeplay. Cash-out ready is what you can request as a payout. Freeplay can be played and is not cash.
           </p>
         </details>
         <div className="grid grid-cols-3 gap-2 border-t border-white/10 pt-3">

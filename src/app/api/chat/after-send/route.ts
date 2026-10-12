@@ -4,13 +4,8 @@ import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { createNotification } from "@/lib/actions/notifications";
 import { notifyAdminOfCustomerMessage } from "@/lib/telegram/notify-admin-message";
-import { processAIChatQuery, getBotSenderProfileId, stripHtmlForDisplay } from "@/lib/ai/chatbot";
-import { asksForPerson, CHAT_FALLBACK_REPLY, CHAT_PERSON_REPLY, supportGreetingReply } from "@/lib/ai/escalate";
-import { insertSupportReplyOnce, scriptedSupportReply } from "@/lib/chat/support-auto-reply";
+import { asksForPerson } from "@/lib/ai/escalate";
 import { supportReferenceCode } from "@/lib/chat/support-thread";
-import { getChatbotSettings } from "@/lib/ai/settings";
-import { isTelegramConfigured, sendTelegramMessage, escapeTelegramHtml } from "@/lib/telegram/client";
-import { SITE_URL } from "@/lib/constants";
 import { getStaffContext } from "@/lib/data/admin";
 
 export async function POST(request: Request) {
@@ -100,87 +95,18 @@ export async function POST(request: Request) {
       attachmentType,
     });
 
-    const chatSettings = await getChatbotSettings();
-    const queue = await readHumanQueue(db, conversationId);
     const wantsPerson = asksForPerson(content);
-    if (wantsPerson && !queue.queued && queue.columnsReady) {
-      await db
-        .from("conversations")
-        .update({
-          human_requested_at: new Date().toISOString(),
-          support_reference: supportReferenceCode(conversationId),
-          updated_at: new Date().toISOString(),
-        })
-        .eq("id", conversationId);
-    }
-
-    const staffReply = await db
-      .from("messages")
-      .select("id")
-      .eq("conversation_id", conversationId)
-      .eq("from_staff", true)
-      .limit(1);
-    const staffIsTalking = !staffReply.error && (staffReply.data?.length ?? 0) > 0;
-
-    if (content.trim() && !staffIsTalking && !/marked this support resolved/i.test(content)) {
-      let replyText = scriptedSupportReply(content, queue.queued);
-      let escalate = wantsPerson;
-      if (
-        !replyText &&
-        !queue.queued &&
-        chatSettings.is_enabled &&
-        chatSettings.auto_reply_enabled
-      ) {
-        try {
-          const aiResult = await processAIChatQuery(content, conversationId, user.id);
-          const plain = stripHtmlForDisplay(aiResult.response || "")
-            .replace(/<[^>]+>/g, " ")
-            .replace(/\s+/g, " ")
-            .trim();
-          replyText = asksForPerson(content)
-            ? CHAT_PERSON_REPLY
-            : plain || supportGreetingReply(content) || CHAT_FALLBACK_REPLY;
-          escalate = wantsPerson || aiResult.shouldEscalateToHuman;
-        } catch (err) {
-          console.error("[AfterSend AI Auto-Reply Error]:", err);
-          replyText = supportGreetingReply(content) || CHAT_FALLBACK_REPLY;
-        }
-      }
-
-      if (replyText) {
-        const botSenderId = await getBotSenderProfileId(user.id);
-        if (botSenderId && botSenderId !== user.id) {
-          await insertSupportReplyOnce(db, {
-            conversationId,
-            userId: user.id,
-            botSenderId,
-            userContent: content,
-            reply: replyText,
-          });
-        } else {
-          console.error("[AfterSend AI insert]: support bot profile is missing");
-        }
-      }
-
-      if (escalate && chatSettings.telegram_escalation_enabled && isTelegramConfigured()) {
-        const { data: profileRows } = await db
-          .from("profiles")
-          .select("full_name, email")
-          .eq("id", user.id)
-          .limit(1);
-        const profile = (profileRows as { full_name: string | null; email: string | null }[] | null)?.[0];
-        const displayName = profile?.full_name || "Player";
-        const email = profile?.email || "No Email";
-
-        await sendTelegramMessage(
-          [
-            "🚨 <b>CHAT ESCALATION</b>",
-            `<b>Player:</b> ${escapeTelegramHtml(displayName)}`,
-            `<b>Email:</b> ${escapeTelegramHtml(email)}`,
-            `<b>Message:</b> ${escapeTelegramHtml(content.slice(0, 500))}`,
-            `<i>${SITE_URL}/admin/chat</i>`,
-          ].join("\n")
-        );
+    if (wantsPerson && content.trim()) {
+      const queue = await readHumanQueue(db, conversationId);
+      if (!queue.queued && queue.columnsReady) {
+        await db
+          .from("conversations")
+          .update({
+            human_requested_at: new Date().toISOString(),
+            support_reference: supportReferenceCode(conversationId),
+            updated_at: new Date().toISOString(),
+          })
+          .eq("id", conversationId);
       }
     }
   }

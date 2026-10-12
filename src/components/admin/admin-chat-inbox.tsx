@@ -202,7 +202,7 @@ function AdminChatPanel({
                 >
                   {!isAdminMsg && (
                     <p className="text-[10px] font-semibold text-orange-400 mb-1">
-                      {isBot ? "Sweepstakes Hub AI" : customerTitle(selected?.user)}
+                      {isBot ? "Support" : customerTitle(selected?.user)}
                     </p>
                   )}
                   <ChatMessageContent message={msg} />

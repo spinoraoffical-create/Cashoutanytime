@@ -65,7 +65,7 @@ export function SupportAiStarter({
       <div>
         <h2 className="text-lg font-bold text-white">{SITE_NAME} support</h2>
         <p className="mt-1 text-sm text-muted-foreground">
-          An automated assistant answers first and identifies itself. You can request a person at any time.
+          Send a message and a person from support will reply in this chat.
         </p>
       </div>
 

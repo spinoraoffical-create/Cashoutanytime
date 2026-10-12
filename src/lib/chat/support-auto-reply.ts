@@ -1,13 +1,10 @@
-import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
-import { getBotSenderProfileId } from "@/lib/ai/settings";
 import {
   asksForPerson,
   CHAT_PERSON_REPLY,
   supportGreetingReply,
   supportTopicReply,
 } from "@/lib/ai/escalate";
-import { supportReferenceCode } from "@/lib/chat/support-thread";
 
 /** Topic and greeting answers stay available until a staff member has replied. */
 export function scriptedSupportReply(content: string, queued: boolean): string | null {
@@ -101,50 +98,7 @@ export async function insertSupportReplyOnce(
   return true;
 }
 
-/** Fill a thread that saved the player text and never saved the assistant line. */
-export async function repairPendingSupportReply(userId: string) {
-  const supabase = await createClient();
-  const admin = createAdminClient();
-  const db = admin ?? supabase;
-  const { data: convRows } = await db
-    .from("conversations")
-    .select("id")
-    .eq("user_id", userId)
-    .eq("is_active", true)
-    .order("updated_at", { ascending: false })
-    .limit(1);
-  const conversationId = (convRows as { id: string }[] | null)?.[0]?.id;
-  if (!conversationId) return;
-
-  await collapseDuplicateBotReplies(db, conversationId, userId);
-  const messages = await threadMessages(db, conversationId);
-  if (messages.some((message) => message.from_staff)) return;
-
-  const latest = messages[messages.length - 1];
-  if (!latest?.content?.trim() || latest.sender_id !== userId) return;
-
-  const botSenderId = await getBotSenderProfileId(userId);
-  if (!botSenderId || botSenderId === userId) return;
-
-  const queued = messages.some((message) => message.content?.includes("will reply in this chat"));
-  const reply = scriptedSupportReply(latest.content, queued);
-  if (!reply) return;
-
-  const saved = await insertSupportReplyOnce(db, {
-    conversationId,
-    userId,
-    botSenderId,
-    userContent: latest.content,
-    reply,
-  });
-  if (saved && asksForPerson(latest.content)) {
-    await db
-      .from("conversations")
-      .update({
-        human_requested_at: new Date().toISOString(),
-        support_reference: supportReferenceCode(conversationId),
-        updated_at: new Date().toISOString(),
-      })
-      .eq("id", conversationId);
-  }
+/** Live chat no longer adds an assistant reply after a player message. */
+export async function repairPendingSupportReply(_userId: string) {
+  return;
 }

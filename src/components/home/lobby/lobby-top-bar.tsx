@@ -7,12 +7,14 @@ import { useUnreadMessages } from "@/hooks/use-unread-messages";
 import { SITE_NAME } from "@/lib/constants";
 
 export function LobbyTopBar() {
-  const { balance, balancesHidden, profile, displayName } = useLobbyProfile();
+  const { balance, balancesHidden, profile, displayName, wallet } = useLobbyProfile();
   const { count: unreadMessages } = useUnreadMessages();
 
-  const fmt = balancesHidden
-    ? "••••"
-    : balance.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  const money = (n: number) =>
+    balancesHidden ? "••••" : n.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  const fmt = money(balance);
+  const cash = money(wallet?.cashoutWallet ?? 0);
+  const freeplay = money(wallet?.bonusWallet ?? 0);
 
   const initial = (profile?.name || displayName || "P").slice(0, 1).toUpperCase();
 
@@ -29,10 +31,13 @@ export function LobbyTopBar() {
           <Link
             href="/dashboard/wallet"
             className="inline-flex h-11 items-center gap-1.5 rounded-2xl border border-white/15 bg-[#24152e]/90 px-3 text-sm font-extrabold tabular-nums text-[#fcf9fb]"
-            aria-label="Wallet balances"
+            aria-label={`Main Wallet $${fmt}. Cash out ready $${cash}. Freeplay $${freeplay}.`}
           >
             <Wallet className="h-3.5 w-3.5 text-[#ff718c]" />
-            ${fmt}
+            <span className="leading-tight">
+              <span className="block">${fmt}</span>
+              <span className="block text-[9px] font-semibold text-[#b9b3c6]">Cash out ${cash}</span>
+            </span>
           </Link>
           <Link
             href="/dashboard/messages"

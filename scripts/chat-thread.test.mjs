@@ -21,10 +21,9 @@ assert.match(settings, /role: "customer"/);
 assert.doesNotMatch(settings, /\.eq\("role", "admin"\)/);
 
 const afterSend = readFileSync(new URL("../src/app/api/chat/after-send/route.ts", import.meta.url), "utf8");
-const insertAt = afterSend.indexOf('from("messages").insert');
-const telegramAt = afterSend.indexOf("await sendTelegramMessage");
-assert.ok(insertAt > 0 && telegramAt > insertAt);
-assert.match(afterSend, /is_read: false/);
+assert.doesNotMatch(afterSend, /processAIChatQuery/);
+assert.doesNotMatch(afterSend, /insertSupportReplyOnce/);
+assert.doesNotMatch(afterSend, /scriptedSupportReply/);
 assert.doesNotMatch(afterSend, /void \(async/);
 
 const sender = readFileSync(new URL("../src/lib/chat/send-message-client.ts", import.meta.url), "utf8");

@@ -136,7 +136,7 @@ function UserChatPanel({
           <p className={cn("truncate text-xs", humanRequested ? "text-amber-300" : "text-[#b9b3c6]")}>
             {humanRequested
               ? "Human support requested · updates stay here"
-              : "An automated assistant answers first"}
+              : "A person from support replies in this chat"}
           </p>
         </div>
         <Link href="/help" className="shrink-0 text-xs font-bold text-white">

@@ -11,7 +11,6 @@ import type { PublicPromotion } from "@/lib/data/promotions-public";
 import { ClaimVerifyBanner } from "@/components/player/claim-verify-banner";
 import { WalletSnapshot } from "@/components/player/wallet-snapshot";
 import { useLobbyProfile } from "@/components/home/lobby/use-lobby-profile";
-import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { usePlayerMotion } from "@/lib/player-motion";
 import { MotionPage } from "@/components/player/motion-page";
@@ -59,10 +58,12 @@ export function PlayerHome({
   const [q, setQ] = useState("");
   const [showSearch, setShowSearch] = useState(false);
   const [ownedOnly, setOwnedOnly] = useState(false);
-  const [catalog, setCatalog] = useState<"rooms" | "instant">("rooms");
   const [hideVerify, setHideVerify] = useState(false);
   const { stagger, tap } = usePlayerMotion();
   const { displayName } = useLobbyProfile();
+
+  const popular = rooms.filter((g) => g.popular);
+  const saved = rooms.find((g) => linkedSlugs.includes(g.slug)) ?? null;
 
   const filtered = useMemo(() => {
     let rows = rooms;
@@ -101,32 +102,6 @@ export function PlayerHome({
         >
           <Search className="h-4 w-4" />
         </button>
-        <div className="flex h-[50px] flex-1 rounded-[15px] bg-white/[0.055] p-0.5">
-          <button
-            type="button"
-            onClick={() => setCatalog("rooms")}
-            className={cn(
-              "flex-1 rounded-[11px] text-sm font-extrabold",
-              catalog === "rooms"
-                ? "bg-[linear-gradient(#ffe38a,#f4c64e)] text-[#241608]"
-                : "text-[#e9e6f0]/70"
-            )}
-          >
-            Game Rooms
-          </button>
-          <button
-            type="button"
-            onClick={() => setCatalog("instant")}
-            className={cn(
-              "flex-1 rounded-[11px] text-sm font-extrabold",
-              catalog === "instant"
-                ? "bg-[linear-gradient(#ffe38a,#f4c64e)] text-[#241608]"
-                : "text-[#e9e6f0]/70"
-            )}
-          >
-            Instant Games
-          </button>
-        </div>
       </div>
 
       {showSearch ? (
@@ -139,18 +114,7 @@ export function PlayerHome({
         />
       ) : null}
 
-      {catalog === "instant" ? (
-        <section className="hub-card rounded-[24px] p-5">
-          <h2 className="text-xl font-extrabold">Instant Games</h2>
-          <p className="mt-2 text-sm text-zinc-400">
-            Instant play is not on this floor. Game Rooms are ready — load credits, then redeem winnings back to your wallet.
-          </p>
-          <Button type="button" className="mt-4 rounded-full bg-[#f3264f] font-bold text-white hover:bg-[#b70d3a]" onClick={() => setCatalog("rooms")}>
-            Back to Game Rooms
-          </Button>
-        </section>
-      ) : (
-        <section className="relative overflow-hidden rounded-[24px]">
+      <section className="relative overflow-hidden rounded-[24px]">
           <div className="relative h-48 w-full lg:h-64">
             <Image src="/games/game-vault.webp" alt="" fill sizes="(min-width: 1024px) 1100px, 100vw" className="object-cover" priority />
             <div className="absolute inset-0 bg-gradient-to-r from-[#030b26] via-[#100914]/85 to-[#100914]/20" />
@@ -167,10 +131,8 @@ export function PlayerHome({
             </div>
           </div>
         </section>
-      )}
 
-      {catalog === "rooms" ? (
-        <div className="flex gap-5 px-1">
+      <div className="flex gap-5 px-1">
           {(
             [
               [false, "All rooms"],
@@ -190,9 +152,7 @@ export function PlayerHome({
             </button>
           ))}
         </div>
-      ) : null}
 
-      {catalog === "rooms" ? (
       <section>
         <div className="mb-3 flex items-end justify-between">
           <div>
@@ -225,6 +185,38 @@ export function PlayerHome({
           <p className="py-6 text-center text-sm text-zinc-400">No rooms match that filter.</p>
         ) : null}
       </section>
+
+      {popular.length > 0 && !ownedOnly && !q.trim() ? (
+        <section>
+          <div className="mb-3 flex items-end justify-between">
+            <div>
+              <h2 className="text-2xl font-extrabold">Popular rooms</h2>
+              <p className="text-sm text-zinc-400">Rooms players open most often</p>
+            </div>
+            <Link href="/play" className="text-sm font-semibold text-primary">
+              See all →
+            </Link>
+          </div>
+          <div className="-mx-1 flex gap-3 overflow-x-auto px-1 pb-1 scrollbar-hide">
+            {popular.slice(0, 8).map((g) => (
+              <RoomCard key={g.slug} game={g} tap={tap} />
+            ))}
+          </div>
+        </section>
+      ) : null}
+
+      {saved ? (
+        <Link href={`/games/${saved.slug}`} className="hub-card flex items-center gap-3 rounded-[22px] p-4">
+          <span className="relative h-14 w-14 shrink-0 overflow-hidden rounded-xl bg-white/5">
+            <GameArt src={saved.image} />
+          </span>
+          <span className="min-w-0 flex-1">
+            <span className="block text-xs font-bold uppercase tracking-wider text-[#f5c542]">Saved room</span>
+            <span className="block truncate font-extrabold">{saved.name}</span>
+            <span className="block text-xs text-zinc-400">Open this room to load or redeem.</span>
+          </span>
+          <ChevronRight className="h-4 w-4 shrink-0 text-zinc-500" />
+        </Link>
       ) : null}
 
       {verify?.show && !hideVerify ? (

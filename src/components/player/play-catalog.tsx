@@ -4,7 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { GameArt } from "@/components/games/game-art";
 import Link from "next/link";
-import { ChevronRight, Gamepad2, LayoutGrid, Search, SlidersHorizontal, Sparkles, Star } from "lucide-react";
+import { ChevronRight, Gamepad2, LayoutGrid, Search, SlidersHorizontal, Star } from "lucide-react";
 import { motion } from "framer-motion";
 import { cn } from "@/lib/utils";
 import type { Game } from "@/lib/games";
@@ -13,7 +13,7 @@ import { MotionPage } from "@/components/player/motion-page";
 
 const FAV_KEY = "hub-favorite-games";
 
-type Segment = "all" | "rooms" | "instant";
+type Segment = "all" | "rooms";
 type Chip = "all" | "popular" | "favorites" | "yours";
 
 export function PlayCatalog({ games }: { games: Game[] }) {
@@ -54,7 +54,6 @@ export function PlayCatalog({ games }: { games: Game[] }) {
 
   const list = useMemo(() => {
     let rows = rooms;
-    if (segment === "instant") return [];
     if (chip === "popular") rows = rows.filter((g) => g.popular);
     if (chip === "favorites" || chip === "yours") rows = rows.filter((g) => favs.includes(g.slug));
     if (category !== "all") rows = rows.filter((g) => g.category === category);
@@ -76,16 +75,15 @@ export function PlayCatalog({ games }: { games: Game[] }) {
         <p className="text-xs font-black uppercase tracking-[0.16em] text-[#ff6b89]">Game Room catalog</p>
         <h1 className="mt-1 text-4xl font-black leading-10">Find your game</h1>
         <p className="mt-2 max-w-xl text-sm text-[#b9b3c6]">
-          Open a Game Room, or switch to Instant Games. Instant play is not on this floor.
+          Open a Game Room, load credits, then redeem winnings back to your wallet.
         </p>
       </div>
 
-      <div className="grid grid-cols-3 gap-2 rounded-2xl bg-white/[0.04] p-1">
+      <div className="grid grid-cols-2 gap-2 rounded-2xl bg-white/[0.04] p-1">
         {(
           [
             ["all", "All Games", LayoutGrid],
             ["rooms", "Game Rooms", Gamepad2],
-            ["instant", "Instant Games", Sparkles],
           ] as const
         ).map(([id, label, Icon]) => (
           <button
@@ -165,19 +163,12 @@ export function PlayCatalog({ games }: { games: Game[] }) {
         </div>
       ) : null}
 
-      {segment !== "instant" ? (
-        <h2 className="text-lg font-extrabold">
-          {segment === "rooms" ? "Game Rooms" : "All games"}{" "}
-          <span className="text-sm font-semibold text-zinc-500">{list.length}</span>
-        </h2>
-      ) : null}
+      <h2 className="text-lg font-extrabold">
+        {segment === "rooms" ? "Game Rooms" : "All games"}{" "}
+        <span className="text-sm font-semibold text-zinc-500">{list.length}</span>
+      </h2>
 
-      {segment === "instant" ? (
-        <div className="hub-card rounded-[24px] px-5 py-10 text-center">
-          <p className="font-bold">Instant Games are not on this floor</p>
-          <p className="mt-1 text-sm text-zinc-400">Game Rooms use load and redeem from your wallet.</p>
-        </div>
-      ) : list.length === 0 ? (
+      {list.length === 0 ? (
         <p className="py-12 text-center text-sm text-zinc-400">
           {chip === "yours" || chip === "favorites"
             ? "Star a room and it will show up here."

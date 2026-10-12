@@ -1,11 +1,6 @@
 import { NextResponse } from "next/server";
-import { createAdminClient } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
-import { processAIChatQuery, getBotSenderProfileId, stripHtmlForDisplay } from "@/lib/ai/chatbot";
-import { getChatbotSettings } from "@/lib/ai/settings";
 import { clientIp, rateLimit } from "@/lib/api/rate-limit";
-import { isTelegramConfigured, sendTelegramMessage, escapeTelegramHtml } from "@/lib/telegram/client";
-import { SITE_URL } from "@/lib/constants";
 
 export async function POST(req: Request) {
   const limited = await rateLimit(`live-bot:${clientIp(req)}`, 30, 60_000);
@@ -19,120 +14,21 @@ export async function POST(req: Request) {
   try {
     const body = await req.json();
     const message = String(body.message || "").slice(0, 2000);
-    const requestHuman = body.requestHuman === true;
     const hasMedia = Boolean(body.hasMedia);
-    const mediaName = String(body.mediaName || "").slice(0, 200);
     const supabase = await createClient();
     const {
       data: { user },
     } = await supabase.auth.getUser();
-    const userId = user?.id ?? null;
 
     if (!message.trim() && !hasMedia) {
       return NextResponse.json({ error: "Message required" }, { status: 400 });
     }
 
-    const settings = await getChatbotSettings();
-    if (!settings.is_enabled) {
-      return NextResponse.json({
-        success: true,
-        reply: "Support chat is temporarily offline. Please email support or try again later.",
-        alertedTelegram: false,
-      });
+    if (!user) {
+      return NextResponse.json({ error: "Not authenticated" }, { status: 401 });
     }
 
-    const query = hasMedia
-      ? `[User uploaded media: ${mediaName || "file"}] ${message}`.trim()
-      : message;
-
-    const aiResult = await processAIChatQuery(query, undefined, userId ?? undefined);
-    let reply = stripHtmlForDisplay(aiResult.response);
-
-    if (hasMedia && aiResult.confidenceScore > 0.7) {
-      reply =
-        "Thank you for sending your receipt/media! I've alerted our support team on Telegram to review and credit your account.";
-    }
-
-    const needsHuman = requestHuman || aiResult.shouldEscalateToHuman || hasMedia;
-    if (requestHuman) {
-      reply = "A person from Sweepstakes Hub support will reply in this chat.";
-    }
-
-    const admin = createAdminClient();
-    const botSenderId = await getBotSenderProfileId();
-
-    if (userId) {
-      if (!admin || !botSenderId || botSenderId === userId) {
-        return NextResponse.json({ error: "Support reply could not be saved." }, { status: 500 });
-      }
-
-      const { data: existingRows } = await admin
-        .from("conversations")
-        .select("id")
-        .eq("user_id", userId)
-        .eq("is_active", true)
-        .order("updated_at", { ascending: false })
-        .limit(1);
-      let convId = (existingRows as { id: string }[] | null)?.[0]?.id ?? null;
-
-      if (!convId) {
-        const { data: createdRows, error: createError } = await admin
-          .from("conversations")
-          .insert({ user_id: userId, is_active: true })
-          .select("id")
-          .limit(1);
-        convId = (createdRows as { id: string }[] | null)?.[0]?.id ?? null;
-        if (!convId) {
-          console.error("[live-bot] conversation:", createError?.message);
-          return NextResponse.json({ error: "Support reply could not be saved." }, { status: 500 });
-        }
-      }
-
-      const plainReply = stripHtmlForDisplay(reply).replace(/<[^>]+>/g, " ").replace(/\s+/g, " ").trim();
-      const { error: userInsertError } = await admin.from("messages").insert({
-        conversation_id: convId,
-        sender_id: userId,
-        content: message || (hasMedia ? "Uploaded media file" : "User message"),
-        is_read: false,
-      });
-      const { error: botInsertError } = await admin.from("messages").insert({
-        conversation_id: convId,
-        sender_id: botSenderId,
-        content: plainReply || reply,
-        is_read: false,
-      });
-      if (userInsertError || botInsertError) {
-        console.error("[live-bot] insert:", userInsertError?.message, botInsertError?.message);
-        return NextResponse.json({ error: "Support reply could not be saved." }, { status: 500 });
-      }
-
-      await admin
-        .from("conversations")
-        .update({ updated_at: new Date().toISOString() })
-        .eq("id", convId);
-    }
-
-    if (
-      needsHuman &&
-      settings.telegram_escalation_enabled &&
-      isTelegramConfigured()
-    ) {
-      const alertText = [
-        "🚨 <b>LIVE CASINO BOT ESCALATION</b> 🚨",
-        "",
-        `<b>Player:</b> ${escapeTelegramHtml(userId || "guest")}`,
-        `<b>Question:</b> ${escapeTelegramHtml(message || (hasMedia ? "Uploaded media" : "Support needed"))}`,
-        hasMedia ? `<b>File:</b> ${escapeTelegramHtml(mediaName || "attachment")}` : "",
-        "",
-        `<i>Review: ${SITE_URL}/admin/ai-bot</i>`,
-      ]
-        .filter(Boolean)
-        .join("\n");
-
-      await sendTelegramMessage(alertText);
-    }
-
-    return NextResponse.json({ success: true, reply, alertedTelegram: needsHuman });
+    return NextResponse.json({ success: true, reply: null, alertedTelegram: false });
   } catch (err) {
     console.error("[live-bot]", err instanceof Error ? err.message : err);
     return NextResponse.json(
