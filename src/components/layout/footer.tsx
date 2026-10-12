@@ -17,6 +17,8 @@ const footerLinks = {
     { href: "/about", label: "About Us" },
     { href: "/contact", label: "Contact" },
     { href: "/support", label: "Help Center" },
+    { href: "/faq", label: "FAQ" },
+    { href: "/help", label: "Account help" },
     { href: "/terms", label: "Terms" },
     { href: "/privacy", label: "Privacy" },
   ],

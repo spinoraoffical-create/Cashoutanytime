@@ -18,7 +18,13 @@ export const FREEPLAY_RULES = {
 
 /** VIP points awarded per successful referral */
 export const REFERRAL_REWARD_POINTS = 10;
-export const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL || "https://spinoracasinos.com";
+export const SITE_URL = (() => {
+  const configured = (process.env.NEXT_PUBLIC_SITE_URL || "").trim().replace(/\/$/, "");
+  if (configured.includes("sweeptakehub.com")) {
+    return configured.startsWith("http") ? configured : `https://${configured}`;
+  }
+  return "https://www.sweeptakehub.com";
+})();
 export const SITE_DESCRIPTION =
   "Sweepstakes Hub for Juwa, Game Vault, slot games, and fish games. Create game accounts fast, claim bonuses, earn VIP rewards, and get 24/7 live support.";
 
@@ -63,6 +69,9 @@ export const REQUEST_STATUSES = [
 export const PUBLIC_ROUTES = [
   { path: "/", priority: 1.0 },
   { path: "/games", priority: 0.95 },
+  { path: "/play", priority: 0.95 },
+  { path: "/faq", priority: 0.9 },
+  { path: "/help", priority: 0.85 },
   { path: "/blog", priority: 0.9 },
   { path: "/promotions", priority: 0.9 },
   { path: "/leaderboard", priority: 0.85 },

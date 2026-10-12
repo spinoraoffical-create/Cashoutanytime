@@ -18,7 +18,7 @@ export function getAuthCallbackUrl(redirect = "/"): string {
   const origin =
     typeof window !== "undefined"
       ? getEmailAuthOrigin(window.location.origin)
-      : process.env.NEXT_PUBLIC_SITE_URL || "https://spinoracasinos.com";
+      : process.env.NEXT_PUBLIC_SITE_URL || "https://www.sweeptakehub.com";
 
   const url = new URL("/auth/callback", origin);
   url.searchParams.set("redirect", redirect);

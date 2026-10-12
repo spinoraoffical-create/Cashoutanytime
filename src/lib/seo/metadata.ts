@@ -113,3 +113,18 @@ export const supportMetadata = createMetadata({
   keywords: ["gaming support", "live chat help", "Sweepstakes Hub support", "game account help", "customer service"],
   path: "/support",
 });
+
+export const faqMetadata = createMetadata({
+  title: "FAQ",
+  description:
+    "Answers about Sweepstakes Hub at sweeptakehub.com: creating an account, Game Rooms, the wallet, cash outs, age, support, and email notices.",
+  keywords: [
+    "Sweepstakes Hub FAQ",
+    "sweeptakehub.com",
+    "how to sign up",
+    "game rooms",
+    "cash out",
+    "sweepstakes hub help",
+  ],
+  path: "/faq",
+});
