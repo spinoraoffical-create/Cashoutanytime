@@ -2,10 +2,17 @@ import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
 
 import { pickLoginDestination, signedInUsesAdminHome } from "@/lib/auth/account-home";
+import { withAuthCookieDomain } from "@/lib/supabase/cookie-domain";
 import { getSupabaseAnonKey, getSupabaseUrl, isSupabaseConfigured } from "@/lib/supabase/env";
 
 export async function updateSession(request: NextRequest) {
   const path = request.nextUrl.pathname;
+
+  // Google returns here with a one-time code. Clearing cookies on this request
+  // deletes the new session before the browser can store it.
+  if (path === "/auth/callback" || path.startsWith("/auth/callback/")) {
+    return NextResponse.next({ request });
+  }
 
   const protectedRoutes = ["/dashboard", "/admin", "/chat"];
   const adminRoutes = ["/admin"];
@@ -17,7 +24,12 @@ export async function updateSession(request: NextRequest) {
 
   const hasSupabaseSession = request.cookies
     .getAll()
-    .some((c) => c.name.includes("-auth-token") && c.value);
+    .some(
+      (c) =>
+        c.name.includes("-auth-token") &&
+        !c.name.includes("code-verifier") &&
+        c.value
+    );
 
   if (!isProtected && !isAuth && !hasSupabaseSession) {
     return NextResponse.next({ request });
@@ -54,8 +66,9 @@ export async function updateSession(request: NextRequest) {
       setAll(cookiesToSet) {
         cookiesToSet.forEach(({ name, value }) => request.cookies.set(name, value));
         supabaseResponse = NextResponse.next({ request });
+        const host = request.headers.get("host");
         cookiesToSet.forEach(({ name, value, options }) =>
-          supabaseResponse.cookies.set(name, value, options)
+          supabaseResponse.cookies.set(name, value, withAuthCookieDomain(options, host))
         );
       },
     },
@@ -73,7 +86,14 @@ export async function updateSession(request: NextRequest) {
     const stale = request.cookies.getAll().filter((cookie) => cookie.name.includes("-auth-token"));
     for (const cookie of stale) request.cookies.delete(cookie.name);
     const cleared = NextResponse.next({ request });
-    for (const cookie of stale) cleared.cookies.set(cookie.name, "", { path: "/", maxAge: 0 });
+    for (const cookie of stale) {
+      if (cookie.name.includes("code-verifier")) continue;
+      cleared.cookies.set(
+        cookie.name,
+        "",
+        withAuthCookieDomain({ path: "/", maxAge: 0 }, request.headers.get("host"))
+      );
+    }
     if (isProtected) {
       const url = request.nextUrl.clone();
       url.pathname = "/login";

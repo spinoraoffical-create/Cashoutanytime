@@ -14,7 +14,15 @@ export function createClient(): SupabaseClient | null {
   }
 
   if (!client) {
-    client = createBrowserClient(getSupabaseUrl(), getSupabaseAnonKey());
+    const domain =
+      typeof window !== "undefined" && window.location.hostname.endsWith("sweeptakehub.com")
+        ? ".sweeptakehub.com"
+        : undefined;
+    client = createBrowserClient(
+      getSupabaseUrl(),
+      getSupabaseAnonKey(),
+      domain ? { cookieOptions: { domain } } : undefined
+    );
   }
 
   return client;

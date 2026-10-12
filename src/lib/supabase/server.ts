@@ -1,11 +1,13 @@
 import { createServerClient } from "@supabase/ssr";
-import { cookies } from "next/headers";
+import { cookies, headers } from "next/headers";
 import type { SupabaseClient } from "@supabase/supabase-js";
 
+import { withAuthCookieDomain } from "@/lib/supabase/cookie-domain";
 import { getSupabaseAnonKey, getSupabaseUrl, isSupabaseConfigured } from "@/lib/supabase/env";
 
 export async function createClient(): Promise<SupabaseClient> {
   const cookieStore = await cookies();
+  const host = (await headers()).get("host");
 
   return createServerClient(getSupabaseUrl(), getSupabaseAnonKey(), {
     cookies: {
@@ -15,7 +17,7 @@ export async function createClient(): Promise<SupabaseClient> {
       setAll(cookiesToSet) {
         try {
           cookiesToSet.forEach(({ name, value, options }) =>
-            cookieStore.set(name, value, options)
+            cookieStore.set(name, value, withAuthCookieDomain(options, host))
           );
         } catch {
           // Server Component — ignore

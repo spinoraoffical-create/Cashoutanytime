@@ -3,6 +3,7 @@ import { cookies } from "next/headers";
 import { NextResponse, type NextRequest } from "next/server";
 import type { EmailOtpType } from "@supabase/supabase-js";
 import { pickLoginDestination, signedInUsesAdminHome } from "@/lib/auth/account-home";
+import { withAuthCookieDomain } from "@/lib/supabase/cookie-domain";
 import { syncProfileFromAuthMetadata } from "@/lib/actions/auth";
 import { linkSignupSecurity } from "@/lib/actions/security";
 
@@ -53,13 +54,15 @@ export async function GET(request: NextRequest) {
           return cookieStore.getAll();
         },
         setAll(cookiesToSet) {
+          const host = request.headers.get("host");
           cookiesToSet.forEach(({ name, value, options }) => {
+            const cookieOptions = withAuthCookieDomain(options, host);
             try {
-              cookieStore.set(name, value, options);
+              cookieStore.set(name, value, cookieOptions);
             } catch {
               /* Route handlers keep the session on the redirect response. */
             }
-            response.cookies.set(name, value, options);
+            response.cookies.set(name, value, cookieOptions);
           });
         },
       },
