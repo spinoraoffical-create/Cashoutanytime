@@ -6,6 +6,13 @@ import { pickLoginDestination, signedInUsesAdminHome } from "@/lib/auth/account-
 import { syncProfileFromAuthMetadata } from "@/lib/actions/auth";
 import { linkSignupSecurity } from "@/lib/actions/security";
 
+function publicOrigin(request: NextRequest) {
+  const forwardedHost = request.headers.get("x-forwarded-host")?.split(",")[0]?.trim();
+  const forwardedProto = request.headers.get("x-forwarded-proto")?.split(",")[0]?.trim() || "https";
+  if (forwardedHost) return `${forwardedProto}://${forwardedHost}`;
+  return new URL(request.url).origin;
+}
+
 function resolveRedirect(request: NextRequest, type: EmailOtpType | null) {
   const { searchParams } = new URL(request.url);
   const raw =
@@ -19,7 +26,8 @@ function resolveRedirect(request: NextRequest, type: EmailOtpType | null) {
 }
 
 export async function GET(request: NextRequest) {
-  const { searchParams, origin } = new URL(request.url);
+  const { searchParams } = new URL(request.url);
+  const origin = publicOrigin(request);
   const code = searchParams.get("code");
   const tokenHash = searchParams.get("token_hash");
   const rawType = searchParams.get("type");
@@ -46,7 +54,11 @@ export async function GET(request: NextRequest) {
         },
         setAll(cookiesToSet) {
           cookiesToSet.forEach(({ name, value, options }) => {
-            cookieStore.set(name, value, options);
+            try {
+              cookieStore.set(name, value, options);
+            } catch {
+              /* Route handlers keep the session on the redirect response. */
+            }
             response.cookies.set(name, value, options);
           });
         },
@@ -76,40 +88,21 @@ export async function GET(request: NextRequest) {
     console.error("auth callback profile sync:", err);
   }
 
-  if (type === "signup" || searchParams.get("verified") === "1") {
-    try {
-      const linked = await linkSignupSecurity();
-      if (!linked.ok) {
-        const failUrl = new URL("/login", origin);
-        failUrl.searchParams.set("error", linked.error);
-        response.headers.set("location", failUrl.toString());
-        return response;
-      }
-    } catch (err) {
-      const message = err instanceof Error ? err.message : "Signup checks are unavailable.";
-      const failUrl = new URL("/login", origin);
-      failUrl.searchParams.set("error", message);
-      response.headers.set("location", failUrl.toString());
-      return response;
-    }
-  } else {
-    const {
-      data: { user },
-    } = await supabase.auth.getUser();
-    if (user) {
-      const created = new Date(user.created_at).getTime();
-      if (Date.now() - created < 5 * 60 * 1000) {
-        try {
-          const linked = await linkSignupSecurity();
-          if (!linked.ok) {
-            const failUrl = new URL("/login", origin);
-            failUrl.searchParams.set("error", linked.error);
-            response.headers.set("location", failUrl.toString());
-            return response;
-          }
-        } catch (err) {
-          console.error("auth callback linkSignupSecurity (oauth):", err);
+  const {
+    data: { user: sessionUser },
+  } = await supabase.auth.getUser();
+
+  if (type === "signup" || searchParams.get("verified") === "1" || sessionUser) {
+    const createdAt = sessionUser ? new Date(sessionUser.created_at).getTime() : 0;
+    const freshGoogleAccount = Boolean(sessionUser && Date.now() - createdAt < 5 * 60 * 1000);
+    if (type === "signup" || searchParams.get("verified") === "1" || freshGoogleAccount) {
+      try {
+        const linked = await linkSignupSecurity(null, sessionUser?.id);
+        if (!linked.ok) {
+          console.error("auth callback linkSignupSecurity:", linked.error);
         }
+      } catch (err) {
+        console.error("auth callback linkSignupSecurity:", err);
       }
     }
   }

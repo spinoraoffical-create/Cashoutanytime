@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
 import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
@@ -22,6 +22,14 @@ export function GoogleAuthButton({
   const [loading, setLoading] = useState(false);
 
   async function handleGoogleSignIn() {
+    if (window.location.hostname === "sweeptakehub.com") {
+      const target = new URL(window.location.href);
+      target.hostname = "www.sweeptakehub.com";
+      target.searchParams.set("google", "1");
+      window.location.replace(target.toString());
+      return;
+    }
+
     setLoading(true);
     const supabase = createClient();
     if (!supabase) {
@@ -82,6 +90,17 @@ export function GoogleAuthButton({
 
     window.location.href = data.url;
   }
+
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    if (params.get("google") !== "1") return;
+    params.delete("google");
+    const next = `${window.location.pathname}${params.toString() ? `?${params}` : ""}`;
+    window.history.replaceState({}, "", next);
+    void handleGoogleSignIn();
+    // Start Google once after moving onto www.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   return (
     <Button

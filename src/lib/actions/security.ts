@@ -9,6 +9,7 @@ const DEVICE_COOKIE = "spinora_did";
 function getClientIp(h: Headers): string {
   const forwarded =
     h.get("x-forwarded-for")?.split(",")[0]?.trim() ||
+    h.get("x-vercel-forwarded-for")?.split(",")[0]?.trim() ||
     h.get("x-real-ip")?.trim() ||
     h.get("cf-connecting-ip")?.trim() ||
     "";
