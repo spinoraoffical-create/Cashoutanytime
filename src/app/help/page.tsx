@@ -3,8 +3,15 @@ import { VipPageLayout } from "@/components/layout/vip-page-layout";
 import { getPublishedFaqs } from "@/lib/data/faqs-public";
 import { HelpFaqList } from "@/components/player/help-faq-list";
 import { GAME_BONUS_RULES } from "@/lib/games";
+import { createMetadata } from "@/lib/seo/metadata";
 
-export const metadata = { title: "Help & Support | Sweepstakes Hub" };
+export const metadata = createMetadata({
+  title: "Help",
+  description:
+    "Help with the Sweepstakes Hub wallet, game loads, cash outs, verification, and account login.",
+  keywords: ["Sweepstakes Hub help", "cash out help", "game wallet", "account verification"],
+  path: "/help",
+});
 
 const FALLBACK = [
   {

@@ -32,7 +32,10 @@ export function createMetadata({
     creator: SITE_NAME,
     publisher: SITE_NAME,
     metadataBase: new URL(SITE_URL),
-    alternates: { canonical: url },
+    alternates: {
+      canonical: url,
+      types: { "application/rss+xml": `${SITE_URL}/feed.xml` },
+    },
     openGraph: {
       type: "website",
       locale: "en_US",

@@ -27,7 +27,7 @@ const AI_AGENTS = [
 
 export default function robots(): MetadataRoute.Robots {
   const publicRule = {
-    allow: ["/", "/llms.txt", "/llms-full.txt", "/faq", "/sitemap.xml"],
+    allow: ["/", "/llms.txt", "/llms-full.txt", "/faq", "/feed.xml", "/sitemap.xml"],
     disallow: PRIVATE_PATHS,
   };
 

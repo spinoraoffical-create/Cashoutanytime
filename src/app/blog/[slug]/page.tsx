@@ -6,6 +6,7 @@ import { ArrowLeft } from "lucide-react";
 import { VipPageLayout } from "@/components/layout/vip-page-layout";
 import { BlogCoverImage } from "@/components/marketing/blog-cover-image";
 import { Breadcrumbs } from "@/components/seo/breadcrumbs";
+import { SITE_NAME, SITE_URL } from "@/lib/constants";
 import { getBlogPost } from "@/lib/data/marketing";
 
 // Heavy Traffic Optimization: 1-Hour Edge Caching for Sub-30ms Global Response Time
@@ -20,8 +21,8 @@ export async function generateMetadata({
   const post = await getBlogPost(slug);
   if (!post) return { title: "Post not found" };
 
-  const fullUrl = `https://spinoracasinos.com/blog/${slug}`;
-  const imageUrl = post.cover_image_url || "https://spinoracasinos.com/images/promos/spinora_dealer_ten.jpg";
+  const fullUrl = `${SITE_URL}/blog/${slug}`;
+  const imageUrl = post.cover_image_url || `${SITE_URL}/logo.webp`;
 
   return {
     title: `${post.seo_title ?? post.title} | Sweepstakes Hub`,
@@ -67,17 +68,18 @@ export default async function BlogPostPage({
     datePublished: post.published_at || new Date().toISOString(),
     author: {
       "@type": "Organization",
-      name: "Sweepstakes Hub Editorial Team",
-      url: "https://spinoracasinos.com",
+      name: SITE_NAME,
+      url: SITE_URL,
     },
     publisher: {
       "@type": "Organization",
-      name: "Sweepstakes Hub",
+      name: SITE_NAME,
       logo: {
         "@type": "ImageObject",
-        url: "https://spinoracasinos.com/favicon.ico",
+        url: `${SITE_URL}/logo.webp`,
       },
     },
+    mainEntityOfPage: `${SITE_URL}/blog/${slug}`,
   };
 
   return (

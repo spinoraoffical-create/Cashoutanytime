@@ -28,6 +28,14 @@ const RESERVED = new Set([
   "terms",
   "vip",
   "about",
+  "faq",
+  "feed.xml",
+  "get-app",
+  "help",
+  "llms-full.txt",
+  "llms.txt",
+  "play",
+  "whats-new",
 ]);
 
 export async function generateStaticParams() {

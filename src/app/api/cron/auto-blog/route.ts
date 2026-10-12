@@ -2,6 +2,8 @@ import { NextResponse } from "next/server";
 import { generateAndSaveAIBlogPost } from "@/lib/ai/blog-generator";
 import { broadcastBlogPostToTelegram } from "@/lib/telegram/auto-post";
 import { verifyCronRequest } from "@/lib/cron/auth";
+import { SITE_URL } from "@/lib/constants";
+import { submitIndexNow } from "@/lib/seo/indexnow";
 import { getBlogSettings, getTelegramSettings } from "@/lib/ai/settings";
 
 export const runtime = "nodejs";
@@ -86,6 +88,19 @@ async function handleCron(request: Request) {
     }
   }
 
+  let searchEngines: { ok: boolean; submitted?: number; error?: string } = { ok: false };
+  if (result.post.slug) {
+    try {
+      searchEngines = await submitIndexNow([
+        `${SITE_URL}/blog/${result.post.slug}`,
+        `${SITE_URL}/blog`,
+        `${SITE_URL}/feed.xml`,
+      ]);
+    } catch (err) {
+      searchEngines = { ok: false, error: err instanceof Error ? err.message : "Index update failed" };
+    }
+  }
+
   return NextResponse.json({
     success: true,
     post: {
@@ -94,5 +109,6 @@ async function handleCron(request: Request) {
       slug: result.post.slug,
     },
     telegramBroadcast: telegramResult,
+    searchEngines,
   });
 }

@@ -1,12 +1,16 @@
 import { Suspense } from "react";
+import type { Metadata } from "next";
 import { redirect } from "next/navigation";
-
-export const dynamic = "force-dynamic";
 import { DashboardShell } from "@/components/layout/dashboard-shell";
 import { CompleteProfilePrompt } from "@/components/auth/complete-profile-prompt";
 import { DashboardProfileProvider } from "@/lib/dashboard/dashboard-profile-context";
 import { DashboardRoutePrefetch } from "@/components/dashboard/dashboard-route-prefetch";
 import { getAuthUser, getProfile } from "@/lib/supabase/session";
+
+export const dynamic = "force-dynamic";
+export const metadata: Metadata = {
+  robots: { index: false, follow: false },
+};
 
 export default async function DashboardLayout({ children }: { children: React.ReactNode }) {
   const user = await getAuthUser();
