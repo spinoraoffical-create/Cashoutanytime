@@ -25,6 +25,7 @@ import {
   htmlToPlainText,
   promoEmailFooterPlain,
   promoEmailHeaders,
+  promoUnsubscribeUrl,
   PROMO_REPLY_TO,
 } from "@/lib/email/deliverability";
 import { FROM, getResend } from "@/lib/email/resend";
@@ -326,7 +327,7 @@ export async function sendNewsletterTestAction(id: string): Promise<AdminActionR
     subject: message.subject,
     html: message.html,
     text: message.text,
-    headers: promoEmailHeaders(),
+    headers: promoEmailHeaders(promoUnsubscribeUrl(auth.staff.userId)),
     tags: [{ name: "category", value: "promo-test" }],
   });
   if (error) return { ok: false, error: error.message };
@@ -377,7 +378,7 @@ export async function processCampaignBatch(campaignId: string, limit = BATCH_SIZ
 
   const { data: pending } = await admin
     .from("newsletter_campaign_recipients")
-    .select("id, email")
+    .select("id, email, user_id")
     .eq("campaign_id", campaignId)
     .eq("status", "pending")
     .limit(limit);
@@ -403,7 +404,7 @@ export async function processCampaignBatch(campaignId: string, limit = BATCH_SIZ
       subject,
       html,
       text,
-      headers: promoEmailHeaders(),
+      headers: promoEmailHeaders(promoUnsubscribeUrl(recipient.user_id)),
       tags: [{ name: "category", value: "promo" }],
     });
     if (error) {

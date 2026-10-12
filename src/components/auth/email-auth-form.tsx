@@ -131,7 +131,6 @@ export function EmailAuthForm({ mode, redirect = "/", referralCodeFromUrl, agent
   const [referralCode, setReferralCode] = useState(referralCodeFromUrl || "");
   const [acceptedTerms, setAcceptedTerms] = useState(false);
   const [acceptedOffers, setAcceptedOffers] = useState(false);
-  const [smsLoginCodes, setSmsLoginCodes] = useState(false);
   const [loading, setLoading] = useState(false);
   const [awaitingConfirmation, setAwaitingConfirmation] = useState(false);
   const [pendingEmail, setPendingEmail] = useState("");
@@ -249,7 +248,6 @@ export function EmailAuthForm({ mode, redirect = "/", referralCodeFromUrl, agent
           referral_code: referralCode.trim() || referralCodeFromUrl || undefined,
           agent_code: agentCode || undefined,
           offers_consent: true,
-          sms_login_codes: smsLoginCodes,
           auth_method: "email",
         },
       },
@@ -295,7 +293,6 @@ export function EmailAuthForm({ mode, redirect = "/", referralCodeFromUrl, agent
         dateOfBirth,
         agentCode,
         offersConsent: true,
-        smsLoginCodes,
       });
       return;
     }
@@ -308,7 +305,6 @@ export function EmailAuthForm({ mode, redirect = "/", referralCodeFromUrl, agent
       dateOfBirth,
       agentCode,
       offersConsent: true,
-      smsLoginCodes,
     });
 
     // Browser session fallback if server-side save failed
@@ -465,19 +461,10 @@ export function EmailAuthForm({ mode, redirect = "/", referralCodeFromUrl, agent
             <input
               type="checkbox"
               className="mt-1"
-              checked={smsLoginCodes}
-              onChange={(e) => setSmsLoginCodes(e.target.checked)}
-            />
-            <span>Send a one-time SMS code when I sign in. This is not marketing consent.</span>
-          </label>
-          <label className="flex items-start gap-2">
-            <input
-              type="checkbox"
-              className="mt-1"
               checked={acceptedOffers}
               onChange={(e) => setAcceptedOffers(e.target.checked)}
             />
-            <span>I agree to receive bonus offers and promotions by email and SMS. I can unsubscribe or reply STOP later.</span>
+            <span>Email me bonus offers and account notices. I can unsubscribe any time.</span>
           </label>
         </div>
       )}

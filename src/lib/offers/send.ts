@@ -5,6 +5,7 @@ import { getAgentScope } from "@/lib/agents/scope";
 import { SITE_URL } from "@/lib/constants";
 import { getStaffContext } from "@/lib/data/admin";
 import { FROM, getResend } from "@/lib/email/resend";
+import { promoEmailHeaders, promoUnsubscribeUrl, PROMO_REPLY_TO } from "@/lib/email/deliverability";
 import {
   emailRecipients,
   formatOfferEmail,
@@ -99,7 +100,29 @@ function escapeHtml(value: string) {
   return value
     .replace(/&/g, "&amp;")
     .replace(/</g, "&lt;")
-    .replace(/>/g, "&gt;");
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;");
+}
+
+function offerHtml(input: { name: string; body: string; unsubscribeUrl: string }) {
+  const name = escapeHtml(input.name.trim() || "there");
+  const paragraphs = input.body
+    .trim()
+    .split(/\n+/)
+    .map(
+      (line) =>
+        `<p style="margin:0 0 12px;font-size:16px;line-height:1.5;color:#222222;">${escapeHtml(line)}</p>`
+    )
+    .join("");
+  const unsubscribe = escapeHtml(input.unsubscribeUrl);
+  return `<!DOCTYPE html>
+<html lang="en">
+  <body style="margin:0;padding:24px;background:#ffffff;font-family:Arial,Helvetica,sans-serif;">
+    <p style="margin:0 0 12px;font-size:16px;line-height:1.5;color:#222222;">Hi ${name},</p>
+    ${paragraphs}
+    <p style="margin:24px 0 0;font-size:13px;line-height:1.5;color:#666666;">Sweepstakes Hub<br><a href="${unsubscribe}">Unsubscribe</a></p>
+  </body>
+</html>`;
 }
 
 async function sendSms(to: string, body: string) {
@@ -171,16 +194,14 @@ export async function sendScopedOffer(input: { subject: string; emailBody: strin
     if (claim.error) continue;
     const unsubscribeUrl = `${SITE_URL}/unsubscribe/${player.id}/${unsubscribeToken(player.id, secret)}`;
     const text = formatOfferEmail({ name: player.name, body: emailBody, unsubscribeUrl });
-    const html = text
-      .split("\n")
-      .map((line) => `<p>${escapeHtml(line) || "&nbsp;"}</p>`)
-      .join("");
     const { error } = await resend.emails.send({
       from: FROM,
       to: player.email || "",
+      replyTo: PROMO_REPLY_TO,
       subject,
       text,
-      html,
+      html: offerHtml({ name: player.name, body: emailBody, unsubscribeUrl }),
+      headers: promoEmailHeaders(promoUnsubscribeUrl(player.id)),
     });
     if (error) {
       await db.from("offer_deliveries").delete().eq("user_id", player.id).eq("channel", "email").eq("sent_on", day);

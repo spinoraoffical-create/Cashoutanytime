@@ -128,7 +128,8 @@ assert.equal(claimOnce(new Set(["player-1:email:2026-10-08"]), "player-1", "emai
 const form = readFileSync(new URL("../src/components/auth/email-auth-form.tsx", import.meta.url), "utf8");
 const auth = readFileSync(new URL("../src/lib/actions/auth.ts", import.meta.url), "utf8");
 const signupPage = readFileSync(new URL("../src/app/(auth)/r/[code]/page.tsx", import.meta.url), "utf8");
-assert.match(form, /I agree to receive bonus offers and promotions by email and SMS\. I can unsubscribe or reply STOP later\./);
+assert.match(form, /Email me bonus offers and account notices\. I can unsubscribe any time\./);
+assert.equal(form.includes("one-time SMS"), false);
 assert.match(form, /disabled=\{mode === "register" \? !signupReady\(acceptedTerms, acceptedOffers\) \|\| loading : loading\}/);
 assert.match(form, /Sign Up/);
 assert.equal(form.includes("sendOffer"), false);
@@ -136,12 +137,13 @@ assert.equal(form.includes("getResend"), false);
 assert.equal(auth.includes("sendOffer"), false);
 assert.equal(auth.includes("getResend"), false);
 assert.match(auth, /email_promotions: true/);
-assert.match(auth, /sms_marketing: true/);
+assert.match(auth, /sms_marketing: false/);
+assert.equal(auth.includes("sms_login_codes"), false);
 assert.match(auth, /offersConsent !== true/);
 const constants = readFileSync(new URL("../src/lib/constants.ts", import.meta.url), "utf8");
 assert.match(constants, /export const SITE_NAME = "Sweepstakes Hub"/);
 assert.match(signupPage, /agentCode/);
-assert.match(signupPage, /EmailAuthForm/);
+assert.match(signupPage, /\/register\?agent=/);
 
 const prefs = readFileSync(new URL("../src/lib/actions/account-prefs.ts", import.meta.url), "utf8");
 assert.equal(prefs.includes("email_promotions: true"), false);

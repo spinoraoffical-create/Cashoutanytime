@@ -521,10 +521,9 @@ export async function finalizeRegistrationAfterSignUp(input: {
   dateOfBirth?: string;
   agentCode?: string | null;
   offersConsent?: boolean;
-  smsLoginCodes?: boolean;
 }): Promise<{ ok: boolean; error?: string }> {
   if (input.offersConsent !== true) {
-    return { ok: false, error: "Agree to bonus offers by email and SMS before creating an account." };
+    return { ok: false, error: "Agree to email notices before creating an account." };
   }
   const e164 = parseValidInternationalPhone(input.phone);
   if (!e164) return { ok: false, error: INVALID_PHONE_MESSAGE };
@@ -558,8 +557,7 @@ export async function finalizeRegistrationAfterSignUp(input: {
     {
       user_id: input.userId,
       email_promotions: true,
-      sms_marketing: true,
-      sms_login_codes: input.smsLoginCodes === true,
+      sms_marketing: false,
     },
     { onConflict: "user_id" }
   );
@@ -569,7 +567,7 @@ export async function finalizeRegistrationAfterSignUp(input: {
       { onConflict: "user_id" }
     );
     if (emailOnly.error) return { ok: false, error: "Account created but offer preferences were not saved." };
-    return { ok: false, error: "Apply supabase/migrations/20261008000170_signup_offers.sql before signup can save SMS consent." };
+    return { ok: false, error: "Apply supabase/migrations/20261008000170_signup_offers.sql before signup can save email notices." };
   }
 
   const { data: authUser } = await admin.auth.admin.getUserById(input.userId);
@@ -582,7 +580,6 @@ export async function finalizeRegistrationAfterSignUp(input: {
       date_of_birth: input.dateOfBirth ?? null,
       agent_code: input.agentCode?.trim() || null,
       offers_consent: true,
-      sms_login_codes: input.smsLoginCodes === true,
     },
   });
 
