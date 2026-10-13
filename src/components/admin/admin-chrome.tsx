@@ -44,12 +44,14 @@ export function AdminChrome({
         Skip to content
       </a>
 
-      <aside className="glass sticky top-0 hidden h-dvh w-64 shrink-0 flex-col border-y-0 border-l-0 lg:flex">
+      <aside className="glass sticky top-0 hidden h-dvh w-72 shrink-0 flex-col border-y-0 border-l-0 lg:flex">
         <div className="flex items-center gap-2 border-b border-border px-5 py-4">
           <Logo size="sm" href="/admin" />
-          <Badge className="bg-ws-green/15 text-ws-green-deep uppercase dark:text-ws-green">
-            Admin
-          </Badge>
+          <div className="min-w-0">
+            <Badge className="bg-ws-green/15 text-ws-green-deep uppercase dark:text-ws-green">
+              Control Center
+            </Badge>
+          </div>
         </div>
         <AdminSidebar items={items} badges={badges} />
       </aside>

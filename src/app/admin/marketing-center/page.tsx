@@ -39,6 +39,20 @@ export default async function MarketingCenterPage() {
           body: "Send a notice inside the site to a VIP group.",
         }
       : null,
+    can(ctx, "promotions.manage")
+      ? {
+          href: "/admin/promotions",
+          title: "Promotions",
+          body: "Turn site promotions on or off and edit the copy players see.",
+        }
+      : null,
+    ctx.isSuperAdmin || ctx.roles.includes("store_creator") || ctx.roles.includes("sub_creator")
+      ? {
+          href: "/admin/offers",
+          title: "One-time offers",
+          body: "Send one email and one SMS to players who agreed. This does not send bulk WhatsApp.",
+        }
+      : null,
   ].filter((tool): tool is { href: string; title: string; body: string } => Boolean(tool));
 
   if (tools.length === 0) redirect("/admin");
@@ -47,7 +61,7 @@ export default async function MarketingCenterPage() {
     <div className="mx-auto max-w-6xl">
       <AdminPageHeader
         title="Marketing"
-        description="Send an email campaign, text one player, post to Telegram, or send an in-app notice."
+        description="Email, one player text, Telegram, in-app notices, and promotions. Text one player does not send bulk SMS or WhatsApp."
       />
       <AdminToolGrid tools={tools} />
     </div>

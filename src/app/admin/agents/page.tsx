@@ -6,7 +6,7 @@ import { AdminToolGrid } from "@/components/admin/admin-tool-grid";
 import { getAgentScope } from "@/lib/agents/scope";
 import { can, requireStaff } from "@/lib/data/admin";
 
-export const metadata: Metadata = { title: "Agents" };
+export const metadata: Metadata = { title: "Stores and agents" };
 
 function scopeLine(scope: NonNullable<Awaited<ReturnType<typeof getAgentScope>>>) {
   if (scope.level === "platform") {
@@ -51,7 +51,7 @@ export default async function AgentsPage() {
   return (
     <div className="mx-auto max-w-6xl">
       <AdminPageHeader
-        title="Agents"
+        title="Stores and agents"
         description={scope ? scopeLine(scope) : "Store creators and the sub creators under them."}
       />
       <AdminToolGrid tools={tools} />

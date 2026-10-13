@@ -144,14 +144,20 @@ export default async function AdminUserDetailPage({
         title={profileDisplayName(p)}
         description={`${profileHandle(p)}${email ? ` · ${email}` : ""} · Parent ${parentName} · joined ${format(new Date(p.created_at!), "MMMM d, yyyy")}`}
         action={
-          profileIsBanned(p) ? (
-            <Badge className="bg-ws-danger/15 text-ws-danger">
-              <Ban className="size-3" aria-hidden />
-              Banned
+          <div className="flex flex-wrap gap-2">
+            {profileIsBanned(p) ? (
+              <Badge className="bg-ws-danger/15 text-ws-danger">
+                <Ban className="size-3" aria-hidden />
+                Banned
+              </Badge>
+            ) : (
+              <Badge className="bg-ws-emerald/15 text-ws-emerald">Not banned</Badge>
+            )}
+            {p.is_suspended ? <Badge className="bg-ws-gold/15 text-ws-gold-deep dark:text-ws-gold">Suspended</Badge> : null}
+            <Badge variant="outline">
+              Identity {(p as ProfileRow & { kyc_status?: string | null }).kyc_status || "not on file"}
             </Badge>
-          ) : (
-            <Badge className="bg-ws-emerald/15 text-ws-emerald">Active</Badge>
-          )
+          </div>
         }
       />
 

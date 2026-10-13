@@ -6,7 +6,7 @@ import { AdminToolGrid } from "@/components/admin/admin-tool-grid";
 import { getAgentScope } from "@/lib/agents/scope";
 import { can, requireStaff } from "@/lib/data/admin";
 
-export const metadata: Metadata = { title: "Game accounts" };
+export const metadata: Metadata = { title: "Games" };
 
 export default async function GameAccountsPage() {
   const ctx = await requireStaff();
@@ -55,7 +55,7 @@ export default async function GameAccountsPage() {
 
   return (
     <div className="mx-auto max-w-6xl">
-      <AdminPageHeader title="Game accounts" description={who} />
+      <AdminPageHeader title="Games" description={who} />
       <AdminToolGrid tools={tools} />
     </div>
   );

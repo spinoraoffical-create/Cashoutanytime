@@ -52,6 +52,11 @@ function since(days: number) {
   return new Date(Date.now() - days * 86_400_000).toISOString();
 }
 
+function utcDayStart() {
+  const now = new Date();
+  return new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate())).toISOString();
+}
+
 export default async function AdminOverviewPage() {
   const scope = await getAgentScope();
   if (scope && (scope.level === "store" || scope.level === "sub")) {
@@ -110,6 +115,38 @@ export default async function AdminOverviewPage() {
     money ? { href: "/admin/cashout-holds", label: "Held cash outs", count: await statusCount("cashout_holds", "held") } : null,
     ctx.isSuperAdmin ? { href: "/admin/failed-loads", label: "Failed webhooks", count: await statusCount("webhook_events", "failed") } : null,
   ].filter((item): item is { href: string; label: string; count: number | null } => Boolean(item));
+
+  const dayStart = utcDayStart();
+  const [depositsToday, cashoutsToday, seenToday, storesOnFile, subsOnFile, linkedPlayers] = await Promise.all([
+    money
+      ? headCount(
+          db.from("deposit_requests").select("id", { count: "exact", head: true }).eq("status", "completed").gte("created_at", dayStart)
+        )
+      : Promise.resolve(null),
+    money
+      ? headCount(
+          db
+            .from("wallet_transactions")
+            .select("id", { count: "exact", head: true })
+            .eq("wallet_type", "cashout")
+            .eq("transaction_type", "debit")
+            .gte("created_at", dayStart)
+        )
+      : Promise.resolve(null),
+    players
+      ? headCount(db.from("profiles").select("id", { count: "exact", head: true }).gte("last_seen_at", dayStart))
+      : Promise.resolve(null),
+    players
+      ? headCount(db.from("agent_accounts").select("user_id", { count: "exact", head: true }).eq("tier", "store_creator").eq("active", true))
+      : Promise.resolve(null),
+    players
+      ? headCount(db.from("agent_accounts").select("user_id", { count: "exact", head: true }).eq("tier", "sub_creator").eq("active", true))
+      : Promise.resolve(null),
+    players
+      ? headCount(db.from("profiles").select("id", { count: "exact", head: true }).not("parent_agent_id", "is", null))
+      : Promise.resolve(null),
+  ]);
+  const failedWebhooks = ctx.isSuperAdmin ? await statusCount("webhook_events", "failed") : null;
 
   const feed: FeedItem[] = [];
   if (players) {
@@ -171,10 +208,63 @@ export default async function AdminOverviewPage() {
   return (
     <div className="mx-auto max-w-6xl">
       <AdminPageHeader
-        title="Overview"
-        description="Open a count that needs a decision, or jump to the tool that handles it."
+        title="Dashboard"
+        description="Counts below come from the live database. A missing number says Not available."
       />
 
+      <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+        {money ? (
+          <MetricLink href="/admin/deposits" label="Deposits completed today (UTC)" count={depositsToday} />
+        ) : null}
+        {money ? (
+          <MetricLink href="/admin/payouts" label="Cash-out debits today (UTC)" count={cashoutsToday} />
+        ) : null}
+        {players ? (
+          <MetricLink href="/admin/users" label="Players seen today (UTC)" count={seenToday} />
+        ) : null}
+        {money ? (
+          <MetricLink
+            href="/admin/cashout-holds"
+            label="Held cash outs"
+            count={attention.find((item) => item.label === "Held cash outs")?.count ?? null}
+          />
+        ) : null}
+        {money ? (
+          <MetricLink
+            href="/admin/failed-loads"
+            label="Failed game loads on file"
+            count={attention.find((item) => item.label === "Failed game loads")?.count ?? null}
+          />
+        ) : null}
+      </div>
+
+      {players ? (
+        <GlassCard className="mt-4 p-4">
+          <h2 className="text-sm font-semibold">Store performance</h2>
+          <p className="mt-1 text-xs text-muted-foreground">Counts on file. This is not revenue.</p>
+          <div className="mt-3 grid gap-3 sm:grid-cols-3">
+            <CountLine label="Active stores" count={storesOnFile} />
+            <CountLine label="Active sub-creators" count={subsOnFile} />
+            <CountLine label="Players linked to a store" count={linkedPlayers} />
+          </div>
+        </GlassCard>
+      ) : null}
+
+      {ctx.isSuperAdmin ? (
+        <GlassCard className="mt-4 p-4">
+          <h2 className="text-sm font-semibold">System health</h2>
+          <ul className="mt-3 space-y-2 text-sm">
+            <li>Email sender: {process.env.RESEND_API_KEY?.trim() ? "Configured" : "Not configured"}</li>
+            <li>Scheduled job secret: {process.env.CRON_SECRET?.trim() ? "Configured" : "Not configured"}</li>
+            <li>Paydora webhook secret: {process.env.PAYDORA_WEBHOOK_SECRET?.trim() ? "Configured" : "Not configured"}</li>
+            <li>
+              Failed webhooks: {failedWebhooks == null ? "Not available" : failedWebhooks.toLocaleString()}
+            </li>
+          </ul>
+        </GlassCard>
+      ) : null}
+
+      <h2 className="mb-3 mt-6 text-sm font-semibold">Needs a decision</h2>
       <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
         {attention.map((item) => (
           <Link key={item.href + item.label} href={item.href}>
@@ -193,7 +283,7 @@ export default async function AdminOverviewPage() {
 
       <GlassCard className="mt-4 overflow-hidden">
         <div className="grid grid-cols-3 border-b border-border text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-          <p className="px-4 py-3">Today</p>
+          <p className="px-4 py-3">24 hours</p>
           <p className="px-4 py-3">7 days</p>
           <p className="px-4 py-3">30 days</p>
         </div>
@@ -236,6 +326,26 @@ export default async function AdminOverviewPage() {
         </ul>
       </GlassCard>
     </div>
+  );
+}
+
+function CountLine({ label, count }: { label: string; count: number | null }) {
+  return (
+    <div>
+      <p className="text-xs text-muted-foreground">{label}</p>
+      <p className="mt-1 text-2xl font-black tabular-nums">{count == null ? "Not available" : count.toLocaleString()}</p>
+    </div>
+  );
+}
+
+function MetricLink({ href, label, count }: { href: string; label: string; count: number | null }) {
+  return (
+    <Link href={href}>
+      <GlassCard className="h-full p-4 transition-colors hover:border-ws-green/40">
+        <p className="text-sm text-muted-foreground">{label}</p>
+        <p className="mt-1 text-3xl font-black tabular-nums">{count == null ? "Not available" : count.toLocaleString()}</p>
+      </GlassCard>
+    </Link>
   );
 }
 
