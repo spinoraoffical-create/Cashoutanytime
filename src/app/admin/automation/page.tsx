@@ -62,7 +62,7 @@ export default async function AutomationPage() {
         ))}
       </div>
       <GlassCard className="mb-4 p-4">
-        <h2 className="text-sm font-semibold">Today's operational snapshot</h2>
+        <h2 className="text-sm font-semibold">Operational snapshot for today</h2>
         <p className="mt-1 text-xs text-muted-foreground">Counts from saved rows. This is not emailed.</p>
         <dl className="mt-3 grid gap-3 sm:grid-cols-2">
           {health.summary.map((row) => (
