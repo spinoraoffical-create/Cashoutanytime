@@ -94,6 +94,19 @@ assert.equal(rejectedLate.refunded, false);
 assert.equal(submitted.balance(userId), 15);
 assert.equal(submitted.row(submittedRow.idempotencyKey)?.status, "submitted");
 
+const broke = createPayoutLedger({ [userId]: 4 });
+await assert.rejects(() => broke.reserve({ ...same, amount: 10 }), /insufficient funds/);
+assert.equal(broke.balance(userId), 4);
+
+const afterFail = createPayoutLedger({ [userId]: 50 });
+const failedOnce = await afterFail.reserve({ ...same, amount: 20 });
+await afterFail.applyProviderResult(userId, failedOnce.idempotencyKey, "rejected");
+assert.equal(afterFail.balance(userId), 50);
+const again = await afterFail.reserve({ ...same, amount: 20 });
+assert.notEqual(again.idempotencyKey, failedOnce.idempotencyKey);
+assert.equal(again.debited, true);
+assert.equal(afterFail.balance(userId), 30);
+
 const otherDest = await paid.reserve({ ...same, amount: 10, destinationKey: "dest-b" });
 assert.notEqual(otherDest.idempotencyKey, afterPaid.idempotencyKey);
 
