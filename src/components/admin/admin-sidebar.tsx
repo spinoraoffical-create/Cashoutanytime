@@ -3,7 +3,7 @@
 import * as React from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { ArrowLeft, ChevronDown, LogOut } from "lucide-react";
+import { ArrowLeft, ChevronDown, LogOut, Search } from "lucide-react";
 
 import { AdminIcon } from "@/components/admin/admin-icon";
 import { logoutAction } from "@/lib/actions/auth";
@@ -41,45 +41,82 @@ export function AdminSidebar({
   badges?: Record<string, number>;
 }) {
   const pathname = usePathname();
+  const [query, setQuery] = React.useState("");
+  const [openLabel, setOpenLabel] = React.useState<string | null>(null);
+  const needle = query.trim().toLowerCase();
+  const visible = items
+    .map((item) => {
+      const kids = (item.children ?? []).filter((child) => child.label.toLowerCase().includes(needle) || child.href.toLowerCase().includes(needle));
+      const parentHit = item.label.toLowerCase().includes(needle);
+      if (!needle) return item;
+      if (parentHit) return item;
+      if (kids.length === 0) return null;
+      return { ...item, children: kids };
+    })
+    .filter((item): item is AdminNavItem => Boolean(item));
 
   return (
     <div className="flex h-full flex-col">
+      <div className="px-3 pt-3">
+        <label className="flex items-center gap-2 rounded-xl border border-white/10 bg-[#0b1224] px-3 text-sm text-[#9fb0d0]">
+          <Search className="size-4 shrink-0" aria-hidden />
+          <input
+            value={query}
+            onChange={(event) => setQuery(event.target.value)}
+            placeholder="Search tools"
+            aria-label="Search admin tools"
+            className="h-10 w-full bg-transparent text-white outline-none placeholder:text-[#7f90b3]"
+          />
+        </label>
+      </div>
       <nav aria-label="Admin" className="flex-1 space-y-1 overflow-y-auto px-3 py-4">
-        {items.map((item) => {
+        {visible.length === 0 ? (
+          <p className="px-3 text-sm text-[#9fb0d0]">No tools match that search.</p>
+        ) : null}
+        {visible.map((item) => {
           const active = sectionActive(pathname, item);
           const kids = item.children ?? [];
+          const expanded = Boolean(needle) || openLabel === item.label || (openLabel === null && active);
           const badge =
             badges[item.href] ||
             kids.reduce((sum, child) => sum + (badges[child.href] ?? 0), 0);
           return (
             <div key={item.label}>
-              <Link
-                href={item.href}
-                prefetch
-                onClick={onNavigate}
-                aria-current={active ? "page" : undefined}
-                className={cn(
-                  "flex min-h-11 items-center gap-3 rounded-xl px-3 text-sm font-semibold transition-colors",
-                  active
-                    ? "bg-ws-green/15 text-ws-green-deep dark:text-ws-green"
-                    : "text-muted-foreground hover:bg-foreground/5 hover:text-foreground"
-                )}
-              >
-                <AdminIcon name={item.icon} className="size-4.5 shrink-0" />
-                <span className="flex-1">{item.label}</span>
-                {badge > 0 ? (
-                  <span className="flex min-w-5 items-center justify-center rounded-full bg-[#f3264f] px-1.5 text-[11px] font-bold leading-5 text-white">
-                    {badge > 99 ? "99+" : badge}
-                  </span>
-                ) : null}
+              <div className="flex items-center gap-1">
+                <Link
+                  href={item.href}
+                  prefetch
+                  onClick={onNavigate}
+                  aria-current={active ? "page" : undefined}
+                  title={item.label}
+                  className={cn(
+                    "flex min-h-11 flex-1 items-center gap-3 rounded-xl px-3 text-sm font-semibold transition-colors",
+                    active
+                      ? "bg-gradient-to-r from-[#6d28d9] to-[#2563eb] text-white shadow-[0_0_18px_rgba(109,40,217,0.45)]"
+                      : "text-[#c5d0e6] hover:bg-white/5 hover:text-white"
+                  )}
+                >
+                  <AdminIcon name={item.icon} className="size-4.5 shrink-0" />
+                  <span className="flex-1">{item.label}</span>
+                  {badge > 0 ? (
+                    <span className="flex min-w-5 items-center justify-center rounded-full bg-cyan-400/20 px-1.5 text-[11px] font-bold leading-5 text-cyan-100">
+                      {badge > 99 ? "99+" : badge}
+                    </span>
+                  ) : null}
+                </Link>
                 {kids.length > 0 ? (
-                  <ChevronDown
-                    className={cn("size-4 shrink-0 transition-transform", active ? "rotate-180" : "")}
-                    aria-hidden
-                  />
+                  <button
+                    type="button"
+                    aria-label={expanded ? `Collapse ${item.label}` : `Expand ${item.label}`}
+                    aria-expanded={expanded}
+                    onClick={() => setOpenLabel(expanded && openLabel === item.label ? "" : item.label)}
+                    className="flex size-9 items-center justify-center rounded-lg text-[#9fb0d0] hover:bg-white/5 hover:text-white"
+                  >
+                    <ChevronDown className={cn("size-4 transition-transform", expanded ? "rotate-180" : "")} aria-hidden />
+                  </button>
                 ) : null}
-              </Link>
-              {active && kids.length > 0 ? (
+              </div>
+              {expanded && kids.length > 0 ? (
                 <ul className="mb-2 mt-1 space-y-0.5 pl-4">
                   {kids.map((child) => {
                     const childActive = isCurrent(pathname, child.href);
@@ -90,16 +127,15 @@ export function AdminSidebar({
                           prefetch
                           onClick={onNavigate}
                           aria-current={childActive ? "page" : undefined}
+                          title={child.label}
                           className={cn(
                             "flex min-h-9 items-center gap-2 rounded-lg px-3 text-sm",
-                            childActive
-                              ? "font-semibold text-foreground"
-                              : "text-muted-foreground hover:text-foreground"
+                            childActive ? "font-semibold text-cyan-200" : "text-[#9fb0d0] hover:text-white"
                           )}
                         >
                           <span className="flex-1">{child.label}</span>
                           {badges[child.href] ? (
-                            <span className="text-xs font-bold text-[#f3264f]">{badges[child.href]}</span>
+                            <span className="text-xs font-bold text-cyan-200">{badges[child.href]}</span>
                           ) : null}
                         </Link>
                       </li>

@@ -39,8 +39,8 @@ export function AdminSectionTabs({
             className={cn(
               "inline-flex h-9 shrink-0 items-center gap-2 rounded-full border px-3 text-sm font-semibold",
               active
-                ? "border-transparent bg-foreground text-background"
-                : "border-border text-muted-foreground hover:text-foreground"
+                ? "border-transparent bg-gradient-to-r from-[#6d28d9] to-[#2563eb] text-white"
+                : "border-white/10 text-[#9fb0d0] hover:text-white"
             )}
           >
             {tab.label}

@@ -35,7 +35,7 @@ export function AdminTopbar({
   const [open, setOpen] = React.useState(false);
 
   return (
-    <header className="glass sticky top-0 z-10 border-x-0 border-t-0">
+    <header className="sticky top-0 z-10 border-b border-white/10 bg-[#0b1022]/95 backdrop-blur">
       <div className="flex h-16 items-center gap-3 px-4 sm:px-6">
         <Sheet open={open} onOpenChange={setOpen}>
           <SheetTrigger asChild className="lg:hidden">
@@ -43,15 +43,15 @@ export function AdminTopbar({
               <Menu className="size-5" aria-hidden />
             </Button>
           </SheetTrigger>
-          <SheetContent
+            <SheetContent
             side="left"
-            className="glass-strong w-72 border-r border-border p-0"
+            className="w-72 border-r border-white/10 bg-[#0b1022] p-0 text-[#e8eefc]"
           >
-            <SheetHeader className="border-b border-border px-4 py-4">
+            <SheetHeader className="border-b border-white/10 px-4 py-4">
               <SheetTitle>
                 <span className="flex items-center gap-2">
                   <Logo size="sm" href={null} />
-                  <Badge className="bg-ws-green/15 text-ws-green-deep uppercase dark:text-ws-green">
+                  <Badge className="border border-cyan-300/30 bg-cyan-400/10 text-cyan-100 uppercase">
                     Admin
                   </Badge>
                 </span>
@@ -63,7 +63,7 @@ export function AdminTopbar({
 
         <div className="flex items-center gap-2 lg:hidden">
           <Logo size="sm" withWordmark={false} />
-          <Badge className="bg-ws-green/15 text-ws-green-deep uppercase dark:text-ws-green">Admin</Badge>
+          <Badge className="border border-cyan-300/30 bg-cyan-400/10 text-cyan-100 uppercase">Admin</Badge>
         </div>
 
         <div className="ml-auto flex items-center gap-3">

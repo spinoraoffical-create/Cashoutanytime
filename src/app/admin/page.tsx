@@ -1,10 +1,17 @@
 import Link from "next/link";
 import { formatDistanceToNow } from "date-fns";
-import { ArrowRight } from "lucide-react";
 
 import { AdminPageHeader } from "@/components/admin/admin-page-header";
-import { GlassCard } from "@/components/shared/glass-card";
+import { AdminCountChart } from "@/components/admin/ui/admin-count-chart";
+import { AdminDataTable } from "@/components/admin/ui/admin-data-table";
+import { AdminEmptyState } from "@/components/admin/ui/admin-empty-state";
+import { AdminErrorState } from "@/components/admin/ui/admin-error-state";
+import { AdminQuickAction } from "@/components/admin/ui/admin-quick-action";
+import { AdminSectionCard } from "@/components/admin/ui/admin-section-card";
+import { AdminStatCard } from "@/components/admin/ui/admin-stat-card";
+import { AdminStatusBadge } from "@/components/admin/ui/admin-status-badge";
 import { adminDb } from "@/lib/actions/admin/core";
+import { loadAutomationHealth } from "@/lib/automation/health";
 import { profileDisplayName } from "@/lib/admin/spinora-profile";
 import { AgentHome } from "@/components/admin/agent-home";
 import { getAgentScope } from "@/lib/agents/scope";
@@ -196,6 +203,49 @@ export default async function AdminOverviewPage() {
   }
   feed.sort((a, b) => (a.at < b.at ? 1 : -1));
 
+  let recentTx: { id: string; amount: number | null; wallet_type: string | null; transaction_type: string | null; source: string | null; created_at: string | null }[] | null = null;
+  if (money) {
+    const { data, error } = await db
+      .from("wallet_transactions")
+      .select("id, amount, wallet_type, transaction_type, source, created_at")
+      .order("created_at", { ascending: false })
+      .limit(6);
+    recentTx = error ? null : (data ?? []);
+  }
+
+  let loadIssues: { id: string; game_name: string | null; status: string | null; amount: number | null; created_at: string | null }[] | null = null;
+  if (money) {
+    const { data, error } = await db
+      .from("game_load_requests")
+      .select("id, game_name, status, amount, created_at")
+      .eq("status", "failed")
+      .order("created_at", { ascending: false })
+      .limit(5);
+    loadIssues = error ? null : (data ?? []);
+  }
+
+  let kycRows: { id: string; user_name: string | null; status: string | null; created_at: string | null }[] | null = null;
+  if (kyc) {
+    const { data, error } = await db
+      .from("kyc_submissions")
+      .select("id, user_name, status, created_at")
+      .eq("status", "pending")
+      .order("created_at", { ascending: false })
+      .limit(5);
+    kycRows = error ? null : (data ?? []);
+  }
+
+  const operator = ctx.isSuperAdmin || ctx.roles.some((role) => role === "admin" || role === "manager");
+  let automation: { name: string; label: string }[] | null = null;
+  if (operator) {
+    try {
+      const health = await loadAutomationHealth();
+      automation = health.jobs.map((job) => ({ name: job.name, label: job.label }));
+    } catch {
+      automation = null;
+    }
+  }
+
   const actions = [
     money ? { href: "/admin/deposits?status=pending", label: "Review deposits" } : null,
     money ? { href: "/admin/payouts", label: "Process cash outs" } : null,
@@ -205,161 +255,214 @@ export default async function AdminOverviewPage() {
     analytics ? { href: "/admin/analytics", label: "View reports" } : null,
   ].filter((item): item is { href: string; label: string } => Boolean(item));
 
+  const held = attention.find((item) => item.label === "Held cash outs")?.count ?? null;
+  const failedLoads = attention.find((item) => item.label === "Failed game loads")?.count ?? null;
+
   return (
-    <div className="mx-auto max-w-6xl">
+    <div className="mx-auto max-w-6xl space-y-4">
       <AdminPageHeader
         title="Dashboard"
-        description="Counts below come from the live database. A missing number says Not available."
+        description="These numbers come from the live database. If a count cannot be loaded, it says Unavailable."
       />
 
       <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
         {money ? (
-          <MetricLink href="/admin/deposits" label="Deposits completed today (UTC)" count={depositsToday} />
+          <AdminStatCard href="/admin/deposits" label="Deposits completed today" value={showCount(depositsToday)} hint="Completed deposit records since 00:00 UTC. This is a count, not revenue." />
         ) : null}
         {money ? (
-          <MetricLink href="/admin/payouts" label="Cash-out debits today (UTC)" count={cashoutsToday} />
+          <AdminStatCard href="/admin/payouts" label="Cash-out debits today" value={showCount(cashoutsToday)} hint="Cash-out wallet debit rows since 00:00 UTC." />
         ) : null}
         {players ? (
-          <MetricLink href="/admin/users" label="Players seen today (UTC)" count={seenToday} />
+          <AdminStatCard href="/admin/users" label="Players seen today" value={showCount(seenToday)} hint="Profiles with a last-seen time since 00:00 UTC." />
         ) : null}
         {money ? (
-          <MetricLink
-            href="/admin/cashout-holds"
-            label="Held cash outs"
-            count={attention.find((item) => item.label === "Held cash outs")?.count ?? null}
-          />
+          <AdminStatCard href="/admin/cashout-holds" label="Held cash outs" value={showCount(held)} hint="Cash outs waiting for a person to review." />
+        ) : null}
+        {kyc ? (
+          <AdminStatCard href="/admin/kyc" label="Identity checks waiting" value={showCount(pendingKyc)} hint="Players who uploaded an ID and are still pending." />
         ) : null}
         {money ? (
-          <MetricLink
-            href="/admin/failed-loads"
-            label="Failed game loads on file"
-            count={attention.find((item) => item.label === "Failed game loads")?.count ?? null}
-          />
+          <AdminStatCard href="/admin/failed-loads" label="Failed game loads" value={showCount(failedLoads)} hint="Game loads marked failed. Open the list before retrying one." />
+        ) : null}
+      </div>
+
+      <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
+        {attention.map((item) => (
+          <AdminStatCard key={item.href + item.label} href={item.href} label={item.label} value={showCount(item.count)} hint="Open this queue to take the next action." />
+        ))}
+      </div>
+
+      {money || players ? (
+        <AdminSectionCard title="Activity counts" description="Completed deposit records and new player profiles. This chart is not revenue.">
+          <div className="grid gap-6 lg:grid-cols-2">
+            {money ? (
+              <AdminCountChart
+                title="Completed deposits"
+                caption="Count of deposit records marked completed."
+                points={[
+                  { label: "24 hours", value: todayDeposits },
+                  { label: "7 days", value: weekDeposits },
+                  { label: "30 days", value: monthDeposits },
+                ]}
+              />
+            ) : null}
+            {players ? (
+              <AdminCountChart
+                title="New players"
+                caption="Count of player profiles created in each window."
+                points={[
+                  { label: "24 hours", value: todayUsers },
+                  { label: "7 days", value: weekUsers },
+                  { label: "30 days", value: monthUsers },
+                ]}
+              />
+            ) : null}
+          </div>
+        </AdminSectionCard>
+      ) : null}
+
+      {actions.length > 0 ? (
+        <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
+          {actions.map((action) => (
+            <AdminQuickAction key={action.href} href={action.href} label={action.label} detail="Opens the existing tool. It does not move money by itself." />
+          ))}
+        </div>
+      ) : null}
+
+      <div className="grid gap-4 xl:grid-cols-2">
+        {money ? (
+          <AdminSectionCard title="Recent transactions" description="Latest wallet rows. Amounts are the stored row amounts.">
+            {recentTx == null ? (
+              <AdminErrorState title="Unavailable" body="The transaction list could not be loaded." />
+            ) : (
+              <AdminDataTable
+                columns={[
+                  { key: "when", label: "When" },
+                  { key: "amount", label: "Amount" },
+                  { key: "type", label: "Type" },
+                  { key: "source", label: "Source" },
+                ]}
+                rows={recentTx.map((row) => ({
+                  when: row.created_at ? formatDistanceToNow(new Date(row.created_at), { addSuffix: true }) : "Unavailable",
+                  amount: row.amount == null ? "Unavailable" : `$${Number(row.amount).toFixed(2)}`,
+                  type: <AdminStatusBadge status={row.transaction_type ?? "unknown"} />,
+                  source: row.source ?? row.wallet_type ?? "Unavailable",
+                }))}
+                emptyTitle="No transactions yet"
+                emptyBody="New wallet rows will show up here."
+              />
+            )}
+          </AdminSectionCard>
+        ) : null}
+
+        <AdminSectionCard title="Recent activity" description="Newest players, tickets, and deposits your role can see.">
+          {feed.length === 0 ? (
+            <AdminEmptyState title="No recent activity" body="Nothing new is waiting in the feeds you can open." />
+          ) : (
+            <ul className="divide-y divide-white/10">
+              {feed.slice(0, 8).map((item) => (
+                <li key={item.id} className="flex items-center justify-between gap-3 py-3">
+                  <Link href={item.href} className="min-w-0 flex-1">
+                    <p className="truncate text-sm font-semibold text-white">{item.title}</p>
+                    <p className="text-xs capitalize text-[#9fb0d0]">{item.meta}</p>
+                  </Link>
+                  <time dateTime={item.at} className="shrink-0 text-xs text-[#9fb0d0]">
+                    {formatDistanceToNow(new Date(item.at), { addSuffix: true })}
+                  </time>
+                </li>
+              ))}
+            </ul>
+          )}
+        </AdminSectionCard>
+      </div>
+
+      <div className="grid gap-4 xl:grid-cols-2">
+        {money ? (
+          <AdminSectionCard title="Game-load issues" description="The newest loads already marked failed.">
+            {loadIssues == null ? (
+              <AdminErrorState title="Unavailable" body="Failed game loads could not be loaded." />
+            ) : (
+              <AdminDataTable
+                columns={[
+                  { key: "game", label: "Game" },
+                  { key: "amount", label: "Amount" },
+                  { key: "status", label: "Status" },
+                ]}
+                rows={loadIssues.map((row) => ({
+                  game: row.game_name ?? "Unavailable",
+                  amount: row.amount == null ? "Unavailable" : Number(row.amount).toFixed(2),
+                  status: <AdminStatusBadge status={row.status ?? "failed"} />,
+                }))}
+                emptyTitle="No failed loads"
+                emptyBody="There are no failed game loads in the latest rows."
+              />
+            )}
+          </AdminSectionCard>
+        ) : null}
+
+        {kyc ? (
+          <AdminSectionCard title="Identity checks" description="Pending reviews. Photos stay on the identity page.">
+            {kycRows == null ? (
+              <AdminErrorState title="Unavailable" body="Identity checks could not be loaded." />
+            ) : (
+              <AdminDataTable
+                columns={[
+                  { key: "name", label: "Player" },
+                  { key: "status", label: "Status" },
+                ]}
+                rows={kycRows.map((row) => ({
+                  name: row.user_name ?? "Player",
+                  status: <AdminStatusBadge status={row.status ?? "pending"} />,
+                }))}
+                emptyTitle="No pending identity checks"
+                emptyBody="New ID uploads will show up here."
+              />
+            )}
+          </AdminSectionCard>
         ) : null}
       </div>
 
       {players ? (
-        <GlassCard className="mt-4 p-4">
-          <h2 className="text-sm font-semibold">Store performance</h2>
-          <p className="mt-1 text-xs text-muted-foreground">Counts on file. This is not revenue.</p>
-          <div className="mt-3 grid gap-3 sm:grid-cols-3">
-            <CountLine label="Active stores" count={storesOnFile} />
-            <CountLine label="Active sub-creators" count={subsOnFile} />
-            <CountLine label="Players linked to a store" count={linkedPlayers} />
+        <AdminSectionCard title="Store activity" description="Counts of stores and linked players. This is not revenue.">
+          <div className="grid gap-3 sm:grid-cols-3">
+            <AdminStatCard label="Active stores" value={showCount(storesOnFile)} />
+            <AdminStatCard label="Active sub-creators" value={showCount(subsOnFile)} />
+            <AdminStatCard label="Players linked to a store" value={showCount(linkedPlayers)} />
           </div>
-        </GlassCard>
+        </AdminSectionCard>
+      ) : null}
+
+      {operator ? (
+        <AdminSectionCard title="Automation health" description="Saved job status. This page does not start a job or send a payment.">
+          {automation == null ? (
+            <AdminErrorState title="Unavailable" body="Automation health could not be loaded." />
+          ) : (
+            <ul className="space-y-2">
+              {automation.map((job) => (
+                <li key={job.name} className="flex items-center justify-between gap-3 rounded-xl bg-[#0b1224] px-3 py-2">
+                  <span className="text-sm text-white">{job.name}</span>
+                  <AdminStatusBadge status={job.label} />
+                </li>
+              ))}
+            </ul>
+          )}
+        </AdminSectionCard>
       ) : null}
 
       {ctx.isSuperAdmin ? (
-        <GlassCard className="mt-4 p-4">
-          <h2 className="text-sm font-semibold">System health</h2>
-          <ul className="mt-3 space-y-2 text-sm">
+        <AdminSectionCard title="System health" description="Whether a key is present. The key itself is not shown.">
+          <ul className="space-y-2 text-sm text-[#d5def2]">
             <li>Email sender: {process.env.RESEND_API_KEY?.trim() ? "Configured" : "Not configured"}</li>
             <li>Scheduled job secret: {process.env.CRON_SECRET?.trim() ? "Configured" : "Not configured"}</li>
             <li>Paydora webhook secret: {process.env.PAYDORA_WEBHOOK_SECRET?.trim() ? "Configured" : "Not configured"}</li>
-            <li>
-              Failed webhooks: {failedWebhooks == null ? "Not available" : failedWebhooks.toLocaleString()}
-            </li>
+            <li>Failed webhooks: {showCount(failedWebhooks)}</li>
           </ul>
-        </GlassCard>
+        </AdminSectionCard>
       ) : null}
-
-      <h2 className="mb-3 mt-6 text-sm font-semibold">Needs a decision</h2>
-      <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
-        {attention.map((item) => (
-          <Link key={item.href + item.label} href={item.href}>
-            <GlassCard className="flex items-center justify-between p-4 transition-colors hover:border-ws-green/40">
-              <div>
-                <p className="text-sm text-muted-foreground">{item.label}</p>
-                <p className="mt-1 text-3xl font-black tabular-nums">
-                  {item.count == null ? "Not available" : item.count.toLocaleString()}
-                </p>
-              </div>
-              <ArrowRight className="size-4 text-muted-foreground" aria-hidden />
-            </GlassCard>
-          </Link>
-        ))}
-      </div>
-
-      <GlassCard className="mt-4 overflow-hidden">
-        <div className="grid grid-cols-3 border-b border-border text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-          <p className="px-4 py-3">24 hours</p>
-          <p className="px-4 py-3">7 days</p>
-          <p className="px-4 py-3">30 days</p>
-        </div>
-        <div className="grid grid-cols-3">
-          <Metric label="New players" values={[todayUsers, weekUsers, monthUsers]} />
-          <Metric label="Completed deposits" values={[todayDeposits, weekDeposits, monthDeposits]} />
-        </div>
-      </GlassCard>
-
-      <div className="mt-4 flex flex-wrap gap-2">
-        {actions.map((action) => (
-          <Link
-            key={action.href}
-            href={action.href}
-            className="inline-flex h-10 items-center rounded-full bg-foreground px-4 text-sm font-semibold text-background"
-          >
-            {action.label}
-          </Link>
-        ))}
-      </div>
-
-      <GlassCard className="mt-6 p-5">
-        <h2 className="font-bold">Recent activity</h2>
-        <ul className="mt-3 divide-y divide-border">
-          {feed.slice(0, 8).length === 0 ? (
-            <li className="py-3 text-sm text-muted-foreground">No recent activity for your role.</li>
-          ) : (
-            feed.slice(0, 8).map((item) => (
-              <li key={item.id} className="flex items-center justify-between gap-3 py-3">
-                <Link href={item.href} className="min-w-0 flex-1">
-                  <p className="truncate text-sm font-semibold">{item.title}</p>
-                  <p className="text-xs capitalize text-muted-foreground">{item.meta}</p>
-                </Link>
-                <time dateTime={item.at} className="shrink-0 text-xs text-muted-foreground">
-                  {formatDistanceToNow(new Date(item.at), { addSuffix: true })}
-                </time>
-              </li>
-            ))
-          )}
-        </ul>
-      </GlassCard>
     </div>
   );
 }
 
-function CountLine({ label, count }: { label: string; count: number | null }) {
-  return (
-    <div>
-      <p className="text-xs text-muted-foreground">{label}</p>
-      <p className="mt-1 text-2xl font-black tabular-nums">{count == null ? "Not available" : count.toLocaleString()}</p>
-    </div>
-  );
-}
-
-function MetricLink({ href, label, count }: { href: string; label: string; count: number | null }) {
-  return (
-    <Link href={href}>
-      <GlassCard className="h-full p-4 transition-colors hover:border-ws-green/40">
-        <p className="text-sm text-muted-foreground">{label}</p>
-        <p className="mt-1 text-3xl font-black tabular-nums">{count == null ? "Not available" : count.toLocaleString()}</p>
-      </GlassCard>
-    </Link>
-  );
-}
-
-function Metric({ label, values }: { label: string; values: (number | null)[] }) {
-  return (
-    <>
-      {values.map((value, index) => (
-        <div key={`${label}-${index}`} className="border-t border-border px-4 py-3 first:border-t-0 sm:border-t-0">
-          <p className="text-lg font-black tabular-nums">
-            {value == null ? "Not available" : value.toLocaleString()}
-          </p>
-          <p className="text-xs text-muted-foreground">{label}</p>
-        </div>
-      ))}
-    </>
-  );
+function showCount(count: number | null) {
+  return count == null ? "Unavailable" : count.toLocaleString();
 }

@@ -7,6 +7,8 @@ export type AdminNavChild = {
   superOnly?: boolean;
   /** Visible when the staff member has any of these roles, in addition to permission. */
   roleAny?: string[];
+  /** Store and sub-creator menus never include this link. */
+  hiddenFromStore?: boolean;
 };
 
 export type AdminNavSection = {
@@ -39,8 +41,27 @@ export const ADMIN_NAV: AdminNavSection[] = [
     children: [],
   },
   {
+    href: "/admin/users",
+    label: "Player CRM",
+    icon: "Users",
+    permission: null,
+    anyPermissions: ["users.manage", "support.manage"],
+    children: [
+      { href: "/admin/users", label: "All players", permission: "users.manage" },
+      {
+        href: "/admin/players",
+        label: "Network players",
+        permission: "users.manage",
+        roleAny: ["store_creator", "sub_creator"],
+      },
+      { href: "/admin/crm", label: "CRM", permission: "users.manage" },
+      { href: "/admin/support", label: "Tickets", permission: null, superOnly: true, hiddenFromStore: true },
+      { href: "/admin/chat", label: "Live chat", permission: "support.manage", hiddenFromStore: true },
+    ],
+  },
+  {
     href: "/admin/money",
-    label: "Money",
+    label: "Financial Center",
     icon: "Wallet",
     permission: null,
     anyPermissions: ["requests.manage"],
@@ -70,47 +91,8 @@ export const ADMIN_NAV: AdminNavSection[] = [
     ],
   },
   {
-    href: "/admin/users",
-    label: "Players",
-    icon: "Users",
-    permission: null,
-    anyPermissions: ["users.manage", "cms.manage"],
-    children: [
-      { href: "/admin/users", label: "All players", permission: "users.manage" },
-      {
-        href: "/admin/players",
-        label: "Network players",
-        permission: "users.manage",
-        roleAny: ["store_creator", "sub_creator"],
-      },
-      { href: "/admin/kyc", label: "Identity check", permission: "kyc.manage" },
-      { href: "/admin/crm", label: "CRM", permission: "users.manage" },
-    ],
-  },
-  {
-    href: "/admin/agents",
-    label: "Stores & Agents",
-    icon: "UserPlus",
-    permission: null,
-    anyPermissions: ["users.manage"],
-    children: [
-      {
-        href: "/admin/sub-creators",
-        label: "Store and sub creators",
-        permission: "users.manage",
-        roleAny: ["store_creator"],
-      },
-      {
-        href: "/admin/agent-inbox",
-        label: "Player chat",
-        permission: null,
-        roleAny: ["super_admin", "store_creator", "sub_creator"],
-      },
-    ],
-  },
-  {
     href: "/admin/game-accounts",
-    label: "Games",
+    label: "Game Center",
     icon: "Gamepad2",
     permission: null,
     anyPermissions: ["cms.manage", "requests.manage"],
@@ -132,21 +114,32 @@ export const ADMIN_NAV: AdminNavSection[] = [
     ],
   },
   {
+    href: "/admin/agents",
+    label: "Store Center",
+    icon: "UserPlus",
+    permission: null,
+    anyPermissions: ["users.manage"],
+    children: [
+      {
+        href: "/admin/sub-creators",
+        label: "Store and sub creators",
+        permission: "users.manage",
+        roleAny: ["store_creator"],
+      },
+      {
+        href: "/admin/agent-inbox",
+        label: "Player chat",
+        permission: null,
+        roleAny: ["super_admin", "store_creator", "sub_creator"],
+      },
+    ],
+  },
+  {
     href: "/admin/marketing-center",
-    label: "Marketing",
+    label: "Marketing Center",
     icon: "Megaphone",
     permission: null,
-    anyPermissions: [
-      "newsletters.manage",
-      "cms.manage",
-      "notifications.broadcast",
-      "promotions.manage",
-      "referrals.manage",
-      "vip.manage",
-      "rewards.manage",
-      "achievements.manage",
-      "leaderboards.manage",
-    ],
+    anyPermissions: ["newsletters.manage", "cms.manage", "notifications.broadcast", "promotions.manage"],
     children: [
       { href: "/admin/newsletters", label: "Email campaigns", permission: "newsletters.manage" },
       { href: "/admin/marketing", label: "Text one player", permission: "cms.manage" },
@@ -159,6 +152,28 @@ export const ADMIN_NAV: AdminNavSection[] = [
         permission: null,
         roleAny: ["super_admin", "store_creator", "sub_creator"],
       },
+    ],
+  },
+  {
+    href: "/admin/automation",
+    label: "Automation Center",
+    icon: "Bot",
+    permission: null,
+    anyPermissions: ["cms.manage", "support.manage"],
+    operatorOnly: true,
+    children: [
+      { href: "/admin/ai-blog", label: "AI blog", permission: "cms.manage" },
+      { href: "/admin/ai-bot", label: "Support chatbot", permission: "support.manage" },
+      { href: "/admin/analyzer", label: "Analyzer", permission: null },
+    ],
+  },
+  {
+    href: "/admin/growth",
+    label: "Rewards Center",
+    icon: "Gift",
+    permission: null,
+    anyPermissions: ["promotions.manage", "referrals.manage", "vip.manage", "rewards.manage", "achievements.manage", "leaderboards.manage"],
+    children: [
       {
         href: "/admin/growth",
         label: "Rewards hub",
@@ -174,31 +189,28 @@ export const ADMIN_NAV: AdminNavSection[] = [
     ],
   },
   {
-    href: "/admin/support",
-    label: "Support",
-    icon: "LifeBuoy",
-    permission: "support.manage",
-    children: [
-      { href: "/admin/support", label: "Tickets", permission: null, superOnly: true },
-      { href: "/admin/chat", label: "Live chat", permission: "support.manage" },
-    ],
+    href: "/admin/kyc",
+    label: "Verification Center",
+    icon: "ShieldCheck",
+    permission: null,
+    anyPermissions: ["kyc.manage"],
+    children: [{ href: "/admin/kyc", label: "Identity check", permission: "kyc.manage" }],
   },
   {
-    href: "/admin/automation",
-    label: "Automation",
-    icon: "Bot",
+    href: "/admin/security",
+    label: "Security Center",
+    icon: "ShieldAlert",
     permission: null,
-    anyPermissions: ["cms.manage", "support.manage"],
-    operatorOnly: true,
+    superOnly: true,
     children: [
-      { href: "/admin/ai-blog", label: "AI blog", permission: "cms.manage" },
-      { href: "/admin/ai-bot", label: "Support chatbot", permission: "support.manage" },
-      { href: "/admin/analyzer", label: "Analyzer", permission: null },
+      { href: "/admin/fraud", label: "Fraud", permission: null, superOnly: true },
+      { href: "/admin/security", label: "Security", permission: null, superOnly: true },
+      { href: "/admin/audit", label: "Audit log", permission: null, superOnly: true },
     ],
   },
   {
     href: "/admin/analytics",
-    label: "Reports",
+    label: "Analytics Center",
     icon: "ChartColumn",
     permission: null,
     children: [
@@ -215,7 +227,6 @@ export const ADMIN_NAV: AdminNavSection[] = [
         permission: null,
         roleAny: ["super_admin", "store_creator", "sub_creator"],
       },
-      { href: "/admin/audit", label: "Audit log", permission: null, superOnly: true },
     ],
   },
   {
@@ -232,8 +243,6 @@ export const ADMIN_NAV: AdminNavSection[] = [
       { href: "/admin/reviews", label: "Reviews", permission: "cms.manage" },
       { href: "/admin/geo", label: "City pages", permission: "cms.manage" },
       { href: "/admin/content", label: "Website hub", permission: "cms.manage" },
-      { href: "/admin/fraud", label: "Fraud", permission: null, superOnly: true },
-      { href: "/admin/security", label: "Security", permission: null, superOnly: true },
     ],
   },
 ];
@@ -290,7 +299,11 @@ export function visibleAdminNav(access: StaffNavAccess): AdminNavSection[] {
       continue;
     }
 
-    const children = section.children.filter((child) => canSeeNavItem(access, child));
+    const storeScoped = access.roles.includes("store_creator") || access.roles.includes("sub_creator");
+    const children = section.children.filter((child) => {
+      if (child.hiddenFromStore && storeScoped) return false;
+      return canSeeNavItem(access, child);
+    });
     const listed =
       !section.anyPermissions ||
       access.isSuperAdmin ||

@@ -12,9 +12,9 @@ export function AdminPageHeader({
   return (
     <div className="mb-6 flex flex-wrap items-end justify-between gap-3">
       <div>
-        <h1 className="text-2xl font-bold sm:text-3xl">{title}</h1>
+        <h1 className="text-2xl font-semibold tracking-tight text-white sm:text-3xl">{title}</h1>
         {description && (
-          <p className="mt-1 text-sm text-muted-foreground">{description}</p>
+          <p className="mt-1 max-w-2xl text-sm leading-6 text-[#9fb0d0]">{description}</p>
         )}
       </div>
       {action && <div className="flex items-center gap-2">{action}</div>}
