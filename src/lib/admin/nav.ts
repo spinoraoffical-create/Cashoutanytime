@@ -40,7 +40,7 @@ export const ADMIN_NAV: AdminNavSection[] = [
   },
   {
     href: "/admin/money",
-    label: "Money Center",
+    label: "Financial operations",
     icon: "Wallet",
     permission: null,
     anyPermissions: ["requests.manage"],
@@ -52,16 +52,31 @@ export const ADMIN_NAV: AdminNavSection[] = [
         roleAny: ["store_creator", "sub_creator"],
       },
       { href: "/admin/game-loads", label: "Wallet Loads & Redeems", permission: "requests.manage" },
-      {
-        href: "/admin/player-transactions",
-        label: "Player transactions",
-        permission: null,
-        roleAny: ["super_admin", "store_creator", "sub_creator"],
-      },
       { href: "/admin/game-balances", label: "Live game coins", permission: null, superOnly: true },
       { href: "/admin/payouts", label: "Cash-out / Payouts", permission: "requests.manage" },
       { href: "/admin/transactions", label: "Transaction History", permission: "requests.manage" },
       { href: "/admin/cashout-holds", label: "Held cash outs", permission: "requests.manage" },
+    ],
+  },
+  {
+    href: "/admin/agents",
+    label: "Agents",
+    icon: "UserPlus",
+    permission: null,
+    anyPermissions: ["users.manage"],
+    children: [
+      {
+        href: "/admin/sub-creators",
+        label: "Store and sub creators",
+        permission: "users.manage",
+        roleAny: ["store_creator"],
+      },
+      {
+        href: "/admin/agent-inbox",
+        label: "Player chat",
+        permission: null,
+        roleAny: ["store_creator", "sub_creator"],
+      },
     ],
   },
   {
@@ -78,20 +93,40 @@ export const ADMIN_NAV: AdminNavSection[] = [
         permission: "users.manage",
         roleAny: ["store_creator", "sub_creator"],
       },
-      {
-        href: "/admin/sub-creators",
-        label: "Sub-creators",
-        permission: "users.manage",
-        roleAny: ["store_creator"],
-      },
-      {
-        href: "/admin/agent-inbox",
-        label: "Player chat",
-        permission: null,
-        roleAny: ["store_creator", "sub_creator"],
-      },
       { href: "/admin/kyc", label: "Identity review", permission: "cms.manage" },
       { href: "/admin/crm", label: "CRM", permission: "users.manage" },
+    ],
+  },
+  {
+    href: "/admin/game-accounts",
+    label: "Game accounts",
+    icon: "Gamepad2",
+    permission: null,
+    anyPermissions: ["cms.manage", "requests.manage"],
+    children: [
+      { href: "/admin/games", label: "Games catalog", permission: "cms.manage" },
+      { href: "/admin/game-loads", label: "Wallet loads & redeems", permission: "requests.manage" },
+      {
+        href: "/admin/failed-loads",
+        label: "Failed loads",
+        permission: "requests.manage",
+        roleAny: ["store_creator", "sub_creator"],
+      },
+      { href: "/admin/game-balances", label: "Live game coins", permission: null, superOnly: true },
+    ],
+  },
+  {
+    href: "/admin/agent-reports",
+    label: "Agent reports",
+    icon: "ChartColumn",
+    permission: null,
+    children: [
+      {
+        href: "/admin/player-transactions",
+        label: "Player transactions",
+        permission: null,
+        roleAny: ["super_admin", "store_creator", "sub_creator"],
+      },
     ],
   },
   {
@@ -233,6 +268,9 @@ export function canSeeNavItem(
 const HUB_HREFS = new Set([
   "/admin",
   "/admin/money",
+  "/admin/agents",
+  "/admin/game-accounts",
+  "/admin/agent-reports",
   "/admin/growth",
   "/admin/content",
   "/admin/marketing-center",
@@ -271,5 +309,5 @@ export function visibleAdminNav(access: StaffNavAccess): AdminNavSection[] {
     sections.push({ ...section, href, children });
   }
 
-  return sections.slice(0, 10);
+  return sections;
 }
