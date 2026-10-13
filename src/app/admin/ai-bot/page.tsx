@@ -75,7 +75,7 @@ export default async function AdminAIChatbotPage() {
               {chatSettings.is_enabled ? "Active" : "Paused"}
             </span>
             <Badge className={chatSettings.is_enabled ? "bg-emerald-500/15 text-emerald-400" : "bg-rose-500/15 text-rose-400"}>
-              {chatSettings.is_enabled ? "24/7 Online" : "Offline"}
+              {chatSettings.is_enabled ? "On" : "Off"}
             </Badge>
           </div>
         </GlassCard>

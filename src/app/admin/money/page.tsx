@@ -5,7 +5,7 @@ import { AdminToolGrid } from "@/components/admin/admin-tool-grid";
 import { getAgentScope } from "@/lib/agents/scope";
 import { requirePermission } from "@/lib/data/admin";
 
-export const metadata: Metadata = { title: "Financial operations" };
+export const metadata: Metadata = { title: "Money" };
 
 export default async function MoneyCenterPage() {
   const scope = await getAgentScope();
@@ -68,8 +68,8 @@ export default async function MoneyCenterPage() {
   return (
     <div className="mx-auto max-w-6xl">
       <AdminPageHeader
-        title="Financial operations"
-        description="Approve deposits, move wallet loads, pay cash outs, and look up history. Every money change is confirmed on the next screen and written to the audit log."
+        title="Money"
+        description="Open deposits, loads, cash outs, and history. Each money change is confirmed on the next screen."
       />
       <AdminToolGrid tools={tools} />
     </div>

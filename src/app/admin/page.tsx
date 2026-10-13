@@ -22,26 +22,29 @@ type FeedItem = {
 
 async function headCount(
   query: PromiseLike<{ count: number | null; error: { message: string } | null }>
-) {
+): Promise<number | null> {
   try {
     const { count, error } = await query;
-    if (error) return 0;
+    if (error) return null;
     return count ?? 0;
   } catch {
-    return 0;
+    return null;
   }
 }
 
-async function statusCount(table: "game_load_requests" | "cashout_holds" | "webhook_events", status: string) {
+async function statusCount(
+  table: "game_load_requests" | "cashout_holds" | "webhook_events",
+  status: string
+): Promise<number | null> {
   try {
     const { count, error } = await adminDb()
       .from(table)
       .select("id", { count: "exact", head: true })
       .eq("status", status);
-    if (error) return 0;
+    if (error) return null;
     return count ?? 0;
   } catch {
-    return 0;
+    return null;
   }
 }
 
@@ -67,14 +70,14 @@ export default async function AdminOverviewPage() {
     await Promise.all([
       money
         ? headCount(db.from("deposit_requests").select("id", { count: "exact", head: true }).in("status", ["pending", "processing"]))
-        : Promise.resolve(0),
+        : Promise.resolve(null),
       money
         ? headCount(db.from("game_load_requests").select("id", { count: "exact", head: true }).in("status", ["pending", "processing"]))
-        : Promise.resolve(0),
+        : Promise.resolve(null),
       support ? countOpenTickets() : Promise.resolve(0),
       kyc
         ? headCount(db.from("kyc_submissions").select("id", { count: "exact", head: true }).eq("status", "pending"))
-        : Promise.resolve(0),
+        : Promise.resolve(null),
       ctx.isSuperAdmin
         ? headCount(
             db
@@ -82,19 +85,19 @@ export default async function AdminOverviewPage() {
               .select("user_id", { count: "exact", head: true })
               .or("rewards_blocked.eq.true,blocked.eq.true,manual_review.eq.true,risk_score.gte.50")
           )
-        : Promise.resolve(0),
-      players ? headCount(db.from("profiles").select("id", { count: "exact", head: true }).gte("created_at", since(1))) : Promise.resolve(0),
-      players ? headCount(db.from("profiles").select("id", { count: "exact", head: true }).gte("created_at", since(7))) : Promise.resolve(0),
-      players ? headCount(db.from("profiles").select("id", { count: "exact", head: true }).gte("created_at", since(30))) : Promise.resolve(0),
+        : Promise.resolve(null),
+      players ? headCount(db.from("profiles").select("id", { count: "exact", head: true }).gte("created_at", since(1))) : Promise.resolve(null),
+      players ? headCount(db.from("profiles").select("id", { count: "exact", head: true }).gte("created_at", since(7))) : Promise.resolve(null),
+      players ? headCount(db.from("profiles").select("id", { count: "exact", head: true }).gte("created_at", since(30))) : Promise.resolve(null),
       money
         ? headCount(db.from("deposit_requests").select("id", { count: "exact", head: true }).eq("status", "completed").gte("created_at", since(1)))
-        : Promise.resolve(0),
+        : Promise.resolve(null),
       money
         ? headCount(db.from("deposit_requests").select("id", { count: "exact", head: true }).eq("status", "completed").gte("created_at", since(7)))
-        : Promise.resolve(0),
+        : Promise.resolve(null),
       money
         ? headCount(db.from("deposit_requests").select("id", { count: "exact", head: true }).eq("status", "completed").gte("created_at", since(30)))
-        : Promise.resolve(0),
+        : Promise.resolve(null),
     ]);
 
   const attention = [
@@ -106,7 +109,7 @@ export default async function AdminOverviewPage() {
     money ? { href: "/admin/failed-loads", label: "Failed game loads", count: await statusCount("game_load_requests", "failed") } : null,
     money ? { href: "/admin/cashout-holds", label: "Held cash outs", count: await statusCount("cashout_holds", "held") } : null,
     ctx.isSuperAdmin ? { href: "/admin/failed-loads", label: "Failed webhooks", count: await statusCount("webhook_events", "failed") } : null,
-  ].filter((item): item is { href: string; label: string; count: number } => Boolean(item));
+  ].filter((item): item is { href: string; label: string; count: number | null } => Boolean(item));
 
   const feed: FeedItem[] = [];
   if (players) {
@@ -168,8 +171,8 @@ export default async function AdminOverviewPage() {
   return (
     <div className="mx-auto max-w-6xl">
       <AdminPageHeader
-        title="Dashboard"
-        description="What needs a decision right now."
+        title="Overview"
+        description="Open a count that needs a decision, or jump to the tool that handles it."
       />
 
       <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
@@ -178,7 +181,9 @@ export default async function AdminOverviewPage() {
             <GlassCard className="flex items-center justify-between p-4 transition-colors hover:border-ws-green/40">
               <div>
                 <p className="text-sm text-muted-foreground">{item.label}</p>
-                <p className="mt-1 text-3xl font-black tabular-nums">{item.count.toLocaleString()}</p>
+                <p className="mt-1 text-3xl font-black tabular-nums">
+                  {item.count == null ? "Not available" : item.count.toLocaleString()}
+                </p>
               </div>
               <ArrowRight className="size-4 text-muted-foreground" aria-hidden />
             </GlassCard>
@@ -234,12 +239,14 @@ export default async function AdminOverviewPage() {
   );
 }
 
-function Metric({ label, values }: { label: string; values: number[] }) {
+function Metric({ label, values }: { label: string; values: (number | null)[] }) {
   return (
     <>
       {values.map((value, index) => (
         <div key={`${label}-${index}`} className="border-t border-border px-4 py-3 first:border-t-0 sm:border-t-0">
-          <p className="text-lg font-black tabular-nums">{value.toLocaleString()}</p>
+          <p className="text-lg font-black tabular-nums">
+            {value == null ? "Not available" : value.toLocaleString()}
+          </p>
           <p className="text-xs text-muted-foreground">{label}</p>
         </div>
       ))}

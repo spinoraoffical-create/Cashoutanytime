@@ -5,13 +5,13 @@ import { AdminPageHeader } from "@/components/admin/admin-page-header";
 import { AdminToolGrid } from "@/components/admin/admin-tool-grid";
 import { can, requireStaff } from "@/lib/data/admin";
 
-export const metadata: Metadata = { title: "Content" };
+export const metadata: Metadata = { title: "Website" };
 
 const TOOLS = [
-  { href: "/admin/cms", title: "CMS", body: "Pages, FAQs, and banners players see in the app.", permission: "cms.manage" },
-  { href: "/admin/games", title: "Games catalog", body: "Turn games on, edit names, and set download links.", permission: "cms.manage" },
+  { href: "/admin/cms", title: "Pages, FAQ, banners, blog", body: "Edit the pages, FAQs, banners, and blog posts players see.", permission: "cms.manage" },
+  { href: "/admin/games", title: "Games list", body: "Turn games on, edit names, and set download links.", permission: "cms.manage" },
   { href: "/admin/reviews", title: "Reviews", body: "Approve or hide player reviews.", permission: "cms.manage" },
-  { href: "/admin/geo", title: "Location pages", body: "Edit city and state landing pages.", permission: "cms.manage" },
+  { href: "/admin/geo", title: "City pages", body: "Edit city and state landing pages.", permission: "cms.manage" },
 ];
 
 export default async function ContentPage() {
@@ -21,7 +21,7 @@ export default async function ContentPage() {
 
   return (
     <div className="mx-auto max-w-6xl">
-      <AdminPageHeader title="Content" description="Site copy, games, reviews, and location pages." />
+      <AdminPageHeader title="Website" description="Edit pages, the games list, reviews, and city pages." />
       <AdminToolGrid tools={tools} />
     </div>
   );

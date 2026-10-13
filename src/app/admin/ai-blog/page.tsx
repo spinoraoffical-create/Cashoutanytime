@@ -29,31 +29,10 @@ export default async function AdminAIBlogPage() {
       />
 
       {/* Top Metrics Grid */}
-      <div className="grid gap-4 sm:grid-cols-3">
-        <GlassCard className="p-5">
-          <p className="hud-label text-xs text-muted-foreground">Published AI Articles</p>
-          <div className="mt-2 flex items-baseline justify-between">
-            <span className="text-3xl font-extrabold text-ws-green">{publishedCount}</span>
-            <Badge className="bg-ws-green/15 text-ws-green">SEO Active</Badge>
-          </div>
-        </GlassCard>
-
-        <GlassCard className="p-5">
-          <p className="hud-label text-xs text-muted-foreground">AI Generation Provider</p>
-          <div className="mt-2 flex items-baseline justify-between">
-            <span className="text-xl font-bold text-foreground">Smart Auto / LLM</span>
-            <Badge variant="outline">GPT-4o / Smart Fallback</Badge>
-          </div>
-        </GlassCard>
-
-        <GlassCard className="p-5">
-          <p className="hud-label text-xs text-muted-foreground">Telegram Auto Broadcast</p>
-          <div className="mt-2 flex items-baseline justify-between">
-            <span className="text-xl font-bold text-emerald-400">Enabled</span>
-            <Badge className="bg-emerald-500/15 text-emerald-400">Channel Sync</Badge>
-          </div>
-        </GlassCard>
-      </div>
+      <GlassCard className="p-5">
+        <p className="text-xs text-muted-foreground">Published posts on file</p>
+        <p className="mt-2 text-3xl font-extrabold tabular-nums">{publishedCount}</p>
+      </GlassCard>
 
       {/* Trigger & Configuration Card */}
       <AIBlogGeneratorCard />
