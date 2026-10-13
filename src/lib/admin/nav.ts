@@ -83,7 +83,7 @@ export const ADMIN_NAV: AdminNavSection[] = [
         permission: "users.manage",
         roleAny: ["store_creator", "sub_creator"],
       },
-      { href: "/admin/kyc", label: "Identity check", permission: "cms.manage" },
+      { href: "/admin/kyc", label: "Identity check", permission: "kyc.manage" },
       { href: "/admin/crm", label: "CRM", permission: "users.manage" },
     ],
   },

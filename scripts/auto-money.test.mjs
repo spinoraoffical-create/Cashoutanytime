@@ -58,14 +58,36 @@ assert.match(loads, /finishGameLoad/);
 assert.equal(loads.includes('status: "failed"'), false);
 
 const wallet = readFileSync(new URL("../src/app/dashboard/wallet/page.tsx", import.meta.url), "utf8");
-assert.equal(wallet.includes("DepositPageClient"), false);
+assert.match(wallet, /id="add-money"/);
+assert.match(wallet, /<DepositPageClient embedded games=\{games\} \/>/);
+
+const depositPage = readFileSync(new URL("../src/app/dashboard/deposit/page.tsx", import.meta.url), "utf8");
+assert.match(depositPage, /<DepositPageClient games=\{games\} \/>/);
+assert.equal(depositPage.includes("embedded"), false);
+
+const depositClient = readFileSync(
+  new URL("../src/components/dashboard/deposit-page-client.tsx", import.meta.url),
+  "utf8"
+);
+assert.match(depositClient, /embedded \? undefined : "add-money"/);
+assert.match(depositClient, /embedded \? null/);
 
 const withdraw = readFileSync(new URL("../src/app/dashboard/withdraw/page.tsx", import.meta.url), "utf8");
 assert.equal(withdraw.includes("/dashboard/games"), false);
 assert.match(withdraw, /CashoutRequestForm/);
 
 const nav = readFileSync(new URL("../src/lib/admin/nav.ts", import.meta.url), "utf8");
-assert.equal(nav.includes("/admin/requests"), false);
-assert.equal(nav.includes("/admin/failed-loads"), false);
+assert.match(nav, /href: "\/admin\/requests"[\s\S]{0,180}permission: "requests\.manage"/);
+assert.match(nav, /href: "\/admin\/failed-loads"[\s\S]{0,180}permission: "requests\.manage"/);
+assert.match(nav, /href: "\/admin\/kyc"[\s\S]{0,120}permission: "kyc\.manage"/);
+
+const debitStart = sql.indexOf("CREATE OR REPLACE FUNCTION public.debit_paydora_payout");
+const debitEnd = sql.indexOf("CREATE OR REPLACE FUNCTION public.credit_cashout_payout_void");
+const debitFn = sql.slice(debitStart, debitEnd);
+assert.match(debitFn, /cashout_wallet = cashout_wallet - v_amount/);
+assert.equal(debitFn.includes("wallet_balance"), false);
+assert.match(debitFn, /INSERT INTO public\.paydora_processed_events/);
+assert.match(debitFn, /WHEN unique_violation/);
+assert.match(debitFn, /'cashout', 'debit', 'withdrawal'/);
 
 console.log("auto money checks passed");
