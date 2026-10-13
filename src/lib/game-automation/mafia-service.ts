@@ -1,6 +1,7 @@
 import { createUntilAccepted } from "./account-username";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { formatGameAutomationError } from "./error-formatter";
+import { shouldRefundProviderError } from "./load-outcome";
 import { MafiaApiClient, isMafiaApiConfigured } from "./mafia-api";
 
 export interface MafiaDirectApiResult {
@@ -195,7 +196,7 @@ export async function autoFulfillMafiaRequest(
   } catch (err: any) {
     const userError = formatGameAutomationError(err, input.amount);
 
-    if (loadType === "load" || loadType === "reload") {
+    if (shouldRefundProviderError(userError, loadType)) {
       try {
         await admin.rpc("refund_game_load_wallet", { p_request_id: requestId });
       } catch {}

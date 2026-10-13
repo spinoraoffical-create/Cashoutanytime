@@ -1,5 +1,6 @@
 import { createAdminClient } from "@/lib/supabase/admin";
 import { OrionStarsApiClient, parseOrionStarsUserBalance } from "./orionstars-api";
+import { shouldRefundProviderError } from "./load-outcome";
 
 export interface AutoFulfillOrionStarsOptions {
   requestId?: string;
@@ -173,7 +174,7 @@ export async function autoFulfillOrionStarsRequest(
     console.error("[Orion Stars Strict Verification Failure]", err.message);
 
     if (admin && requestId) {
-      if (loadType === "load") {
+      if (shouldRefundProviderError(err.message, loadType)) {
         try {
           await admin.rpc("refund_game_load_wallet", { p_request_id: requestId });
         } catch {}

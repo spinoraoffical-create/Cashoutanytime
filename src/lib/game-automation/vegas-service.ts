@@ -1,6 +1,7 @@
 import { createAdminClient } from "@/lib/supabase/admin";
 import { createUntilAccepted } from "./account-username";
 import { VegasApiClient } from "./vegas-api";
+import { shouldRefundProviderError } from "./load-outcome";
 
 export interface AutoFulfillVegasOptions {
   requestId?: string;
@@ -153,7 +154,7 @@ export async function autoFulfillVegasRequest(
     console.error("[Vegas Service Error]", err.message);
 
     if (admin && requestId) {
-      if (loadType === "load") {
+      if (shouldRefundProviderError(err.message, loadType)) {
         try {
           await admin.rpc("refund_game_load_wallet", { p_request_id: requestId });
         } catch {}

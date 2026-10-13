@@ -24,7 +24,6 @@ import {
   getMyGameLoads,
   getMyGameAccount,
   getDepositRolloverForGame,
-  healStaleGameLoads,
   cancelMyGameLoad,
 } from "@/lib/actions/game-loads";
 import type { Game } from "@/lib/games";
@@ -205,7 +204,6 @@ export function GameWalletLoadSection({
     async function init() {
       void refreshWallet();
       await refreshAccount();
-      await healStaleGameLoads(game.slug, 5);
       await refreshLoads();
       if (cancelled) return;
       accountReadyRef.current = true;
@@ -268,16 +266,9 @@ export function GameWalletLoadSection({
   useEffect(() => {
     if (!anyPending) return;
 
-    void healStaleGameLoads(game.slug, 5).then((result) => {
-      if (result.healed > 0) void refreshLoads();
-    });
-
     void refreshLoads();
     const interval = setInterval(() => {
       if (document.visibilityState === "visible") {
-        void healStaleGameLoads(game.slug, 5).then((result) => {
-          if (result.healed > 0) void refreshLoads();
-        });
         void refreshLoads();
       }
     }, 3000);

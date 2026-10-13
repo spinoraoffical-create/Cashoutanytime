@@ -1,4 +1,5 @@
 import { createAdminClient } from "@/lib/supabase/admin";
+import { classifyProviderOutcome } from "./load-outcome";
 import { generateGamePassword } from "./account-username";
 import {
   enqueueFireKirin,
@@ -180,20 +181,24 @@ async function failRequest(requestId: string | undefined, message: string, refun
   if (!requestId) return;
   const admin = createAdminClient();
   if (!admin) return;
-  if (refund) {
+  const unknown = classifyProviderOutcome({ success: false, error: message }) === "unknown";
+  if (refund && !unknown) {
     try {
       await admin.rpc("refund_game_load_wallet", { p_request_id: requestId });
     } catch {
-      // The status update still stops the request from waiting on staff.
+      // A confirmed rejection still closes below. The wallet function itself refuses a second refund.
     }
   }
+  const patch = unknown
+    ? { error_message: message.slice(0, 400), updated_at: new Date().toISOString() }
+    : {
+        status: "failed" as const,
+        error_message: message.slice(0, 400),
+        updated_at: new Date().toISOString(),
+      };
   await admin
     .from("game_load_requests")
-    .update({
-      status: "failed",
-      error_message: message.slice(0, 400),
-      updated_at: new Date().toISOString(),
-    })
+    .update(patch)
     .eq("id", requestId)
     .in("status", ["pending", "processing"]);
 }

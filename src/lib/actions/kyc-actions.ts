@@ -3,7 +3,9 @@
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
-import { authorize } from "@/lib/actions/admin/core";
+import { authorize, writeAudit } from "@/lib/actions/admin/core";
+import { checkKycDataUrl } from "@/lib/kyc/upload-rules";
+import { logIncident } from "@/lib/observability/incident";
 
 export interface KYCSubmissionRecord {
   id: string;
@@ -50,9 +52,11 @@ export async function submitKYCDocument(formData: FormData): Promise<{ ok: boole
   const docDataUrl = (formData.get("document_data_url") as string) || "";
   const docName = file?.name || "government_id_photo.jpg";
 
-  if (!docDataUrl && !file) {
+  if (!docDataUrl) {
     return { ok: false, error: "Please upload a photo of your ID." };
   }
+  const checked = checkKycDataUrl(docDataUrl);
+  if (!checked.ok) return { ok: false, error: checked.error };
 
   const admin = createAdminClient();
   if (!admin) {
@@ -68,12 +72,25 @@ export async function submitKYCDocument(formData: FormData): Promise<{ ok: boole
   const userEmail = profile?.email || user.email || "player@spinora.local";
   const userName = profile?.full_name || userEmail.split("@")[0] || "VIP Player";
 
+  const ext =
+    checked.mime === "application/pdf" ? "pdf" : checked.mime === "image/png" ? "png" : checked.mime === "image/webp" ? "webp" : "jpg";
+  const storagePath = `${user.id}/${crypto.randomUUID()}.${ext}`;
+  const bytes = Buffer.from(docDataUrl.split(",")[1]?.replace(/\s/g, "") ?? "", "base64");
+  const uploaded = await admin.storage.from("kyc-documents").upload(storagePath, bytes, {
+    contentType: checked.mime,
+    upsert: false,
+  });
+  if (uploaded.error) {
+    logIncident("kyc", uploaded.error.message);
+    return { ok: false, error: "ID storage is not ready. A private document bucket has to be created before new IDs can be saved." };
+  }
+
   const payload = {
     user_id: user.id,
     user_email: userEmail,
     user_name: userName,
     document_name: docName,
-    document_url: docDataUrl,
+    document_url: storagePath,
     status: "pending" as const,
     updated_at: new Date().toISOString(),
   };
@@ -83,9 +100,17 @@ export async function submitKYCDocument(formData: FormData): Promise<{ ok: boole
     .upsert(payload, { onConflict: "user_id" });
 
   if (upsertError) {
-    console.error("[KYC] submit:", upsertError.message);
+    logIncident("kyc", upsertError.message);
     return { ok: false, error: "Could not submit that ID. Try again or contact support." };
   }
+
+  await writeAudit({
+    actorId: user.id,
+    action: "kyc.submit",
+    entityType: "kyc_submission",
+    entityId: user.id,
+    after: { document_name: docName, bytes: checked.bytes },
+  });
 
   const { error: profileError } = await admin
     .from("profiles")
@@ -151,7 +176,13 @@ export async function getAdminKYCSubmissions(): Promise<KYCSubmissionRecord[]> {
     return [];
   }
 
-  return (data ?? []).map((row) => mapRow(row as Record<string, unknown>));
+  const rows = (data ?? []).map((row) => mapRow(row as Record<string, unknown>));
+  for (const row of rows) {
+    if (!row.document_url || row.document_url.startsWith("data:") || row.document_url.startsWith("http")) continue;
+    const signed = await admin.storage.from("kyc-documents").createSignedUrl(row.document_url, 120);
+    if (signed.data?.signedUrl) row.document_url = signed.data.signedUrl;
+  }
+  return rows;
 }
 
 /** Approve or Reject KYC (Admin) — submissionIdOrUserId can be row id or user_id */

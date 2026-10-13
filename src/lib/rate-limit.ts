@@ -1,5 +1,7 @@
 import "server-only";
 
+import { logIncident } from "@/lib/observability/incident";
+import { decideRateLimit, securityActionFor } from "@/lib/rate-limit-decision";
 import { createAdminClient } from "@/lib/supabase/admin";
 
 export type RateLimitRule = { max: number; windowSeconds: number };
@@ -63,49 +65,42 @@ export function publicClientIp(request: Request): string | null {
   return null;
 }
 
-/** Game loads and broadcasts stay blocked if the limiter cannot be checked.
- * Deposits still open Paydora checkout when the limiter function is missing.
- */
-const FAIL_CLOSED_ACTIONS = new Set<keyof typeof RATE_LIMITS>([
-  "gameLoad",
-  "broadcast",
-]);
-
 export type RateLimitOutcome = {
   allowed: boolean;
   reason?: "limited" | "unavailable";
 };
 
 /**
- * Fixed-window rate limit via the check_rate_limit RPC (service role).
- * Fail-open when the limiter function is missing, including deposits, so a
- * missing check_rate_limit function does not block Paydora checkout.
- * A real limit (the function returns false) still blocks the request.
+ * Fixed-window rate limit via check_rate_limit (service role).
+ * The live function takes p_bucket_key, p_action, p_max_attempts, p_window_seconds
+ * and returns JSON { allowed }. A database error blocks the request.
  */
 export async function checkRateLimit(
   action: keyof typeof RATE_LIMITS,
   identifier: string
 ): Promise<RateLimitOutcome> {
   const rule = RATE_LIMITS[action];
-  const failClosed = FAIL_CLOSED_ACTIONS.has(action);
   try {
     const admin = createAdminClient();
     if (!admin) {
-      return failClosed ? { allowed: false, reason: "unavailable" } : { allowed: true };
+      logIncident("rate-limit", `${action} admin client unavailable`);
+      return { allowed: false, reason: "unavailable" };
     }
     const { data, error } = await admin.rpc("check_rate_limit", {
-      p_bucket: `${action}:${identifier}`,
-      p_max_hits: rule.max,
+      p_bucket_key: `${action}:${identifier}`,
+      p_action: securityActionFor(action),
+      p_max_attempts: rule.max,
       p_window_seconds: rule.windowSeconds,
-    });
+      p_block_seconds: 0,
+    } as never);
     if (error) {
-      console.error("[rate-limit]", action, error.message);
-      return failClosed ? { allowed: false, reason: "unavailable" } : { allowed: true };
+      logIncident("rate-limit", `${action} ${error.message}`);
+      return decideRateLimit(null, true);
     }
-    if (data === true) return { allowed: true };
-    return { allowed: false, reason: "limited" };
-  } catch {
-    return failClosed ? { allowed: false, reason: "unavailable" } : { allowed: true };
+    return decideRateLimit(data, false);
+  } catch (err) {
+    logIncident("rate-limit", err instanceof Error ? err.message : "check failed");
+    return { allowed: false, reason: "unavailable" };
   }
 }
 

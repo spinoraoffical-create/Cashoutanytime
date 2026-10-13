@@ -1,5 +1,6 @@
 import { createAdminClient } from "@/lib/supabase/admin";
 import { MilkyWayApiClient, parseMilkyWayUserBalance } from "./milkyway-api";
+import { shouldRefundProviderError } from "./load-outcome";
 
 export interface AutoFulfillMilkyWayOptions {
   requestId?: string;
@@ -173,7 +174,7 @@ export async function autoFulfillMilkyWayRequest(
     console.error("[Milky Way Strict Verification Failure]", err.message);
 
     if (admin && requestId) {
-      if (loadType === "load") {
+      if (shouldRefundProviderError(err.message, loadType)) {
         try {
           await admin.rpc("refund_game_load_wallet", { p_request_id: requestId });
         } catch {}

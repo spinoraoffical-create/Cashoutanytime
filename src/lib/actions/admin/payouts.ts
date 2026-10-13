@@ -2,6 +2,9 @@
 
 import { revalidatePath } from "next/cache";
 
+import { adminListScope } from "@/lib/admin/list-scope";
+import { playerInScope, readAgentScope } from "@/lib/agents/scope";
+import { getStaffContext } from "@/lib/data/admin";
 import { adminDb, authorize, writeAudit, type AdminActionResult } from "./core";
 import { adminLink, tgEsc, tgNotify } from "@/lib/telegram";
 
@@ -22,6 +25,21 @@ export async function payoutCashout(formData: FormData): Promise<AdminActionResu
   if (!userId) return { ok: false, error: "Missing player." };
   if (!Number.isFinite(amount) || amount <= 0) {
     return { ok: false, error: "Enter a payout amount greater than $0." };
+  }
+
+  const ctx = await getStaffContext();
+  const scopeRead = await readAgentScope();
+  const decision = adminListScope({
+    isSuperAdmin: Boolean(ctx?.isSuperAdmin),
+    hasStaffPermission: true,
+    scopeStatus: scopeRead.status,
+    scope: scopeRead.scope,
+  });
+  if (decision.mode === "deny") return { ok: false, error: "You cannot pay this player." };
+  if (decision.mode === "network") {
+    if (!scopeRead.scope || !(await playerInScope(scopeRead.scope, userId))) {
+      return { ok: false, error: "That player is outside your network." };
+    }
   }
 
   const db = adminDb();

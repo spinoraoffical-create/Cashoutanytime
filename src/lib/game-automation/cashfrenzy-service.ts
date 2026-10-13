@@ -1,6 +1,7 @@
 import { createUntilAccepted } from "./account-username";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { formatGameAutomationError } from "./error-formatter";
+import { shouldRefundProviderError } from "./load-outcome";
 import {
   getCashFrenzyApiClient,
   CashFrenzyApiClient,
@@ -155,7 +156,7 @@ export async function autoFulfillCashFrenzyRequest(
   } catch (err: any) {
     const userError = formatGameAutomationError(err, input.amount);
 
-    if (loadType === "load" || loadType === "reload") {
+    if (shouldRefundProviderError(userError, loadType)) {
       const refunded = await admin.rpc("refund_game_load_wallet", { p_request_id: requestId });
       if (refunded.error) {
         console.error("[cashfrenzy] wallet refund failed", refunded.error.message);

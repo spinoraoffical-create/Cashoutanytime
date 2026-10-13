@@ -1,6 +1,7 @@
 import { createAdminClient } from "@/lib/supabase/admin";
 import { createUntilAccepted } from "./account-username";
 import { JuwaApiClient } from "./juwa-api";
+import { shouldRefundProviderError } from "./load-outcome";
 
 export interface AutoFulfillJuwaOptions {
   requestId?: string;
@@ -154,7 +155,7 @@ export async function autoFulfillJuwaRequest(
     console.error("[Juwa Service Error]", err.message);
 
     if (admin && requestId) {
-      if (loadType === "load") {
+      if (shouldRefundProviderError(err.message, loadType)) {
         try {
           await admin.rpc("refund_game_load_wallet", { p_request_id: requestId });
         } catch {}

@@ -40,6 +40,8 @@ import { isVegasApiConfigured } from "@/lib/game-automation/vegas-api";
 import { userFacingGameLoadError } from "@/lib/game-automation/user-facing-errors";
 import { usernameForOwner } from "@/lib/games/owned-account";
 import { finishGameLoad } from "@/lib/game-automation/finish-game-load";
+import { classifyProviderOutcome } from "@/lib/game-automation/load-outcome";
+import { logIncident } from "@/lib/observability/incident";
 
 async function savedGameLogin(userId: string, gameSlug: string) {
   const admin = createAdminClient();
@@ -152,21 +154,18 @@ async function generatedLoginForUser(
   };
 }
 
-async function clearStaleRequests(userId: string, gameSlug: string) {
+async function holdUnknownGameLoad(requestId: string, message: string) {
   const admin = createAdminClient();
   if (!admin) return;
-  const cutoff = new Date(Date.now() - 2 * 60 * 1000).toISOString();
+  const id = logIncident("game-load", "provider result unknown");
   await admin
     .from("game_load_requests")
     .update({
-      status: "failed",
-      error_message: "This request timed out. Try again.",
+      error_message: `Needs review ${id}. ${message}`.slice(0, 400),
       updated_at: new Date().toISOString(),
     })
-    .eq("user_id", userId)
-    .eq("game_slug", gameSlug)
-    .in("status", ["pending", "processing"])
-    .lt("created_at", cutoff);
+    .eq("id", requestId)
+    .in("status", ["pending", "processing"]);
 }
 
 function playerGameError(message: string | null | undefined, loadType?: string | null): string {
@@ -201,6 +200,16 @@ async function fulfillOrFail(
       });
       return { success: false as const, error: "Game API credentials are not configured." };
     }
+    if (
+      !result.success &&
+      classifyProviderOutcome({ success: false, error: result.error }) === "unknown"
+    ) {
+      await holdUnknownGameLoad(requestId, result.error || "Provider result unknown");
+      return {
+        success: false as const,
+        error: "The game did not confirm this request. It stays open until a person checks it.",
+      };
+    }
     const redeemed =
       result.redeemedAmount ??
       (result.success && (loadType === "redeem" || loadType === "check_balance") ? input.amount : null);
@@ -234,7 +243,14 @@ async function fulfillOrFail(
       : { success: false as const, error: result.error || "Game load failed." };
   } catch (err) {
     const message = err instanceof Error ? err.message : "Game request failed";
-    console.error("[game-loads] fulfill threw", message);
+    if (classifyProviderOutcome({ success: false, error: message }) === "unknown") {
+      await holdUnknownGameLoad(requestId, message);
+      return {
+        success: false as const,
+        error: "The game did not confirm this request. It stays open until a person checks it.",
+      };
+    }
+    logIncident("game-load", message);
     await finishGameLoad({
       requestId,
       success: false,
@@ -488,12 +504,6 @@ export async function requestGameAccountCreate(input: {
     return { error: GAME_API_UNAVAILABLE };
   }
 
-  // Fail jobs stuck in pending/processing (no-op if SQL migration not applied yet).
-  void supabase.rpc("fail_my_stale_game_load", {
-    p_stale_minutes: 5,
-    p_game_slug: input.gameSlug,
-  });
-
   const existing = await getMyGameAccount(input.gameSlug);
   const hasAccount = Boolean(existing?.game_username);
   const shouldReplace = input.replaceAccount || hasAccount;
@@ -522,8 +532,6 @@ export async function requestGameAccountCreate(input: {
     finalPassword = generated.password;
   }
 
-  await clearStaleRequests(user.id, input.gameSlug);
-
   const { data: pending } = await supabase
     .from("game_load_requests")
     .select("id, load_type, game_username")
@@ -532,25 +540,7 @@ export async function requestGameAccountCreate(input: {
     .in("status", ["pending", "processing"])
     .maybeSingle();
 
-  const stuckCreate = pending as { id: string; load_type?: string; game_username: string | null } | null;
-  const replacingStuckCreate =
-    Boolean(stuckCreate) &&
-    (shouldReplace || !stuckCreate?.game_username) &&
-    (stuckCreate?.load_type === "create_account" || stuckCreate?.load_type === "new_account" || !stuckCreate?.game_username);
-  if (stuckCreate && replacingStuckCreate) {
-    const admin = createAdminClient();
-    if (admin) {
-      await admin
-        .from("game_load_requests")
-        .update({
-          status: "failed",
-          error_message: "Replaced by a new account request.",
-          updated_at: new Date().toISOString(),
-        })
-        .eq("id", stuckCreate.id)
-        .in("status", ["pending", "processing"]);
-    }
-  } else if (pending) {
+  if (pending) {
     return {
       error:
         "A request is already in progress. Cancel the stuck item under Recent activity below, then try Replace again.",
@@ -615,8 +605,6 @@ export async function requestGameCheckBalance(input: {
 
   const gameUsername = await ownedGameUsername(user.id, input.gameSlug);
   if (!gameUsername) return { error: "Account not found" };
-
-  await clearStaleRequests(user.id, input.gameSlug);
 
   if (API_CONFIGURED_GAMES.includes(input.gameSlug)) {
     const admin = createAdminClient();
@@ -708,8 +696,6 @@ export async function requestGameLoad(input: {
   if (input.walletType !== "current") {
     return { error: "Loads must use Total Deposit wallet." };
   }
-
-  await clearStaleRequests(user.id, input.gameSlug);
 
   const { data: pending } = await supabase
     .from("game_load_requests")
@@ -838,8 +824,6 @@ export async function requestGameRedeem(input: {
   } else {
     return { error: "Load credits from Total Deposit into this game before redeeming." };
   }
-
-  await clearStaleRequests(user.id, input.gameSlug);
 
   const { data: pending } = await supabase
     .from("game_load_requests")
