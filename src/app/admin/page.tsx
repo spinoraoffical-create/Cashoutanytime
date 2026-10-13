@@ -68,7 +68,7 @@ export default async function AdminOverviewPage() {
   const ticketAccess = await platformTicketAccess();
   const support = ticketAccess.tickets;
   const players = can(ctx, "users.manage");
-  const kyc = can(ctx, "cms.manage");
+  const kyc = can(ctx, "kyc.manage");
   const analytics = can(ctx, "analytics.read");
 
   const [pendingDeposits, pendingLoads, openTickets, pendingKyc, fraudFlags, todayUsers, weekUsers, monthUsers, todayDeposits, weekDeposits, monthDeposits] =
