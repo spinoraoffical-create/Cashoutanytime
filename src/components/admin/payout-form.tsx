@@ -69,7 +69,7 @@ export function PayoutForm({
         maxLength={120}
         aria-label="Payout note"
       />
-      <Button type="submit" size="sm" disabled={pending}>
+      <Button type="submit" size="sm" variant="destructive" disabled={pending}>
         {pending ? <Loader2 className="size-4 animate-spin" /> : "Mark paid"}
       </Button>
     </form>

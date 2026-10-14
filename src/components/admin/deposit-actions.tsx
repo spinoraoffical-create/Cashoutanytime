@@ -36,6 +36,7 @@ export function DepositActions({ depositId, currentStatus }: DepositActionsProps
     <div className="flex flex-col gap-2 min-w-[200px]">
       <Input
         placeholder="Admin notes (optional)"
+        className="border-white/10 bg-[#0b1224] text-white placeholder:text-[#8ea0c3]"
         value={adminNotes}
         onChange={(e) => setAdminNotes(e.target.value)}
       />
@@ -49,6 +50,7 @@ export function DepositActions({ depositId, currentStatus }: DepositActionsProps
           Reject
         </Button>
       </div>
+      <p className="text-xs text-[#9fb0d0]">Reject changes this record. It does not send a payment.</p>
     </div>
   );
 }

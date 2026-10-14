@@ -5,20 +5,23 @@ import { adminDb } from "@/lib/actions/admin/core";
 import { adminListScope, idsOrNone } from "@/lib/admin/list-scope";
 import { readAgentScope } from "@/lib/agents/scope";
 import { can, getStaffContext } from "@/lib/data/admin";
-import { Card, CardContent } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
+import { AdminPageHeader } from "@/components/admin/admin-page-header";
 import { DepositActions } from "@/components/admin/deposit-actions";
+import { AdminEmptyState } from "@/components/admin/ui/admin-empty-state";
+import { AdminSectionCard } from "@/components/admin/ui/admin-section-card";
+import { AdminStatusBadge } from "@/components/admin/ui/admin-status-badge";
 import { DepositsLiveRefresh } from "@/components/deposits/deposits-live-refresh";
 import { DepositProofImage } from "@/components/deposits/deposit-proof-image";
 import { getDepositMethod } from "@/lib/payments/methods";
 import { cn, formatDate } from "@/lib/utils";
 import type { RequestStatus } from "@/types/database";
 
-const statusVariant: Record<RequestStatus, "default" | "warning" | "success" | "destructive"> = {
-  pending: "warning",
-  processing: "default",
-  completed: "success",
-  rejected: "destructive",
+const STATUS_HELP: Record<string, string> = {
+  all: "The latest 100 records, in every stored status. Pending and completed stay in separate filters.",
+  pending: "Still marked pending. This filter does not include completed records.",
+  processing: "Marked in progress. This is not a completed deposit.",
+  completed: "Marked completed. This is a count of records, not revenue.",
+  rejected: "Turned down. Reject does not send a payment.",
 };
 
 async function attachStoreNames<T extends { user_id?: string; storeName?: string | null }>(deposits: T[]) {
@@ -114,72 +117,65 @@ export default async function AdminDepositsPage({
   return (
     <div className="mx-auto max-w-7xl">
       <DepositsLiveRefresh />
-      <div className="mb-6 sm:mb-8">
-        <h1 className="text-2xl sm:text-3xl font-bold">Deposit Requests</h1>
-        <p className="text-muted-foreground text-sm sm:text-base">
-          Paydora credits the wallet when payment is confirmed. This list is the deposit record.
-        </p>
-      </div>
+      <AdminPageHeader
+        title="Deposits"
+        description="Paydora credits the wallet when payment is confirmed. This list is the deposit record. Each filter shows one status."
+      />
 
-      <div className="mb-6 flex flex-wrap gap-2">
+      <div className="mb-3 flex flex-wrap gap-2">
         {FILTER_TABS.map((tab) => (
           <Link
             key={tab.id}
             href={tab.href}
             className={cn(
-              "rounded-lg border px-3 py-1.5 text-sm transition-colors",
+              "inline-flex min-h-9 items-center rounded-full border px-4 py-1.5 text-sm font-semibold",
               activeFilter === tab.id
-                ? "border-primary bg-primary/15 text-primary"
-                : "border-border text-muted-foreground hover:text-foreground hover:bg-muted"
+                ? "border-transparent bg-gradient-to-r from-[#6d28d9] to-[#2563eb] text-white"
+                : "border-white/10 text-[#9fb0d0] hover:text-white"
             )}
           >
             {tab.label}
           </Link>
         ))}
       </div>
+      <p className="mb-6 text-sm text-[#9fb0d0]">{STATUS_HELP[activeFilter] ?? STATUS_HELP.all}</p>
 
       <div className="space-y-4">
         {!deposits?.length ? (
-          <Card>
-            <CardContent className="p-8 text-center text-muted-foreground">
-              No deposit requests{status && status !== "all" ? ` with status "${status}"` : ""}.
-            </CardContent>
-          </Card>
+          <AdminEmptyState
+            title="No deposit records"
+            body={status && status !== "all" ? `Nothing is marked ${status} in the latest records.` : "New deposit records will show here."}
+          />
         ) : (
           deposits.map((dep) => {
             const user = dep.user as { full_name?: string; email?: string };
             const method = getDepositMethod(dep.payment_method);
             return (
-              <Card key={dep.id}>
-                <CardContent className="p-4">
-                  <div className="flex flex-col lg:flex-row lg:items-start justify-between gap-4">
-                    <div className="flex-1 space-y-3">
-                      <div className="flex flex-wrap items-center gap-2">
-                        <h3 className="font-semibold">{dep.game_name}</h3>
-                        <Badge variant={statusVariant[dep.status as RequestStatus]}>{dep.status}</Badge>
-                        <Badge variant="outline">{method?.label ?? dep.payment_method}</Badge>
-                      </div>
-                      <p className="text-sm text-muted-foreground">
-                        {user?.full_name} ({user?.email})
-                        {dep.storeName ? ` · ${dep.storeName}` : ""}
-                        {dep.amount != null && dep.amount > 0 && (
-                          <span className="text-emerald-400 font-semibold"> · ${Number(dep.amount).toFixed(2)}</span>
-                        )}
-                      </p>
-                      <DepositProofImage path={dep.proof_url ?? ""} />
-                      {dep.admin_notes && (
-                        <p className="text-sm text-primary">Admin: {dep.admin_notes}</p>
-                      )}
-                      <p className="text-xs text-muted-foreground">{formatDate(dep.created_at)}</p>
+              <AdminSectionCard
+                key={dep.id}
+                title={dep.game_name}
+                description={`${user?.full_name ?? "Player"}${user?.email ? ` (${user.email})` : ""}${dep.storeName ? ` · ${dep.storeName}` : ""}`}
+                action={<AdminStatusBadge status={dep.status} />}
+              >
+                <div className="flex flex-col justify-between gap-4 lg:flex-row lg:items-start">
+                  <div className="flex-1 space-y-3">
+                    <div className="flex flex-wrap items-center gap-2 text-sm text-[#9fb0d0]">
+                      <span>{method?.label ?? dep.payment_method}</span>
+                      {dep.amount != null && dep.amount > 0 ? (
+                        <span className="font-semibold text-white">${Number(dep.amount).toFixed(2)}</span>
+                      ) : null}
                     </div>
-                    <DepositActions
-                      depositId={dep.id}
-                      currentStatus={dep.status as RequestStatus}
-                      amount={dep.amount != null ? Number(dep.amount) : null}
-                    />
+                    <DepositProofImage path={dep.proof_url ?? ""} />
+                    {dep.admin_notes ? <p className="text-sm text-cyan-100">Note: {dep.admin_notes}</p> : null}
+                    <p className="text-xs text-[#8ea0c3]">{formatDate(dep.created_at)}</p>
                   </div>
-                </CardContent>
-              </Card>
+                  <DepositActions
+                    depositId={dep.id}
+                    currentStatus={dep.status as RequestStatus}
+                    amount={dep.amount != null ? Number(dep.amount) : null}
+                  />
+                </div>
+              </AdminSectionCard>
             );
           })
         )}

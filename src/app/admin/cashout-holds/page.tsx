@@ -2,6 +2,10 @@ import type { Metadata } from "next";
 
 import { AdminPageHeader } from "@/components/admin/admin-page-header";
 import { CashoutLimitForm } from "@/components/admin/cashout-limit-form";
+import { AdminEmptyState } from "@/components/admin/ui/admin-empty-state";
+import { AdminErrorState } from "@/components/admin/ui/admin-error-state";
+import { AdminSectionCard } from "@/components/admin/ui/admin-section-card";
+import { AdminStatusBadge } from "@/components/admin/ui/admin-status-badge";
 import { adminDb } from "@/lib/actions/admin/core";
 import { requirePermission } from "@/lib/data/admin";
 
@@ -21,24 +25,34 @@ export default async function CashoutHoldsPage() {
     <div className="mx-auto max-w-4xl">
       <AdminPageHeader
         title="Held cash outs"
-        description="Amounts at or under the limit go out through Paydora. Anything over the limit, or a risk flag, waits here and does not debit the wallet."
+        description="Amounts at or under the limit go out through Paydora. Anything over the limit, or a risk flag, waits here with status held. A held cash out does not debit the wallet."
       />
       {error ? (
-        <p className="mb-4 text-sm text-destructive">Apply supabase/migrations/20261008000130_auto_ops.sql to turn on automatic cash outs.</p>
+        <div className="mb-4">
+          <AdminErrorState title="Held cash outs unavailable" body="The hold list could not be loaded. The automatic cash-out tables may still need to be applied." />
+        </div>
       ) : null}
       <CashoutLimitForm limit={limit} />
-      <ul className="mt-4 divide-y divide-border rounded-2xl border border-border">
-        {rows.length === 0 ? <li className="p-6 text-sm text-muted-foreground">No held cash outs.</li> : null}
-        {rows.map((row) => (
-          <li key={row.id} className="flex items-center justify-between gap-3 p-4 text-sm">
-            <div>
-              <p className="font-semibold">${Number(row.amount).toFixed(2)}</p>
-              <p className="text-muted-foreground">{row.reason}</p>
-            </div>
-            <span className="text-muted-foreground">{new Date(row.created_at).toLocaleString()}</span>
-          </li>
-        ))}
-      </ul>
+      <div className="mt-4">
+      <AdminSectionCard title="Held records" description="Each row is a cash-out hold marked held. Saving the limit uses the confirmation already on the form.">
+        {rows.length === 0 ? <AdminEmptyState title="No held cash outs" body="New holds appear when a cash out is over the limit or flagged." /> : (
+          <ul className="divide-y divide-white/10">
+            {rows.map((row) => (
+              <li key={row.id} className="flex items-center justify-between gap-3 py-3 text-sm">
+                <div>
+                  <p className="font-semibold text-white">${Number(row.amount).toFixed(2)}</p>
+                  <p className="text-[#9fb0d0]">{row.reason}</p>
+                </div>
+                <div className="text-right">
+                  <AdminStatusBadge status="held" />
+                  <p className="mt-1 text-xs text-[#8ea0c3]">{new Date(row.created_at).toLocaleString()}</p>
+                </div>
+              </li>
+            ))}
+          </ul>
+        )}
+      </AdminSectionCard>
+      </div>
     </div>
   );
 }

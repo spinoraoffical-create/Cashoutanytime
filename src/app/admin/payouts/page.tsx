@@ -3,7 +3,8 @@ import { redirect } from "next/navigation";
 
 import { AdminPageHeader } from "@/components/admin/admin-page-header";
 import { PayoutForm } from "@/components/admin/payout-form";
-import { GlassCard } from "@/components/shared/glass-card";
+import { AdminEmptyState } from "@/components/admin/ui/admin-empty-state";
+import { AdminSectionCard } from "@/components/admin/ui/admin-section-card";
 import {
   Table,
   TableBody,
@@ -92,20 +93,18 @@ export default async function AdminPayoutsPage() {
   return (
     <div className="mx-auto max-w-5xl space-y-6">
       <AdminPageHeader
-        title="Cash-out Payouts"
-        description={`${players.length} player(s) awaiting payout · $${totalOwed.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })} owed — pay off-platform, then mark paid here to debit the cash-out balance`}
+        title="Cash outs"
+        description={`${players.length} player${players.length === 1 ? "" : "s"} with a cash-out balance. Combined balance $${totalOwed.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}. This is a balance total. Mark paid records a payout and removes the amount from the cash-out wallet.`}
       />
 
       {players.length === 0 ? (
-        <GlassCard className="py-16 text-center text-muted-foreground">
-          No pending cash-outs. Balances appear here when players redeem winnings from a game.
-        </GlassCard>
+        <AdminEmptyState title="No cash-out balances" body="Balances appear here when a player has money in the cash-out wallet." />
       ) : (
-        <GlassCard className="overflow-hidden">
+        <AdminSectionCard title="Waiting for a recorded payout" description="These rows are cash-out wallet balances. Mark paid records the payout on this screen.">
           <div className="overflow-x-auto">
             <Table>
               <TableHeader>
-                <TableRow className="border-foreground/8 hover:bg-transparent">
+                <TableRow className="border-white/10 hover:bg-transparent">
                   <TableHead>Player</TableHead>
                   <TableHead className="text-right">Cash-out balance</TableHead>
                   <TableHead className="text-right">Pay out</TableHead>
@@ -116,12 +115,12 @@ export default async function AdminPayoutsPage() {
                   const name = profileDisplayName(p);
                   const bal = profileNum(p.cashout_wallet);
                   return (
-                    <TableRow key={p.id!} className="border-foreground/8">
+                    <TableRow key={p.id!} className="border-white/10">
                       <TableCell>
-                        <p className="text-sm font-medium text-foreground">{name}</p>
-                        <p className="text-xs text-muted-foreground">{profileHandle(p)}</p>
+                        <p className="text-sm font-medium text-white">{name}</p>
+                        <p className="text-xs text-[#9fb0d0]">{profileHandle(p)}</p>
                       </TableCell>
-                      <TableCell className="tnum text-right text-base font-bold text-ws-emerald">
+                      <TableCell className="text-right text-base font-bold tabular-nums text-white">
                         ${bal.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                       </TableCell>
                       <TableCell>
@@ -135,18 +134,15 @@ export default async function AdminPayoutsPage() {
               </TableBody>
             </Table>
           </div>
-        </GlassCard>
+        </AdminSectionCard>
       )}
 
       {ledger.length > 0 && (
-        <GlassCard className="overflow-hidden">
-          <div className="border-b border-foreground/8 px-6 py-4">
-            <h2 className="font-bold">Recent payouts</h2>
-          </div>
+        <AdminSectionCard title="Recorded cash-out debits" description="The latest cash-out wallet debit rows already stored.">
           <div className="overflow-x-auto">
             <Table>
               <TableHeader>
-                <TableRow className="border-foreground/8 hover:bg-transparent">
+                <TableRow className="border-white/10 hover:bg-transparent">
                   <TableHead>Player</TableHead>
                   <TableHead className="text-right">Amount</TableHead>
                   <TableHead>Note</TableHead>
@@ -155,11 +151,11 @@ export default async function AdminPayoutsPage() {
               </TableHeader>
               <TableBody>
                 {ledger.map((row) => (
-                  <TableRow key={row.id} className="border-foreground/8">
+                  <TableRow key={row.id} className="border-white/10">
                     <TableCell className="text-sm">
                       {nameById.get(row.user_id) ?? "player"}
                     </TableCell>
-                    <TableCell className="tnum text-right font-semibold text-ws-emerald">
+                    <TableCell className="text-right font-semibold tabular-nums text-white">
                       ${Math.abs(Number(row.amount)).toFixed(2)}
                     </TableCell>
                     <TableCell className="max-w-xs truncate text-sm text-muted-foreground">
@@ -173,7 +169,7 @@ export default async function AdminPayoutsPage() {
               </TableBody>
             </Table>
           </div>
-        </GlassCard>
+        </AdminSectionCard>
       )}
     </div>
   );

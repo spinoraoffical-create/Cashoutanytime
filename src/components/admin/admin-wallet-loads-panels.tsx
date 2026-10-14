@@ -36,7 +36,7 @@ interface AdminWalletLoadsPanelsProps {
 const PAGE_SIZE = 40;
 
 const CARD =
-  "overflow-hidden rounded-2xl border border-violet-400/25 bg-[rgba(18,14,34,0.72)] backdrop-blur-xl";
+  "overflow-hidden rounded-2xl border border-white/10 bg-[#10182e]/80";
 
 type UserLoadStats = {
   count: number;
@@ -258,13 +258,18 @@ export function AdminWalletLoadsPanels({ loads: initialLoads, users }: AdminWall
       </div>
 
       <div className="flex flex-wrap gap-2">
-        <Button variant={failedOnly ? "outline" : "default"} size="sm" asChild>
-          <Link href="/admin/game-loads">All</Link>
+        <Button variant="outline" size="sm" asChild className={failedOnly ? "border-white/15 bg-transparent text-white" : "border-transparent bg-gradient-to-r from-[#6d28d9] to-[#2563eb] text-white"}>
+          <Link href="/admin/game-loads">All statuses</Link>
         </Button>
-        <Button variant={failedOnly ? "default" : "outline"} size="sm" asChild>
-          <Link href="/admin/game-loads?status=failed">Failed</Link>
+        <Button variant="outline" size="sm" asChild className={failedOnly ? "border-transparent bg-gradient-to-r from-[#6d28d9] to-[#2563eb] text-white" : "border-white/15 bg-transparent text-white"}>
+          <Link href="/admin/game-loads?status=failed">Failed only</Link>
         </Button>
       </div>
+      <p className="text-sm text-[#9fb0d0]">
+        {failedOnly
+          ? "Showing game loads marked failed. Pending and completed loads stay on All statuses."
+          : "Pending, processing, completed, and failed loads are listed together. Pending players stay at the top."}
+      </p>
 
       <div className="relative max-w-md">
         <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-500" />
@@ -275,7 +280,7 @@ export function AdminWalletLoadsPanels({ loads: initialLoads, users }: AdminWall
             setVisibleCount(PAGE_SIZE);
           }}
           placeholder="Filter players by name or email..."
-          className="border-violet-400/20 bg-[rgba(18,14,34,0.5)] pl-9"
+          className="border-white/10 bg-[#0b1224] pl-9 text-white placeholder:text-[#8ea0c3]"
         />
       </div>
 

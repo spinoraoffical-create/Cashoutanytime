@@ -113,15 +113,15 @@ export default async function AdminOverviewPage() {
     ]);
 
   const attention = [
-    money ? { href: "/admin/deposits?status=pending", label: "Pending deposits", count: pendingDeposits } : null,
-    money ? { href: "/admin/game-loads", label: "Pending wallet loads", count: pendingLoads } : null,
-    support ? { href: "/admin/support", label: "Open tickets", count: openTickets } : null,
-    kyc ? { href: "/admin/kyc", label: "New identity checks", count: pendingKyc } : null,
-    ctx.isSuperAdmin ? { href: "/admin/fraud", label: "Fraud flags", count: fraudFlags } : null,
-    money ? { href: "/admin/failed-loads", label: "Failed game loads", count: await statusCount("game_load_requests", "failed") } : null,
-    money ? { href: "/admin/cashout-holds", label: "Held cash outs", count: await statusCount("cashout_holds", "held") } : null,
-    ctx.isSuperAdmin ? { href: "/admin/failed-loads", label: "Failed Game Loads", count: await statusCount("webhook_events", "failed") } : null,
-  ].filter((item): item is { href: string; label: string; count: number | null } => Boolean(item));
+    money ? { href: "/admin/deposits?status=pending", label: "Pending deposits", count: pendingDeposits, hint: "Deposit records still marked pending." } : null,
+    money ? { href: "/admin/game-loads", label: "Pending wallet loads", count: pendingLoads, hint: "Game loads still marked pending or processing." } : null,
+    support ? { href: "/admin/support", label: "Open tickets", count: openTickets, hint: "Open this queue to take the next action." } : null,
+    kyc ? { href: "/admin/kyc", label: "New identity checks", count: pendingKyc, hint: "Identity records still marked pending." } : null,
+    ctx.isSuperAdmin ? { href: "/admin/fraud", label: "Fraud flags", count: fraudFlags, hint: "Open this queue to take the next action." } : null,
+    money ? { href: "/admin/failed-loads", label: "Failed game loads", count: await statusCount("game_load_requests", "failed"), hint: "Game-load records marked failed. Opens the failed-load list." } : null,
+    money ? { href: "/admin/cashout-holds", label: "Held cash outs", count: await statusCount("cashout_holds", "held"), hint: "Cash outs marked held. The wallet is not debited while they stay held." } : null,
+    ctx.isSuperAdmin ? { label: "Failed webhooks", count: await statusCount("webhook_events", "failed"), hint: "Webhook events marked failed. There is no webhook list to open." } : null,
+  ].filter((item): item is { href?: string; label: string; count: number | null; hint: string } => Boolean(item));
 
   const dayStart = utcDayStart();
   const [depositsToday, cashoutsToday, seenToday, storesOnFile, subsOnFile, linkedPlayers] = await Promise.all([
@@ -288,7 +288,7 @@ export default async function AdminOverviewPage() {
 
       <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
         {attention.map((item) => (
-          <AdminStatCard key={item.href + item.label} href={item.href} label={item.label} value={showCount(item.count)} hint="Open this queue to take the next action." />
+          <AdminStatCard key={(item.href ?? "info") + item.label} href={item.href} label={item.label} value={showCount(item.count)} hint={item.hint} />
         ))}
       </div>
 

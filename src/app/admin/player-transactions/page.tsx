@@ -2,7 +2,10 @@ import type { Metadata } from "next";
 import Link from "next/link";
 
 import { AdminPageHeader } from "@/components/admin/admin-page-header";
-import { GlassCard } from "@/components/shared/glass-card";
+import { AdminEmptyState } from "@/components/admin/ui/admin-empty-state";
+import { AdminSectionCard } from "@/components/admin/ui/admin-section-card";
+import { AdminStatCard } from "@/components/admin/ui/admin-stat-card";
+import { AdminStatusBadge } from "@/components/admin/ui/admin-status-badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
@@ -46,18 +49,9 @@ export default async function PlayerTransactionsPage({
           query={{ q: "", status: "completed", from: null, to: null, storeId: report.query.storeId }}
         />
         <div className="grid gap-3 sm:grid-cols-3">
-          <GlassCard className="px-6 py-4">
-            <p className="text-sm text-muted-foreground">Money received</p>
-            <p className="text-2xl font-bold">{moneyLabel(report.moneyReceived)}</p>
-          </GlassCard>
-          <GlassCard className="px-6 py-4">
-            <p className="text-sm text-muted-foreground">Cash paid out</p>
-            <p className="text-2xl font-bold">{moneyLabel(report.cashPaidOut)}</p>
-          </GlassCard>
-          <GlassCard className="px-6 py-4">
-            <p className="text-sm text-muted-foreground">Profit or loss</p>
-            <p className="text-2xl font-bold">{signedMoneyLabel(report.profit)}</p>
-          </GlassCard>
+          <AdminStatCard label="Money received" value={moneyLabel(report.moneyReceived)} hint="Completed deposit money stored for this day." />
+          <AdminStatCard label="Cash paid out" value={moneyLabel(report.cashPaidOut)} hint="Cash paid out on stored rows for this day." />
+          <AdminStatCard label="Received minus paid out" value={signedMoneyLabel(report.profit)} hint="Money received minus cash paid out for this day. This is not a full profit statement." />
         </div>
         <form method="get" className="flex flex-wrap items-end gap-2">
           <input type="hidden" name="tab" value="report" />
@@ -80,7 +74,7 @@ export default async function PlayerTransactionsPage({
           ) : null}
           <Button type="submit">Filter</Button>
         </form>
-        <GlassCard className="overflow-hidden">
+        <AdminSectionCard title="Coins by game" description="Completed coin activity for the selected day.">
           <Table>
             <TableHeader>
               <TableRow>
@@ -93,8 +87,8 @@ export default async function PlayerTransactionsPage({
             <TableBody>
               {report.games.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={4} className="text-muted-foreground">
-                    No completed coin activity this day.
+                  <TableCell colSpan={4}>
+                    <AdminEmptyState title="No completed coin activity" body="Completed loads for this day will show here." />
                   </TableCell>
                 </TableRow>
               ) : (
@@ -109,8 +103,8 @@ export default async function PlayerTransactionsPage({
               )}
             </TableBody>
           </Table>
-        </GlassCard>
-        <GlassCard className="overflow-hidden">
+        </AdminSectionCard>
+        <AdminSectionCard title="Player rows" description="Completed records for the selected day. Pending rows stay out of this daily view.">
           <Table>
             <TableHeader>
               <TableRow>
@@ -126,8 +120,8 @@ export default async function PlayerTransactionsPage({
             <TableBody>
               {report.rows.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={7} className="text-muted-foreground">
-                    No completed records this day.
+                  <TableCell colSpan={7}>
+                    <AdminEmptyState title="No completed records" body="Completed player rows for this day will show here." />
                   </TableCell>
                 </TableRow>
               ) : (
@@ -145,7 +139,7 @@ export default async function PlayerTransactionsPage({
               )}
             </TableBody>
           </Table>
-        </GlassCard>
+        </AdminSectionCard>
       </div>
     );
   }
@@ -167,10 +161,11 @@ export default async function PlayerTransactionsPage({
 
       <RecordTabs current={query.kind} query={query} />
 
-      <GlassCard className="px-6 py-4">
-        <p className="text-sm text-muted-foreground">{query.kind === "recharge" ? "Credit spent" : "Redeemed"}</p>
-        <p className="text-2xl font-bold">{moneyLabel(total)}</p>
-      </GlassCard>
+      <AdminStatCard
+        label={query.kind === "recharge" ? "Credit spent" : "Redeemed"}
+        value={moneyLabel(total)}
+        hint={query.status === "all" ? "Rows in the current search." : `Rows marked ${query.status}. Other statuses stay in their own filter.`}
+      />
 
       <form method="get" className="flex flex-wrap items-end gap-2">
         <input type="hidden" name="tab" value={query.kind} />
@@ -180,7 +175,7 @@ export default async function PlayerTransactionsPage({
         </label>
         <label className="grid gap-1 text-xs text-muted-foreground">
           Status
-          <select name="status" defaultValue={query.status} className="h-9 rounded-md border border-input bg-transparent px-2 text-sm">
+          <select name="status" defaultValue={query.status} className="h-9 rounded-md border border-white/10 bg-[#0b1224] px-2 text-sm text-white">
             {TRANSACTION_STATUSES.map((status) => (
               <option key={status} value={status}>
                 {status === "all" ? "All" : status}
@@ -212,7 +207,7 @@ export default async function PlayerTransactionsPage({
         <Button type="submit">Filter</Button>
       </form>
 
-      <GlassCard className="overflow-hidden">
+      <AdminSectionCard title={query.kind === "recharge" ? "Recharge records" : "Redeem records"} description="Stored rows for the current status filter.">
         <Table>
           <TableHeader>
             <TableRow>
@@ -233,8 +228,8 @@ export default async function PlayerTransactionsPage({
           <TableBody>
             {rows.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={query.kind === "recharge" ? 6 : 5} className="text-muted-foreground">
-                  No {query.kind === "recharge" ? "recharge" : "redeem"} records.
+                <TableCell colSpan={query.kind === "recharge" ? 6 : 5}>
+                  <AdminEmptyState title="No records in this filter" body={`No ${query.kind === "recharge" ? "recharge" : "redeem"} rows match this search and status.`} />
                 </TableCell>
               </TableRow>
             ) : (
@@ -246,7 +241,7 @@ export default async function PlayerTransactionsPage({
                   </TableCell>
                   <TableCell>{row.game}</TableCell>
                   <TableCell>{formatDate(row.createdAt)}</TableCell>
-                  <TableCell className="capitalize">{row.status}</TableCell>
+                  <TableCell><AdminStatusBadge status={row.status} /></TableCell>
                   {query.kind === "recharge" ? (
                     <>
                       <TableCell className="text-right">{moneyLabel(row.collected)}</TableCell>
@@ -260,15 +255,15 @@ export default async function PlayerTransactionsPage({
             )}
           </TableBody>
         </Table>
-      </GlassCard>
+      </AdminSectionCard>
     </div>
   );
 }
 
 function scopeDescription(level: "platform" | "store" | "sub") {
-  if (level === "sub") return "Recharge and redeem records for your players.";
-  if (level === "store") return "Recharge and redeem records for your players and your sub-creators' players.";
-  return "Recharge and redeem records for every player. Filter by store to see one creator's players.";
+  if (level === "sub") return "Recharge and redeem records for your players. Each status filter stays separate.";
+  if (level === "store") return "Recharge and redeem records for your players and your sub-creators' players. Each status filter stays separate.";
+  return "Recharge and redeem records for every player. Filter by store or status. The daily received-minus-paid-out figure is not a full profit statement.";
 }
 
 function formatReportTime(iso: string) {
@@ -302,8 +297,8 @@ function RecordTabs({
       <Link
         href={`/admin/player-transactions?tab=report${query.storeId ? `&store=${encodeURIComponent(query.storeId)}` : ""}`}
         className={cn(
-          "rounded-lg border px-3 py-1.5 text-sm",
-          current === "report" ? "border-primary bg-primary/15 text-primary" : "border-border text-muted-foreground"
+          "inline-flex min-h-9 items-center rounded-full border px-4 py-1.5 text-sm font-semibold",
+          current === "report" ? "border-transparent bg-gradient-to-r from-[#6d28d9] to-[#2563eb] text-white" : "border-white/10 text-[#9fb0d0]"
         )}
       >
         Daily report
@@ -328,8 +323,8 @@ function TabLink({
     <Link
       href={`/admin/player-transactions?${params}`}
       className={cn(
-        "rounded-lg border px-3 py-1.5 text-sm",
-        current === kind ? "border-primary bg-primary/15 text-primary" : "border-border text-muted-foreground"
+        "inline-flex min-h-9 items-center rounded-full border px-4 py-1.5 text-sm font-semibold",
+        current === kind ? "border-transparent bg-gradient-to-r from-[#6d28d9] to-[#2563eb] text-white" : "border-white/10 text-[#9fb0d0]"
       )}
     >
       {label}

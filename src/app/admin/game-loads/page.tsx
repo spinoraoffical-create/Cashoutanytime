@@ -1,5 +1,6 @@
 import { redirect } from "next/navigation";
 
+import { AdminPageHeader } from "@/components/admin/admin-page-header";
 import { AdminWalletLoadsPanels } from "@/components/admin/admin-wallet-loads-panels";
 import { adminDb } from "@/lib/actions/admin/core";
 import { getAgentScope } from "@/lib/agents/scope";
@@ -46,13 +47,10 @@ export default async function AdminGameLoadsPage() {
 
   return (
     <div>
-      <div className="mb-6 sm:mb-8">
-        <h1 className="text-2xl sm:text-3xl font-bold">Wallet Loads</h1>
-        <p className="text-sm text-slate-400 sm:text-base">
-          Browse every player&apos;s deposit loads and redeems — pending requests shown first.
-          Click any row to open their full load history. Updates live.
-        </p>
-      </div>
+      <AdminPageHeader
+        title="Loads and redeems"
+        description="Pending and processing loads need a person. Completed loads are finished. Failed loads are the ones that did not finish. A retry does not credit the deposit again. Opening a row shows that player's history."
+      />
 
       <AdminWalletLoadsPanels loads={loads ?? []} users={users ?? []} />
     </div>

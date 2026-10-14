@@ -6,7 +6,9 @@ import {
   type FieldValue,
 } from "@/components/admin/entity-edit-dialog";
 import { ConfirmActionButton } from "@/components/admin/confirm-action-button";
-import { GlassCard } from "@/components/shared/glass-card";
+import { AdminEmptyState } from "@/components/admin/ui/admin-empty-state";
+import { AdminSectionCard } from "@/components/admin/ui/admin-section-card";
+import { AdminStatusBadge } from "@/components/admin/ui/admin-status-badge";
 import { adminDb } from "@/lib/actions/admin/core";
 import {
   deletePaymentMethodAction,
@@ -51,7 +53,7 @@ export default async function AdminPaymentsPage() {
     <div className="mx-auto max-w-3xl">
       <AdminPageHeader
         title="Payment Methods"
-        description="Stored payment labels. Player checkout uses Paydora only, so these handles and QR codes are not shown on the deposit page."
+        description="Stored payment labels for the settings list. Player checkout uses Paydora. Delete asks for confirmation before a method is removed."
       />
 
       <div className="mb-6">
@@ -79,26 +81,11 @@ export default async function AdminPaymentsPage() {
 
       <div className="space-y-3">
         {methods.length === 0 && (
-          <p className="text-sm text-muted-foreground">No payment methods yet — add one above.</p>
+          <AdminEmptyState title="No payment methods yet" body="Add a label above. This list does not send a payment." />
         )}
         {methods.map((m) => (
-          <GlassCard key={m.id} className="flex flex-wrap items-center justify-between gap-3 p-4">
-            <div className="min-w-0">
-              <p className="flex items-center gap-2 font-semibold">
-                {m.label}
-                {!m.is_active && (
-                  <span className="rounded-full bg-foreground/10 px-2 py-0.5 text-[10px] uppercase text-muted-foreground">
-                    Hidden
-                  </span>
-                )}
-              </p>
-              <p className="truncate text-xs text-muted-foreground">
-                {m.handle_label ? `${m.handle_label}: ` : ""}
-                {m.handle ?? "—"}
-                {m.pay_link ? " · link ✓" : ""}
-                {m.qr_image_url ? " · QR ✓" : ""}
-              </p>
-            </div>
+          <AdminSectionCard key={m.id} title={m.label} description={`${m.handle_label ? `${m.handle_label}: ` : ""}${m.handle ?? "No handle"}${m.pay_link ? " · link saved" : ""}${m.qr_image_url ? " · QR saved" : ""}`} action={m.is_active ? <AdminStatusBadge status="Active" /> : <AdminStatusBadge status="Hidden" />}>
+            <div className="flex flex-wrap items-center justify-between gap-3">
             <div className="flex items-center gap-2">
               <EntityEditDialog
                 title={`Edit — ${m.label}`}
@@ -132,7 +119,8 @@ export default async function AdminPaymentsPage() {
                 }}
               />
             </div>
-          </GlassCard>
+            </div>
+          </AdminSectionCard>
         ))}
       </div>
     </div>
