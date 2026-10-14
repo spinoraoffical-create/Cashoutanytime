@@ -51,6 +51,9 @@ export function OfferSendForm({ emailCount, smsCount }: { emailCount: number; sm
         <Label htmlFor="offer-sms">SMS</Label>
         <Input id="offer-sms" value={smsBody} onChange={(event) => setSmsBody(event.target.value)} required maxLength={120} />
       </div>
+      <p className="text-xs leading-5 text-[#9fb0d0]">
+        Send delivers this offer now. It does not ask for a second confirmation.
+      </p>
       <Button type="submit" disabled={busy}>
         {busy ? "Sending..." : "Send"}
       </Button>

@@ -1,11 +1,14 @@
 import type { Metadata } from "next";
 
 import { AdminPageHeader } from "@/components/admin/admin-page-header";
-import { GlassCard } from "@/components/shared/glass-card";
-import { Badge } from "@/components/ui/badge";
+import { AdminSectionCard } from "@/components/admin/ui/admin-section-card";
+import { AdminStatCard } from "@/components/admin/ui/admin-stat-card";
+import { AdminStatusBadge } from "@/components/admin/ui/admin-status-badge";
+import { AdminEmptyState } from "@/components/admin/ui/admin-empty-state";
 import { requirePermission } from "@/lib/data/admin";
 import { adminDb } from "@/lib/actions/admin/core";
 import { AIBlogGeneratorCard } from "@/components/admin/ai-blog-generator-card";
+import { blogStatusHelp } from "@/lib/admin/marketing-status";
 
 export const metadata: Metadata = { title: "AI Auto Blog" };
 
@@ -19,57 +22,49 @@ export default async function AdminAIBlogPage() {
     .order("created_at", { ascending: false })
     .limit(10);
 
-  const publishedCount = (posts ?? []).filter((p) => p.status === "published").length;
+  const loaded = posts ?? [];
+  const publishedCount = loaded.filter((p) => p.status === "published").length;
 
   return (
     <div className="mx-auto max-w-7xl space-y-6">
       <AdminPageHeader
-        title="AI Auto Blog Engine"
-        description="Automated AI-powered SEO content generator. Craft high-ranking articles with auto keywords, JSON-LD Schema, and instant Telegram broadcasting."
+        title="AI blog"
+        description="Opening this page does not generate or publish. The generate control below still uses the existing action, and that action can publish. Stored post statuses are draft, scheduled, published, and archived."
       />
 
-      {/* Top Metrics Grid */}
-      <GlassCard className="p-5">
-        <p className="text-xs text-muted-foreground">Published posts on file</p>
-        <p className="mt-2 text-3xl font-extrabold tabular-nums">{publishedCount}</p>
-      </GlassCard>
+      <AdminStatCard
+        label="Published in this list"
+        value={String(publishedCount)}
+        hint="This counts published rows among the 10 newest posts loaded here."
+      />
 
-      {/* Trigger & Configuration Card */}
       <AIBlogGeneratorCard />
 
-      {/* Recent Blog Posts List */}
-      <GlassCard className="p-6">
-        <h3 className="text-md font-bold text-foreground mb-4">Recent Published Blog Posts</h3>
-        <div className="divide-y divide-border/50">
-          {(posts ?? []).length === 0 ? (
-            <p className="py-4 text-center text-sm text-muted-foreground">No blog posts found. Generate your first post above!</p>
-          ) : (
-            (posts ?? []).map((post) => (
-              <div key={post.id} className="flex flex-col sm:flex-row sm:items-center justify-between py-3 gap-2">
+      <AdminSectionCard title="Newest posts" description="This list is for reading. It does not publish.">
+        {loaded.length === 0 ? (
+          <AdminEmptyState title="No blog posts in this list" body="A post appears here after the existing generate control creates one." />
+        ) : (
+          <div className="divide-y divide-white/10">
+            {loaded.map((post) => (
+              <div key={post.id} className="flex flex-col justify-between gap-2 py-3 sm:flex-row sm:items-center">
                 <div>
-                  <a
-                    href={`/blog/${post.slug}`}
-                    target="_blank"
-                    rel="noreferrer"
-                    className="font-medium text-foreground hover:text-ws-green transition-colors"
-                  >
+                  <a href={`/blog/${post.slug}`} target="_blank" rel="noreferrer" className="font-medium text-white hover:text-sky-200">
                     {post.title}
                   </a>
-                  <p className="text-xs text-muted-foreground line-clamp-1">{post.excerpt || post.slug}</p>
+                  <p className="line-clamp-1 text-xs text-[#9fb0d0]">{post.excerpt || post.slug}</p>
                 </div>
-                <div className="flex items-center gap-2 shrink-0">
-                  <Badge variant={post.status === "published" ? "default" : "secondary"}>
-                    {post.status}
-                  </Badge>
-                  <span className="text-xs text-muted-foreground">
-                    {post.published_at ? new Date(post.published_at).toLocaleDateString() : "Draft"}
-                  </span>
+                <div className="shrink-0">
+                  <AdminStatusBadge status={post.status} />
+                  <p className="mt-1 text-xs text-[#9fb0d0]">{blogStatusHelp(post.status)}</p>
+                  <p className="text-xs text-[#8ea0c3]">
+                    {post.published_at ? new Date(post.published_at).toLocaleDateString() : "No publish date"}
+                  </p>
                 </div>
               </div>
-            ))
-          )}
-        </div>
-      </GlassCard>
+            ))}
+          </div>
+        )}
+      </AdminSectionCard>
     </div>
   );
 }

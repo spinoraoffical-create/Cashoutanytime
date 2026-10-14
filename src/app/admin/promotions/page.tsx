@@ -4,31 +4,15 @@ import { format } from "date-fns";
 import { AdminPageHeader } from "@/components/admin/admin-page-header";
 import { ConfirmActionButton } from "@/components/admin/confirm-action-button";
 import { PromotionFormDialog } from "@/components/admin/promotion-form-dialog";
-import { EmptyState } from "@/components/shared/empty-state";
-import { GlassCard } from "@/components/shared/glass-card";
-import { Badge } from "@/components/ui/badge";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
+import { AdminSectionCard } from "@/components/admin/ui/admin-section-card";
+import { AdminStatusBadge } from "@/components/admin/ui/admin-status-badge";
+import { AdminEmptyState } from "@/components/admin/ui/admin-empty-state";
 import { deletePromotionAction } from "@/lib/actions/admin/promotions";
 import { adminDb } from "@/lib/actions/admin/core";
 import { requirePermission } from "@/lib/data/admin";
-import { BadgePercent } from "lucide-react";
+import { promotionStatusHelp } from "@/lib/admin/marketing-status";
 
 export const metadata: Metadata = { title: "Promotions" };
-
-const STATUS_STYLE: Record<string, string> = {
-  draft: "bg-foreground/8 text-muted-foreground",
-  scheduled: "bg-ws-cyan/15 text-ws-cyan",
-  active: "bg-ws-emerald/15 text-ws-emerald",
-  expired: "bg-ws-green/15 text-ws-green-deep dark:text-ws-green",
-  archived: "bg-foreground/8 text-muted-foreground",
-};
 
 export default async function AdminPromotionsPage() {
   await requirePermission("promotions.manage");
@@ -43,70 +27,54 @@ export default async function AdminPromotionsPage() {
   const list = promotions ?? [];
 
   return (
-    <div className="mx-auto max-w-6xl">
+    <div className="mx-auto max-w-6xl space-y-4">
       <AdminPageHeader
         title="Promotions"
-        description="Create, schedule and expire member bonus offers."
+        description="Draft, scheduled, active, expired, and archived are the stored statuses. Edit and delete change the promotion record. They do not send email or SMS from this screen."
         action={<PromotionFormDialog />}
       />
 
-      {list.length === 0 ? (
-        <EmptyState
-          icon={<BadgePercent />}
-          title="No promotions yet"
-          description="Create your first promotion to drive engagement."
-        />
-      ) : (
-        <GlassCard className="overflow-hidden">
+      <AdminSectionCard title="Promotion list" description="The reward columns are the stored coin and XP amounts on the promotion. This page does not pay them out.">
+        {list.length === 0 ? (
+          <AdminEmptyState title="No promotions yet" body="Create a promotion to save a draft. Creating one does not email players." />
+        ) : (
           <div className="overflow-x-auto">
-            <Table>
-              <TableHeader>
-                <TableRow className="border-foreground/8 hover:bg-transparent">
-                  <TableHead>Promotion</TableHead>
-                  <TableHead className="text-right">Reward</TableHead>
-                  <TableHead className="text-right">Window</TableHead>
-                  <TableHead className="text-right">Status</TableHead>
-                  <TableHead className="w-24 text-right">Actions</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
+            <table className="w-full min-w-[44rem] text-left text-sm">
+              <thead>
+                <tr className="border-b border-white/10 text-xs uppercase tracking-wide text-[#8ea0c3]">
+                  <th className="px-2 py-2 font-medium">Promotion</th>
+                  <th className="px-2 py-2 text-right font-medium">Reward</th>
+                  <th className="px-2 py-2 text-right font-medium">Window</th>
+                  <th className="px-2 py-2 text-right font-medium">Status</th>
+                  <th className="px-2 py-2 text-right font-medium">Actions</th>
+                </tr>
+              </thead>
+              <tbody>
                 {list.map((p) => (
-                  <TableRow key={p.id} className="border-foreground/8">
-                    <TableCell>
-                      <div className="flex items-center gap-2">
-                        <span className="font-medium">{p.title}</span>
-                        {p.is_featured && (
-                          <Badge className="bg-ws-green/15 text-ws-green-deep dark:text-ws-green">Featured</Badge>
-                        )}
+                  <tr key={p.id} className="border-b border-white/5 align-top last:border-0">
+                    <td className="px-2 py-3">
+                      <div className="flex flex-wrap items-center gap-2">
+                        <span className="font-medium text-white">{p.title}</span>
+                        {p.is_featured ? <AdminStatusBadge status="Featured" /> : null}
                       </div>
-                      <p className="text-xs text-muted-foreground">/{p.slug}</p>
-                    </TableCell>
-                    <TableCell className="tnum text-right text-sm">
-                      {p.coins_bonus > 0 && (
-                        <span className="text-ws-green-deep dark:text-ws-green">
-                          {p.coins_bonus.toLocaleString()}c
-                        </span>
-                      )}
-                      {p.coins_bonus > 0 && p.xp_bonus > 0 && " · "}
-                      {p.xp_bonus > 0 && (
-                        <span className="text-ws-cyan">
-                          {p.xp_bonus.toLocaleString()} XP
-                        </span>
-                      )}
-                    </TableCell>
-                    <TableCell className="tnum text-right text-xs text-muted-foreground">
+                      <p className="text-xs text-[#9fb0d0]">/{p.slug}</p>
+                    </td>
+                    <td className="px-2 py-3 text-right text-sm tabular-nums text-[#e8eefc]">
+                      {p.coins_bonus > 0 ? <span>{p.coins_bonus.toLocaleString()} coins</span> : null}
+                      {p.coins_bonus > 0 && p.xp_bonus > 0 ? " · " : null}
+                      {p.xp_bonus > 0 ? <span>{p.xp_bonus.toLocaleString()} XP</span> : null}
+                      {p.coins_bonus <= 0 && p.xp_bonus <= 0 ? "—" : null}
+                    </td>
+                    <td className="px-2 py-3 text-right text-xs tabular-nums text-[#9fb0d0]">
                       {p.starts_at ? format(new Date(p.starts_at), "MMM d") : "—"}
                       {" → "}
                       {p.ends_at ? format(new Date(p.ends_at), "MMM d") : "∞"}
-                    </TableCell>
-                    <TableCell className="text-right">
-                      <Badge
-                        className={`uppercase tracking-wide ${STATUS_STYLE[p.status]}`}
-                      >
-                        {p.status}
-                      </Badge>
-                    </TableCell>
-                    <TableCell className="text-right">
+                    </td>
+                    <td className="px-2 py-3 text-right">
+                      <AdminStatusBadge status={p.status} />
+                      <p className="mt-1 text-xs leading-5 text-[#9fb0d0]">{promotionStatusHelp(p.status)}</p>
+                    </td>
+                    <td className="px-2 py-3 text-right">
                       <div className="flex justify-end gap-1">
                         <PromotionFormDialog promotion={p} />
                         <ConfirmActionButton
@@ -116,14 +84,14 @@ export default async function AdminPromotionsPage() {
                           confirmLabel="Delete"
                         />
                       </div>
-                    </TableCell>
-                  </TableRow>
+                    </td>
+                  </tr>
                 ))}
-              </TableBody>
-            </Table>
+              </tbody>
+            </table>
           </div>
-        </GlassCard>
-      )}
+        )}
+      </AdminSectionCard>
     </div>
   );
 }

@@ -2,8 +2,10 @@ import type { Metadata } from "next";
 
 import { AdminPageHeader } from "@/components/admin/admin-page-header";
 import { AdminAiBotControlCard } from "@/components/admin/admin-ai-bot-control-card";
-import { GlassCard } from "@/components/shared/glass-card";
-import { Badge } from "@/components/ui/badge";
+import { AdminSectionCard } from "@/components/admin/ui/admin-section-card";
+import { AdminStatusBadge } from "@/components/admin/ui/admin-status-badge";
+import { AdminErrorState } from "@/components/admin/ui/admin-error-state";
+import { AdminEmptyState } from "@/components/admin/ui/admin-empty-state";
 import { requirePermission } from "@/lib/data/admin";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { getChatbotSettings } from "@/lib/ai/settings";
@@ -28,7 +30,7 @@ export default async function AdminAIChatbotPage() {
 
   const db = createAdminClient();
   if (!db) {
-    logsError = "SUPABASE_SERVICE_ROLE_KEY is missing — AI settings cannot be saved.";
+    logsError = "The admin database client is missing, so chatbot settings cannot be saved from here.";
   } else {
     const { data, error } = await db
       .from("ai_chat_logs")
@@ -38,8 +40,8 @@ export default async function AdminAIChatbotPage() {
 
     if (error) {
       logsError = /ai_chat_logs|schema cache|does not exist/i.test(error.message)
-        ? "Run supabase/migrations/20260720000300_kyc_and_ai_system.sql in Supabase SQL Editor."
-        : error.message;
+        ? "Chat logs are not available until the AI tables exist."
+        : "Chat logs could not be loaded.";
     } else {
       logs = (data ?? []) as ChatLogRow[];
     }
@@ -54,95 +56,52 @@ export default async function AdminAIChatbotPage() {
   return (
     <div className="mx-auto max-w-7xl space-y-6">
       <AdminPageHeader
-        title="AI Customer Support Chatbot"
-        description="Database-backed controls, unified chatbot engine, Telegram escalation, and live conversation logs."
+        title="Support chatbot"
+        description="The switch below is the saved chatbot setting. Opening this page does not send a chat or change the switch. Keys stay hidden."
       />
 
-      {logsError && (
-        <GlassCard className="border-amber-500/40 bg-amber-500/5 p-4">
-          <p className="text-sm font-bold text-amber-400">AI database setup required</p>
-          <p className="mt-1 text-xs text-muted-foreground">{logsError}</p>
-        </GlassCard>
-      )}
+      {logsError ? <AdminErrorState title="Chat logs could not be loaded" body={logsError} /> : null}
 
       <AdminAiBotControlCard />
 
       <div className="grid gap-4 sm:grid-cols-3">
-        <GlassCard className="p-5">
-          <p className="hud-label text-xs text-muted-foreground">AI Support Status</p>
-          <div className="mt-2 flex items-baseline justify-between">
-            <span className="text-2xl font-bold text-emerald-400">
-              {chatSettings.is_enabled ? "Active" : "Paused"}
-            </span>
-            <Badge className={chatSettings.is_enabled ? "bg-emerald-500/15 text-emerald-400" : "bg-rose-500/15 text-rose-400"}>
-              {chatSettings.is_enabled ? "On" : "Off"}
-            </Badge>
-          </div>
-        </GlassCard>
-
-        <GlassCard className="p-5">
-          <p className="hud-label text-xs text-muted-foreground">Engine Mode</p>
-          <div className="mt-2 flex items-baseline justify-between">
-            <span className="text-lg font-bold text-foreground">
-              {isLLMConfigured ? "LLM + Knowledge Base" : "Knowledge Base Only"}
-            </span>
-            <Badge variant="outline">{isLLMConfigured ? "LLM Ready" : "Rules Only"}</Badge>
-          </div>
-        </GlassCard>
-
-        <GlassCard className="p-5">
-          <p className="hud-label text-xs text-muted-foreground">Human Handover Threshold</p>
-          <div className="mt-2 flex items-baseline justify-between">
-            <span className="text-2xl font-bold text-ws-green">{thresholdPct}%</span>
-            <Badge className="bg-ws-green/15 text-ws-green">Auto Escalate</Badge>
-          </div>
-        </GlassCard>
+        <AdminSectionCard title="Saved switch" description="On means the stored chatbot switch is enabled. Off means it is disabled.">
+          <AdminStatusBadge status={chatSettings.is_enabled ? "On" : "Off"} />
+        </AdminSectionCard>
+        <AdminSectionCard title="Reply engine" description="This shows whether a model key is present. The key value stays hidden. This page does not call the model.">
+          <AdminStatusBadge status={isLLMConfigured ? "Model key present" : "No model key"} />
+        </AdminSectionCard>
+        <AdminSectionCard title="Handover threshold" description="Stored percent. A chat at or below this confidence can be handed to a person. This page does not send that chat.">
+          <p className="text-2xl font-semibold tabular-nums text-white">{thresholdPct}%</p>
+        </AdminSectionCard>
       </div>
 
-      <GlassCard className="p-6">
-        <div className="flex items-center justify-between border-b border-border/50 pb-4 mb-4">
-          <h2 className="text-lg font-semibold text-foreground">Recent AI Chatbot Interactions</h2>
-          <Badge variant="outline" className="font-mono">
-            Unified engine
-          </Badge>
-        </div>
-
-        <div className="space-y-4">
-          {logs.length === 0 ? (
-            <p className="py-6 text-center text-sm text-muted-foreground">
-              {logsError
-                ? "Chat logs unavailable until the AI migration is applied."
-                : "No AI chat logs yet. Logs appear when users chat via the live widget or dashboard."}
-            </p>
-          ) : (
-            logs.map((log) => (
-              <div key={log.id} className="border border-border/60 rounded-lg p-4 bg-background/40 space-y-2">
-                <div className="flex items-center justify-between text-xs text-muted-foreground">
+      <AdminSectionCard title="Recent chatbot replies" description="Saved replies only. This list does not send a new message.">
+        {logs.length === 0 ? (
+          <AdminEmptyState
+            title="No chatbot replies in this list"
+            body={logsError ? "Logs stay hidden until they can be loaded." : "Replies appear here after a player uses the existing chat widget."}
+          />
+        ) : (
+          <div className="space-y-4">
+            {logs.map((log) => (
+              <article key={log.id} className="space-y-2 rounded-xl border border-white/10 bg-[#0c1224] p-4">
+                <div className="flex flex-wrap items-center justify-between gap-2 text-xs text-[#9fb0d0]">
                   <span>{new Date(log.created_at).toLocaleString()}</span>
                   <div className="flex items-center gap-2">
-                    <Badge variant={log.confidence_score >= 0.8 ? "default" : "secondary"}>
-                      Confidence: {Math.round(log.confidence_score * 100)}%
-                    </Badge>
-                    {log.escalated_to_human && (
-                      <Badge className="bg-amber-500/20 text-amber-400">Escalated</Badge>
-                    )}
+                    <AdminStatusBadge status={`${Math.round(log.confidence_score * 100)}% confidence`} />
+                    {log.escalated_to_human ? <AdminStatusBadge status="Escalated" /> : null}
                   </div>
                 </div>
-                <div>
-                  <p className="text-xs font-bold text-emerald-400">User Query</p>
-                  <p className="text-sm text-foreground bg-background/60 p-2 rounded mt-0.5">{log.user_query}</p>
-                </div>
-                <div>
-                  <p className="text-xs font-bold text-sky-400">AI Response</p>
-                  <p className="text-sm text-muted-foreground bg-background/60 p-2 rounded mt-0.5 whitespace-pre-wrap">
-                    {log.bot_response}
-                  </p>
-                </div>
-              </div>
-            ))
-          )}
-        </div>
-      </GlassCard>
+                <p className="text-xs font-semibold text-emerald-200">Player</p>
+                <p className="rounded-lg bg-white/5 p-2 text-sm text-white">{log.user_query}</p>
+                <p className="text-xs font-semibold text-sky-200">Chatbot</p>
+                <p className="whitespace-pre-wrap rounded-lg bg-white/5 p-2 text-sm text-[#9fb0d0]">{log.bot_response}</p>
+              </article>
+            ))}
+          </div>
+        )}
+      </AdminSectionCard>
     </div>
   );
 }

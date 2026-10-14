@@ -4,15 +4,14 @@ import { AdminPageHeader } from "@/components/admin/admin-page-header";
 import { TelegramBroadcastCard } from "@/components/admin/telegram-broadcast-card";
 import { AdminAutopilotCard } from "@/components/admin/admin-autopilot-card";
 import { AdminImageGeneratorCard } from "@/components/admin/admin-image-generator-card";
-import { GlassCard } from "@/components/shared/glass-card";
-import { Badge } from "@/components/ui/badge";
+import { AdminTelegramTester } from "@/components/admin/admin-telegram-tester";
+import { AdminSectionCard } from "@/components/admin/ui/admin-section-card";
+import { AdminStatusBadge } from "@/components/admin/ui/admin-status-badge";
 import { requirePermission } from "@/lib/data/admin";
 import { isTelegramConfigured } from "@/lib/telegram/client";
 import { SITE_URL } from "@/lib/constants";
 
-export const metadata: Metadata = { title: "Telegram Bot & 100% Hands-Free Autopilot" };
-
-import { AdminTelegramTester } from "@/components/admin/admin-telegram-tester";
+export const metadata: Metadata = { title: "Telegram channel" };
 
 export default async function AdminTelegramPage() {
   await requirePermission("cms.manage");
@@ -25,67 +24,34 @@ export default async function AdminTelegramPage() {
   return (
     <div className="mx-auto max-w-7xl space-y-6">
       <AdminPageHeader
-        title="Telegram Bot & 100% Hands-Free Autopilot"
-        description="Zero work required! The AI Autopilot automatically rotates poster photos and posts daily date offers every day."
+        title="Telegram channel"
+        description="This page posts to the Telegram channel when you use the existing buttons. Opening it does not send a message. Player email and SMS are separate tools."
       />
 
-      {/* 🟢 100% Hands-Free Autopilot Master Control Card */}
       <AdminAutopilotCard />
-
-      {/* 1-Click Telegram Bot Connection Tester */}
       <AdminTelegramTester />
-
-      {/* 1-Click Interactive Broadcast Panel with Templates */}
       <TelegramBroadcastCard siteUrl={SITE_URL} promoChatIdPresent={promoChatIdPresent} />
-
-      {/* In-Browser AI Image Poster Creator */}
       <AdminImageGeneratorCard />
 
-      {/* Integration Status Cards */}
       <div className="grid gap-4 sm:grid-cols-3">
-        <GlassCard className="p-5">
-          <p className="hud-label text-xs text-muted-foreground">Bot Status</p>
-          <div className="mt-2 flex items-baseline justify-between">
-            <span className={`text-2xl font-bold ${isConfigured ? "text-emerald-400" : "text-amber-400"}`}>
-              {isConfigured ? "Connected" : "Action Required"}
-            </span>
-            <Badge className={isConfigured ? "bg-emerald-500/15 text-emerald-400" : "bg-amber-500/15 text-amber-400"}>
-              {isConfigured ? "Active" : "Incomplete"}
-            </Badge>
-          </div>
-        </GlassCard>
-
-        <GlassCard className="p-5">
-          <p className="hud-label text-xs text-muted-foreground">Bot Token</p>
-          <div className="mt-2 flex items-baseline justify-between">
-            <span className="text-md font-mono text-foreground">
-              {botTokenPresent ? "••••••••••••" : "Not Set"}
-            </span>
-            <Badge variant="outline">{botTokenPresent ? "Configured" : "Missing"}</Badge>
-          </div>
-        </GlassCard>
-
-        <GlassCard className="p-5">
-          <p className="hud-label text-xs text-muted-foreground">Admin Chat ID</p>
-          <div className="mt-2 flex items-baseline justify-between">
-            <span className="text-md font-mono text-foreground">
-              {adminChatIdPresent ? process.env.TELEGRAM_ADMIN_CHAT_ID : "Not Set"}
-            </span>
-            <Badge variant="outline">{adminChatIdPresent ? "Ready" : "Missing"}</Badge>
-          </div>
-        </GlassCard>
+        <AdminSectionCard title="Bot status" description="Present means the token and admin chat are both set. This check does not call Telegram.">
+          <AdminStatusBadge status={isConfigured ? "Connected" : "Incomplete"} />
+        </AdminSectionCard>
+        <AdminSectionCard title="Bot token" description="The token value stays hidden.">
+          <AdminStatusBadge status={botTokenPresent ? "Present" : "Missing"} />
+        </AdminSectionCard>
+        <AdminSectionCard title="Admin chat" description="The chat id stays hidden. Present means a chat id is set.">
+          <AdminStatusBadge status={adminChatIdPresent ? "Present" : "Missing"} />
+        </AdminSectionCard>
       </div>
 
-      {/* Setup Instructions */}
-      <GlassCard className="p-6">
-        <h3 className="text-md font-bold text-foreground mb-3">Telegram Setup & Webhook Guide</h3>
-        <ol className="list-decimal list-inside space-y-2 text-sm text-muted-foreground">
-          <li>Create a Telegram bot via <strong>@BotFather</strong> on Telegram and copy your API Token.</li>
-          <li>Create a Telegram Group/Channel for your team or players, add the bot as an administrator.</li>
-          <li>Get your Chat ID by forwarding a message to <strong>@userinfobot</strong> or <strong>@getidsbot</strong>.</li>
-          <li>Set <code className="bg-background px-1.5 py-0.5 rounded text-foreground font-mono">TELEGRAM_BOT_TOKEN</code> and <code className="bg-background px-1.5 py-0.5 rounded text-foreground font-mono">TELEGRAM_ADMIN_CHAT_ID</code> in your <code className="bg-background px-1.5 py-0.5 rounded text-foreground font-mono">.env.local</code> or Vercel Environment Variables.</li>
+      <AdminSectionCard title="What these controls do" description="The tester, broadcast, and autopilot buttons are the existing send controls. They can post when clicked.">
+        <ol className="list-inside list-decimal space-y-2 text-sm text-[#9fb0d0]">
+          <li>A bot token and an admin chat must already be set in the server environment.</li>
+          <li>The promo chat uses its own setting when one is saved. This page only shows whether that setting is present inside the broadcast card.</li>
+          <li>Setup values are changed in the host environment, not typed into this page.</li>
         </ol>
-      </GlassCard>
+      </AdminSectionCard>
     </div>
   );
 }

@@ -5,16 +5,10 @@ import { AdminPageHeader } from "@/components/admin/admin-page-header";
 import { ConfirmActionButton } from "@/components/admin/confirm-action-button";
 import { NewsletterCampaignDialog } from "@/components/admin/newsletter-campaign-dialog";
 import { simpleFormToCampaignPayload } from "@/lib/email/newsletter-form";
-import { GlassCard } from "@/components/shared/glass-card";
-import { Badge } from "@/components/ui/badge";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
+import { AdminSectionCard } from "@/components/admin/ui/admin-section-card";
+import { AdminStatusBadge } from "@/components/admin/ui/admin-status-badge";
+import { AdminEmptyState } from "@/components/admin/ui/admin-empty-state";
+import { AdminErrorState } from "@/components/admin/ui/admin-error-state";
 import { adminDb } from "@/lib/actions/admin/core";
 import {
   deleteNewsletterCampaignAction,
@@ -22,18 +16,11 @@ import {
 } from "@/lib/actions/admin/newsletters";
 import { NewsletterSendControls } from "@/components/admin/newsletter-send-controls";
 import { requirePermission } from "@/lib/data/admin";
-import type { NewsletterCampaign, NewsletterCampaignStatus } from "@/lib/database.types";
+import type { NewsletterCampaign } from "@/lib/database.types";
 import { newsletterSegmentLabel } from "@/lib/email/newsletter-segments";
+import { newsletterStatusHelp } from "@/lib/admin/marketing-status";
 
 export const metadata: Metadata = { title: "Newsletters" };
-
-const STATUS_BADGE: Record<NewsletterCampaignStatus, string> = {
-  draft: "bg-foreground/8 text-muted-foreground",
-  scheduled: "bg-ws-gold/15 text-ws-gold-deep dark:text-ws-gold",
-  sending: "bg-ws-gold/15 text-ws-gold-deep dark:text-ws-gold",
-  sent: "bg-ws-emerald/15 text-ws-emerald",
-  failed: "bg-destructive/15 text-destructive",
-};
 
 export default async function AdminNewslettersPage() {
   await requirePermission("newsletters.manage");
@@ -46,19 +33,15 @@ export default async function AdminNewslettersPage() {
 
   if (error) {
     return (
-      <div className="mx-auto max-w-3xl">
+      <div className="mx-auto max-w-3xl space-y-4">
         <AdminPageHeader
           title="Email campaigns"
           description="Lifecycle emails for players who still accept promotional mail."
         />
-        <GlassCard className="p-6 text-sm text-muted-foreground">
-          Newsletter tables are not set up yet. Run{" "}
-          <code className="text-foreground">supabase/admin-essentials/44-newsletters.sql</code> and{" "}
-          <code className="text-foreground">
-            supabase/migrations/20261007000110_newsletter_segments_phone_consent.sql
-          </code>{" "}
-          in the Supabase SQL Editor, then refresh this page.
-        </GlassCard>
+        <AdminErrorState
+          title="Email campaigns could not be loaded"
+          body="Newsletter tables are not set up yet. Run supabase/admin-essentials/44-newsletters.sql and supabase/migrations/20261007000110_newsletter_segments_phone_consent.sql in the Supabase SQL Editor, then refresh this page."
+        />
       </div>
     );
   }
@@ -66,10 +49,10 @@ export default async function AdminNewslettersPage() {
   const campaigns = (data ?? []) as NewsletterCampaign[];
 
   return (
-    <div className="mx-auto max-w-6xl">
+    <div className="mx-auto max-w-6xl space-y-4">
       <AdminPageHeader
         title="Email campaigns"
-        description="Lifecycle emails for players who still accept promotional mail. Phone follow-ups live under Marketing and only include people who opted in."
+        description="Lifecycle emails for players who still accept promotional mail. Draft means not sent. Scheduled means queued. Sending means a send is in progress. Sent means finished. Failed means the campaign is marked failed. Phone follow-ups live under Text one player and only include people who opted in."
         action={
           <NewsletterCampaignDialog
             title="New email promo"
@@ -82,83 +65,74 @@ export default async function AdminNewslettersPage() {
         }
       />
 
-      <GlassCard className="mb-6 p-5">
-        <h2 className="font-semibold">How to send without spamming</h2>
-        <ol className="mt-3 space-y-2 text-sm text-muted-foreground list-decimal list-inside">
+      <AdminSectionCard
+        title="How a send works"
+        description="Opening this list does not send mail. Test send, Send now, and Schedule keep their existing confirmations."
+      >
+        <ol className="list-inside list-decimal space-y-2 text-sm text-[#9fb0d0]">
           <li>
-            <strong className="text-foreground">New campaign</strong> → pick a lifecycle template.
-            The audience is filled in for you (welcome → new signups, first deposit → never
-            deposited, reload → recent depositors, win-back → inactive 7–14 days, VIP → VIP only).
+            <span className="text-white">New campaign</span> picks a lifecycle template. The audience is filled in for you.
           </li>
           <li>
-            Save, then <strong className="text-foreground">Test send</strong>. That goes only to
-            your staff email and leaves the campaign as a draft.
+            <span className="text-white">Test send</span> goes only to your staff email and leaves the campaign as a draft.
           </li>
           <li>
-            <strong className="text-foreground">Send now</strong> or pick a time and{" "}
-            <strong className="text-foreground">Schedule</strong>. The count on the form already
-            leaves out suspended players and anyone with promotional email off.
+            <span className="text-white">Send now</span> or <span className="text-white">Schedule</span> uses the existing audience count. Suspended players and anyone with promotional email off stay out.
           </li>
         </ol>
-        <p className="mt-4 text-xs text-muted-foreground border-t border-border pt-4">
-          Delivery shows sent and failed only. Opens and clicks are not tracked. Players turn offer
-          email off under Notification settings. One note per lifecycle moment — not a daily blast.
+        <p className="mt-4 border-t border-white/10 pt-4 text-xs leading-5 text-[#8ea0c3]">
+          Delivery shows sent and failed only. Opens and clicks are not tracked. A failed mark is not a new send. Players turn offer email off under Notification settings.
         </p>
-      </GlassCard>
+      </AdminSectionCard>
 
-      <GlassCard className="overflow-hidden">
-        <div className="overflow-x-auto">
-          <Table>
-            <TableHeader>
-              <TableRow className="border-foreground/8 hover:bg-transparent">
-                <TableHead>Campaign</TableHead>
-                <TableHead>Audience</TableHead>
-                <TableHead>Status</TableHead>
-                <TableHead>When</TableHead>
-                <TableHead className="text-right">Delivery</TableHead>
-                <TableHead className="w-64 text-right">Actions</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {campaigns.length === 0 ? (
-                <TableRow>
-                  <TableCell colSpan={6} className="py-10 text-center text-sm text-muted-foreground">
-                    No campaigns yet — click <strong>New campaign</strong> above.
-                  </TableCell>
-                </TableRow>
-              ) : (
-                campaigns.map((c) => (
-                  <TableRow key={c.id} className="border-foreground/8">
-                    <TableCell>
-                      <p className="font-medium">{c.name}</p>
-                      <p className="text-xs text-muted-foreground">{c.subject}</p>
-                    </TableCell>
-                    <TableCell className="text-sm text-muted-foreground">
-                      {newsletterSegmentLabel(c.segment)}
-                    </TableCell>
-                    <TableCell>
-                      <Badge className={STATUS_BADGE[c.status]}>{c.status}</Badge>
-                    </TableCell>
-                    <TableCell className="text-xs text-muted-foreground">
+      <AdminSectionCard title="Campaigns" description="A draft can still be edited. Other statuses are view only on this screen.">
+        {campaigns.length === 0 ? (
+          <AdminEmptyState title="No campaigns yet" body="Use New campaign above to save a draft. Saving a draft does not send it." />
+        ) : (
+          <div className="overflow-x-auto">
+            <table className="w-full min-w-[52rem] text-left text-sm">
+              <thead>
+                <tr className="border-b border-white/10 text-xs uppercase tracking-wide text-[#8ea0c3]">
+                  <th className="px-2 py-2 font-medium">Campaign</th>
+                  <th className="px-2 py-2 font-medium">Audience</th>
+                  <th className="px-2 py-2 font-medium">Status</th>
+                  <th className="px-2 py-2 font-medium">When</th>
+                  <th className="px-2 py-2 text-right font-medium">Delivery</th>
+                  <th className="px-2 py-2 text-right font-medium">Actions</th>
+                </tr>
+              </thead>
+              <tbody>
+                {campaigns.map((c) => (
+                  <tr key={c.id} className="border-b border-white/5 align-top last:border-0">
+                    <td className="px-2 py-3">
+                      <p className="font-medium text-white">{c.name}</p>
+                      <p className="text-xs text-[#9fb0d0]">{c.subject}</p>
+                    </td>
+                    <td className="px-2 py-3 text-[#9fb0d0]">{newsletterSegmentLabel(c.segment)}</td>
+                    <td className="px-2 py-3">
+                      <AdminStatusBadge status={c.status} />
+                      <p className="mt-1 max-w-[14rem] text-xs leading-5 text-[#9fb0d0]">{newsletterStatusHelp(c.status)}</p>
+                    </td>
+                    <td className="px-2 py-3 text-xs text-[#9fb0d0]">
                       {c.sent_at
                         ? format(new Date(c.sent_at), "MMM d, p")
                         : c.scheduled_at
                           ? `Queued ${format(new Date(c.scheduled_at), "MMM d, p")}`
                           : "—"}
-                    </TableCell>
-                    <TableCell className="tnum text-right text-sm">
+                    </td>
+                    <td className="px-2 py-3 text-right text-sm tabular-nums text-[#e8eefc]">
                       {c.total_recipients > 0 ? (
                         <span>
                           <span className="block">{c.sent_count} sent</span>
-                          <span className="block text-xs text-muted-foreground">
+                          <span className="block text-xs text-[#9fb0d0]">
                             {c.failed_count} failed · {c.total_recipients} total
                           </span>
                         </span>
                       ) : (
                         "—"
                       )}
-                    </TableCell>
-                    <TableCell className="text-right">
+                    </td>
+                    <td className="px-2 py-3 text-right">
                       {c.status === "draft" ? (
                         <div className="flex flex-col items-end gap-2">
                           <div className="flex flex-wrap justify-end gap-1">
@@ -184,7 +158,7 @@ export default async function AdminNewslettersPage() {
                           <NewsletterSendControls campaignId={c.id} segment={c.segment} />
                         </div>
                       ) : (
-                        <span className="text-xs text-muted-foreground">
+                        <span className="text-xs text-[#9fb0d0]">
                           {c.status === "scheduled"
                             ? "Waiting to send"
                             : c.status === "sending"
@@ -192,14 +166,14 @@ export default async function AdminNewslettersPage() {
                               : "Finished"}
                         </span>
                       )}
-                    </TableCell>
-                  </TableRow>
-                ))
-              )}
-            </TableBody>
-          </Table>
-        </div>
-      </GlassCard>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </AdminSectionCard>
     </div>
   );
 }

@@ -2,9 +2,13 @@ import type { Metadata } from "next";
 import { redirect } from "next/navigation";
 
 import { AdminPageHeader } from "@/components/admin/admin-page-header";
-import { AdminToolGrid } from "@/components/admin/admin-tool-grid";
-import { GlassCard } from "@/components/shared/glass-card";
+import { AdminSectionCard } from "@/components/admin/ui/admin-section-card";
+import { AdminStatCard } from "@/components/admin/ui/admin-stat-card";
+import { AdminStatusBadge } from "@/components/admin/ui/admin-status-badge";
+import { AdminQuickAction } from "@/components/admin/ui/admin-quick-action";
+import { AdminErrorState } from "@/components/admin/ui/admin-error-state";
 import { loadAutomationHealth } from "@/lib/automation/health";
+import { automationJobHelp } from "@/lib/admin/marketing-status";
 import { can, requireStaff } from "@/lib/data/admin";
 
 export const metadata: Metadata = { title: "Automation" };
@@ -18,10 +22,10 @@ export default async function AutomationPage() {
 
   const tools = [
     can(ctx, "cms.manage")
-      ? { href: "/admin/ai-blog", title: "AI blog", body: "Draft and publish SEO posts from the existing blog tool." }
+      ? { href: "/admin/ai-blog", title: "AI blog", body: "Draft and publish SEO posts from the existing blog tool. Opening that page does not generate a post." }
       : null,
     can(ctx, "support.manage")
-      ? { href: "/admin/ai-bot", title: "Support chatbot", body: "Adjust how the support bot replies before a person takes over." }
+      ? { href: "/admin/ai-bot", title: "Support chatbot", body: "Adjust how the support bot replies before a person takes over. This link does not send a chat." }
       : null,
     {
       href: "/admin/analyzer",
@@ -35,56 +39,47 @@ export default async function AutomationPage() {
   const health = await loadAutomationHealth();
 
   return (
-    <div className="mx-auto max-w-6xl">
+    <div className="mx-auto max-w-6xl space-y-4">
       <AdminPageHeader
-        title="Automation"
-        description="What is scheduled, what last ran, and what needs a person. This page does not send messages or move money."
+        title="Automation center"
+        description="Saved job states and today's counts. The states on file are switch off, not scheduled, unknown, stale, and ok. This page does not send messages, run a job, or move money."
       />
       {health.alerts.length > 0 ? (
-        <GlassCard className="mb-4 border-amber-500/40 p-4">
-          <h2 className="text-sm font-semibold">Needs attention</h2>
-          <ul className="mt-2 list-disc space-y-1 pl-5 text-sm text-muted-foreground">
-            {health.alerts.map((alert) => (
-              <li key={alert}>{alert}</li>
-            ))}
-          </ul>
-        </GlassCard>
+        <AdminErrorState title="Needs attention" body={health.alerts.join(" ")} />
       ) : (
-        <p className="mb-4 text-sm text-muted-foreground">No critical alert was found in the saved records.</p>
+        <p className="text-sm text-[#9fb0d0]">No critical alert was found in the saved records.</p>
       )}
-      <div className="mb-4 grid gap-3 sm:grid-cols-2">
+      <div className="grid gap-3 sm:grid-cols-2">
         {health.jobs.map((job) => (
-          <GlassCard key={job.path} className="p-4">
-            <p className="text-sm font-semibold">{job.name}</p>
-            <p className="mt-2 text-lg font-black">{job.label}</p>
-            <p className="mt-1 text-xs text-muted-foreground">{job.detail}</p>
-          </GlassCard>
+          <AdminSectionCard key={job.path} title={job.name} description={job.detail}>
+            <AdminStatusBadge status={job.health.replaceAll("_", " ")} />
+            <p className="mt-2 text-sm text-white">{job.label}</p>
+            <p className="mt-1 text-xs leading-5 text-[#9fb0d0]">{automationJobHelp(job.health)}</p>
+          </AdminSectionCard>
         ))}
       </div>
-      <GlassCard className="mb-4 p-4">
-        <h2 className="text-sm font-semibold">Operational snapshot for today</h2>
-        <p className="mt-1 text-xs text-muted-foreground">Counts from saved rows. This is not emailed.</p>
-        <dl className="mt-3 grid gap-3 sm:grid-cols-2">
+      <AdminSectionCard title="Operational snapshot for today" description="Counts from saved rows. This is not emailed. These counts are not a job running or failed status.">
+        <div className="grid gap-3 sm:grid-cols-2">
           {health.summary.map((row) => (
-            <div key={row.label}>
-              <dt className="text-xs text-muted-foreground">{row.label}</dt>
-              <dd className="text-lg font-black tabular-nums">{row.value}</dd>
-            </div>
+            <AdminStatCard key={row.label} label={row.label} value={row.value} />
           ))}
-        </dl>
-      </GlassCard>
-      <GlassCard className="mb-4 p-4">
-        <h2 className="text-sm font-semibold">Provider keys</h2>
-        <p className="mt-1 text-xs text-muted-foreground">Shows whether a key is present. It does not call the provider.</p>
-        <ul className="mt-3 space-y-1 text-sm">
+        </div>
+      </AdminSectionCard>
+      <AdminSectionCard title="Provider keys" description="Shows whether a key is present. The value stays hidden. This page does not call the provider.">
+        <ul className="space-y-2 text-sm">
           {health.providers.map((provider) => (
-            <li key={provider.name}>
-              {provider.name}: {provider.configured ? "Present" : "Missing"}
+            <li key={provider.name} className="flex items-center justify-between gap-3 border-b border-white/5 py-2 last:border-0">
+              <span className="text-white">{provider.name}</span>
+              <AdminStatusBadge status={provider.configured ? "Present" : "Missing"} />
             </li>
           ))}
         </ul>
-      </GlassCard>
-      <AdminToolGrid tools={tools} />
+      </AdminSectionCard>
+      <div className="grid gap-3 sm:grid-cols-2">
+        {tools.map((tool) => (
+          <AdminQuickAction key={tool.href} href={tool.href} label={tool.title} detail={tool.body} />
+        ))}
+      </div>
     </div>
   );
 }
