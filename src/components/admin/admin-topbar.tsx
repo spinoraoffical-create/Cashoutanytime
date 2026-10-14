@@ -45,15 +45,13 @@ export function AdminTopbar({
           </SheetTrigger>
             <SheetContent
             side="left"
-            className="w-72 border-r border-white/10 bg-[#0b1022] p-0 text-[#e8eefc]"
+            className="w-[min(100%,18rem)] border-r border-white/10 bg-[#090e1c] p-0 text-[#e8eefc]"
           >
             <SheetHeader className="border-b border-white/10 px-4 py-4">
               <SheetTitle>
                 <span className="flex items-center gap-2">
                   <Logo size="sm" href={null} />
-                  <Badge className="border border-cyan-300/30 bg-cyan-400/10 text-cyan-100 uppercase">
-                    Admin
-                  </Badge>
+                  <span className="text-sm font-semibold text-white">Control Center</span>
                 </span>
               </SheetTitle>
             </SheetHeader>
@@ -67,9 +65,9 @@ export function AdminTopbar({
         </div>
 
         <div className="ml-auto flex items-center gap-3">
-          <div className="hidden text-right sm:block">
-            <p className="truncate text-sm font-medium">{email}</p>
-            <p className="hud-label text-ws-text-faint">{topRole}</p>
+          <div className="hidden min-w-0 text-right sm:block">
+            <p className="truncate text-sm font-medium text-white">{email ?? "Account email is not on file"}</p>
+            <p className="text-xs text-[#9fb0d0]">{topRole}</p>
           </div>
           <Button asChild variant="ghost" size="icon" title="Visit website">
             <Link href="/" aria-label="Visit website">

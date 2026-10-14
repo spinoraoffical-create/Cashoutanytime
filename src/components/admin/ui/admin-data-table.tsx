@@ -28,7 +28,7 @@ export function AdminDataTable({
         </thead>
         <tbody>
           {rows.map((row, index) => (
-            <tr key={index} className="border-b border-white/5 last:border-0">
+                <tr key={index} className="border-b border-white/5 last:border-0 hover:bg-white/[0.03]">
               {columns.map((column) => (
                 <td key={column.key} className={column.align === "right" ? "px-2 py-3 text-right text-[#e8eefc]" : "px-2 py-3 text-[#e8eefc]"}>
                   {row[column.key]}

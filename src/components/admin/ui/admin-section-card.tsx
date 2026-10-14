@@ -16,7 +16,7 @@ export function AdminSectionCard({
   className?: string;
 }) {
   return (
-    <section className={cn("rounded-2xl border border-white/10 bg-[#10182e]/80 p-4 shadow-[0_0_30px_rgba(99,102,241,0.08)] sm:p-5", className)}>
+    <section className={cn("rounded-2xl border border-[#7c3aed]/25 bg-gradient-to-br from-[#141432] to-[#0d1428] p-4 shadow-[0_16px_40px_rgba(49,46,129,0.2)] sm:p-5", className)}>
       <div className="mb-4 flex flex-wrap items-start justify-between gap-3">
         <div>
           <h2 className="text-base font-semibold text-white">{title}</h2>

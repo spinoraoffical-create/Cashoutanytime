@@ -259,28 +259,52 @@ export default async function AdminOverviewPage() {
       <AdminPageHeader
         title="Dashboard"
         description="These numbers come from the live database. If a count cannot be loaded, it says Unavailable."
+        action={
+          <div className="rounded-2xl border border-[#7c3aed]/30 bg-[#12182e] px-4 py-2">
+            <p className="text-xs font-semibold text-[#c4b5fd]">{roleLabel(ctx)}</p>
+            <p className="max-w-[16rem] truncate text-sm text-white">{ctx.email ?? "Account email is not on file."}</p>
+          </div>
+        }
       />
 
-      <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+      <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
         {money ? (
           <AdminStatCard href="/admin/deposits" label="Deposits completed today" value={showCount(depositsToday)} hint="Completed deposit records since 00:00 UTC. This is a count, not revenue." />
         ) : null}
         {money ? (
-          <AdminStatCard href="/admin/payouts" label="Cash-out debits today" value={showCount(cashoutsToday)} hint="Cash-out wallet debit rows since 00:00 UTC." />
+          <AdminStatCard href="/admin/payouts" label="Cash-out debits today" value={showCount(cashoutsToday)} hint="Cash-out wallet debit rows since 00:00 UTC. This is not profit." />
         ) : null}
         {players ? (
           <AdminStatCard href="/admin/users" label="Players seen today" value={showCount(seenToday)} hint="Profiles with a last-seen time since 00:00 UTC." />
         ) : null}
       </div>
 
-      <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
-        {attention.map((item) => (
-          <AdminStatCard key={(item.href ?? "info") + item.label} href={item.href} label={item.label} value={showCount(item.count)} hint={item.hint} />
-        ))}
-      </div>
+      {attention.length > 0 ? (
+        <AdminSectionCard title="Needs attention" description="These counts are pending work or warnings. Each card opens the existing page. Nothing on this list moves money by itself.">
+          <ul className="grid gap-3 sm:grid-cols-2">
+            {attention.map((item) => (
+              <li key={item.href + item.label}>
+                <Link
+                  href={item.href}
+                  title={item.hint}
+                  className={`flex items-center justify-between gap-3 rounded-xl border px-3 py-3 ${attentionTone(item.label, item.count)}`}
+                >
+                  <span className="min-w-0">
+                    <span className="block text-sm font-semibold text-white">{item.label}</span>
+                    <span className="block text-xs leading-5 text-[#9fb0d0]">{item.hint}</span>
+                  </span>
+                  <span className="shrink-0 text-2xl font-semibold tabular-nums text-white">{showCount(item.count)}</span>
+                </Link>
+              </li>
+            ))}
+          </ul>
+        </AdminSectionCard>
+      ) : (
+        <AdminEmptyState title="No attention items" body="This role does not have a pending queue on the dashboard." />
+      )}
 
       {money || players ? (
-        <AdminSectionCard title="Activity counts" description="Completed deposit records and new player profiles. This chart is not revenue.">
+        <AdminSectionCard title="Activity counts" description="Completed deposit records and new player profiles. A day-by-day history is not available from the current data source. These bars are the existing 24-hour, 7-day, and 30-day counts. This chart is not revenue.">
           <div className="grid gap-6 lg:grid-cols-2">
             {money ? (
               <AdminCountChart
@@ -448,6 +472,21 @@ export default async function AdminOverviewPage() {
       ) : null}
     </div>
   );
+}
+
+function attentionTone(label: string, count: number | null) {
+  if (count == null) return "border-white/10 bg-[#0c1224]";
+  if (count === 0) return "border-white/10 bg-[#0c1224]";
+  const name = label.toLowerCase();
+  if (name.includes("failed") || name.includes("fraud")) return "border-rose-400/40 bg-rose-500/10";
+  return "border-[#7c3aed]/40 bg-[#1a1440]";
+}
+
+function roleLabel(ctx: { isSuperAdmin: boolean; roles: string[] }) {
+  if (ctx.isSuperAdmin) return "Super Admin";
+  if (ctx.roles.includes("admin")) return "Admin";
+  if (ctx.roles.includes("manager")) return "Manager";
+  return "Platform staff";
 }
 
 function showCount(count: number | null) {

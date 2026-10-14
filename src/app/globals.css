@@ -1356,3 +1356,49 @@ body.lobby-mode .fixed.bottom-20 {
     min-height: 128px;
   }
 }
+
+.admin-v2 {
+  overflow-x: clip;
+  scrollbar-color: #6d28d9 #0b1022;
+  scrollbar-width: thin;
+}
+
+.admin-v2 .gradient-text {
+  background: linear-gradient(135deg, #c4b5fd, #818cf8, #38bdf8);
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+
+.admin-v2::-webkit-scrollbar,
+.admin-v2 *::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+.admin-v2::-webkit-scrollbar-track,
+.admin-v2 *::-webkit-scrollbar-track {
+  background: #0b1022;
+}
+
+.admin-v2::-webkit-scrollbar-thumb,
+.admin-v2 *::-webkit-scrollbar-thumb {
+  background: linear-gradient(#7c3aed, #2563eb);
+  border-radius: 999px;
+}
+
+.admin-v2 :focus-visible {
+  outline: 2px solid #67e8f9;
+  outline-offset: 2px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .admin-v2 *,
+  .admin-v2 *::before,
+  .admin-v2 *::after {
+    scroll-behavior: auto !important;
+    transition-duration: 0.01ms !important;
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+  }
+}

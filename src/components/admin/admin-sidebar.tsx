@@ -58,7 +58,7 @@ export function AdminSidebar({
   return (
     <div className="flex h-full flex-col">
       <div className="px-3 pt-3">
-        <label className="flex items-center gap-2 rounded-xl border border-white/10 bg-[#0b1224] px-3 text-sm text-[#9fb0d0]">
+        <label className="flex items-center gap-2 rounded-xl border border-[#7c3aed]/30 bg-[#0b1224] px-3 text-sm text-[#9fb0d0]">
           <Search className="size-4 shrink-0" aria-hidden />
           <input
             value={query}
@@ -90,7 +90,7 @@ export function AdminSidebar({
                   aria-current={active ? "page" : undefined}
                   title={item.label}
                   className={cn(
-                    "flex min-h-11 flex-1 items-center gap-3 rounded-xl px-3 text-sm font-semibold transition-colors",
+                    "flex min-h-11 flex-1 items-center gap-3 rounded-xl px-3 text-sm font-semibold motion-safe:transition-colors",
                     active
                       ? "bg-gradient-to-r from-[#6d28d9] to-[#2563eb] text-white shadow-[0_0_18px_rgba(109,40,217,0.45)]"
                       : "text-[#c5d0e6] hover:bg-white/5 hover:text-white"
@@ -112,7 +112,7 @@ export function AdminSidebar({
                     onClick={() => setOpenLabel(expanded && openLabel === item.label ? "" : item.label)}
                     className="flex size-9 items-center justify-center rounded-lg text-[#9fb0d0] hover:bg-white/5 hover:text-white"
                   >
-                    <ChevronDown className={cn("size-4 transition-transform", expanded ? "rotate-180" : "")} aria-hidden />
+                    <ChevronDown className={cn("size-4 motion-safe:transition-transform", expanded ? "rotate-180" : "")} aria-hidden />
                   </button>
                 ) : null}
               </div>
@@ -148,11 +148,11 @@ export function AdminSidebar({
         })}
       </nav>
 
-      <div className="space-y-1 border-t border-border p-3">
+      <div className="space-y-1 border-t border-white/10 p-3">
         <Link
           href="/dashboard"
           onClick={onNavigate}
-          className="flex min-h-10 items-center gap-3 rounded-lg px-3 text-sm font-medium text-muted-foreground transition-colors hover:bg-foreground/5 hover:text-foreground"
+          className="flex min-h-10 items-center gap-3 rounded-lg px-3 text-sm font-medium text-[#9fb0d0] hover:bg-white/5 hover:text-white"
         >
           <ArrowLeft className="size-4.5" aria-hidden />
           Exit to player app
@@ -160,7 +160,7 @@ export function AdminSidebar({
         <form action={logoutAction}>
           <button
             type="submit"
-            className="flex min-h-10 w-full cursor-pointer items-center gap-3 rounded-lg px-3 text-sm font-medium text-muted-foreground transition-colors hover:bg-destructive/10 hover:text-destructive"
+            className="flex min-h-10 w-full cursor-pointer items-center gap-3 rounded-lg px-3 text-sm font-semibold text-rose-200 hover:bg-rose-500/15"
           >
             <LogOut className="size-4.5" aria-hidden />
             Sign out
