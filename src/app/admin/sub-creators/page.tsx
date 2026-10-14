@@ -2,7 +2,10 @@ import type { Metadata } from "next";
 import { redirect } from "next/navigation";
 
 import { AdminPageHeader } from "@/components/admin/admin-page-header";
+import { StoreAccountFocus } from "@/components/admin/store-account-focus";
+import { StoreHierarchyNote } from "@/components/admin/store-hierarchy";
 import { SubCreatorsManager } from "@/components/admin/sub-creators-manager";
+import { AdminErrorState } from "@/components/admin/ui/admin-error-state";
 import { loadAgentRows } from "@/lib/actions/agents";
 import { requireAgentScope } from "@/lib/agents/scope";
 
@@ -22,21 +25,24 @@ export default async function SubCreatorsPage({
   return (
     <div className="mx-auto max-w-7xl">
       <AdminPageHeader
-        title="Sub-creators"
-        description="Store creators manage their own agents. A sub-creator only sees players who registered with their code."
+        title="Stores and sub-creators"
+        description="A store is a business account. A sub-creator works under one store. A player is a customer. Deactivate, edit, and password reset change the account. They do not send a payment."
       />
-      {loaded.error ? <p className="mb-4 text-sm text-destructive">{loaded.error}</p> : null}
+      <StoreHierarchyNote />
+      {loaded.error ? (
+        <div className="mb-4">
+          <AdminErrorState title="Store list unavailable" body={loaded.error} />
+        </div>
+      ) : null}
       {scope.missingTable ? (
-        <p className="mb-4 text-sm text-destructive">
-          Apply supabase/migrations/20261008000120_agent_network.sql in Supabase before creating agents.
-        </p>
+        <div className="mb-4">
+          <AdminErrorState
+            title="Store list unavailable"
+            body="Apply supabase/migrations/20261008000120_agent_network.sql in Supabase before creating agents."
+          />
+        </div>
       ) : null}
-      {focus ? (
-        <p className="mb-4 rounded-2xl border border-border px-4 py-3 text-sm">
-          {focus.name} has {focus.playerCount} players, wallet ${focus.wallet.toFixed(2)}, and an estimated commission rate of {focus.commissionBps / 100}%.
-          Code {focus.promoCode}.
-        </p>
-      ) : null}
+      {focus ? <StoreAccountFocus row={focus} rows={loaded.rows} /> : null}
       <SubCreatorsManager
         rows={loaded.rows}
         stores={loaded.stores}

@@ -1,7 +1,10 @@
 import Link from "next/link";
 
 import { AdminPageHeader } from "@/components/admin/admin-page-header";
-import { GlassCard } from "@/components/shared/glass-card";
+import { StoreHierarchyNote } from "@/components/admin/store-hierarchy";
+import { AdminQuickAction } from "@/components/admin/ui/admin-quick-action";
+import { AdminSectionCard } from "@/components/admin/ui/admin-section-card";
+import { AdminStatCard } from "@/components/admin/ui/admin-stat-card";
 import { adminDb } from "@/lib/actions/admin/core";
 import type { AgentScope } from "@/lib/agents/scope";
 
@@ -66,72 +69,45 @@ export async function AgentHome({ scope }: { scope: AgentScope }) {
         description={
           scope.level === "store"
             ? "Your sub-creators, their players, and deposits waiting on your network."
-            : "Only players who registered with your link."
+            : "Only players who registered with your code."
         }
       />
+      <StoreHierarchyNote />
       <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-        <GlassCard className="p-4">
-          <p className="text-sm text-muted-foreground">Players</p>
-          <p className="text-3xl font-black">{(count ?? 0).toLocaleString()}</p>
-        </GlassCard>
-        <GlassCard className="p-4">
-          <p className="text-sm text-muted-foreground">New players, 7 days</p>
-          <p className="text-3xl font-black">{newPlayers.toLocaleString()}</p>
-        </GlassCard>
-        <GlassCard className="p-4">
-          <p className="text-sm text-muted-foreground">Pending loads</p>
-          <p className="text-3xl font-black">{(pendingLoads.count ?? 0).toLocaleString()}</p>
-        </GlassCard>
-        <GlassCard className="p-4">
-          <p className="text-sm text-muted-foreground">Failed loads</p>
-          <p className="text-3xl font-black">{(failedLoads.count ?? 0).toLocaleString()}</p>
-        </GlassCard>
-        <GlassCard className="p-4">
-          <p className="text-sm text-muted-foreground">Sub-creators</p>
-          <p className="text-3xl font-black">{scope.subCreatorIds.length.toLocaleString()}</p>
-        </GlassCard>
-        <GlassCard className="p-4">
-          <p className="text-sm text-muted-foreground">Pending deposits</p>
-          <p className="text-3xl font-black">{(pending.count ?? 0).toLocaleString()}</p>
-        </GlassCard>
-        <GlassCard className="p-4">
-          <p className="text-sm text-muted-foreground">Commission</p>
-          <p className="text-3xl font-black">${commission.toFixed(2)}</p>
-        </GlassCard>
+        <AdminStatCard label="Players" value={(count ?? 0).toLocaleString()} hint="Players assigned in this network." />
+        <AdminStatCard label="New players, 7 days" value={newPlayers.toLocaleString()} hint="Players created in the last 7 days among the players loaded for this network." />
+        <AdminStatCard label="Pending loads" value={(pendingLoads.count ?? 0).toLocaleString()} hint="Game loads still marked pending or processing." />
+        <AdminStatCard label="Failed loads" value={(failedLoads.count ?? 0).toLocaleString()} hint="Game loads marked failed." />
+        <AdminStatCard label="Sub-creators" value={scope.subCreatorIds.length.toLocaleString()} hint="Sub-creators on file for this account." />
+        <AdminStatCard label="Pending deposits" value={(pending.count ?? 0).toLocaleString()} hint="Deposit records still marked pending or processing." />
+        <AdminStatCard label="Commission" value={`$${commission.toFixed(2)}`} hint="Sum of stored commission records. This screen does not pay commission." />
       </div>
-      <div className="mt-4 flex flex-wrap gap-2">
-          <Link href="/admin/players" className="inline-flex h-10 items-center rounded-full bg-foreground px-4 text-sm font-semibold text-background">
-          View players
-        </Link>
-        <Link href="/admin/failed-loads" className="inline-flex h-10 items-center rounded-full border border-border px-4 text-sm font-semibold">
-          Failed loads
-        </Link>
+      <div className="mt-4 grid gap-3 sm:grid-cols-2">
+        <AdminQuickAction href="/admin/players" label="View players" detail="Open the players assigned in this network." />
+        <AdminQuickAction href="/admin/failed-loads" label="Failed loads" detail="Open game loads marked failed." />
         {scope.level === "store" ? (
-          <Link href="/admin/sub-creators" className="inline-flex h-10 items-center rounded-full border border-border px-4 text-sm font-semibold">
-            Sub-creators
-          </Link>
+          <AdminQuickAction href="/admin/sub-creators" label="Sub-creators" detail="Open the sub-creators under this store." />
         ) : null}
-        <Link href="/admin/agent-inbox" className="inline-flex h-10 items-center rounded-full border border-border px-4 text-sm font-semibold">
-          Player chat
-        </Link>
+        <AdminQuickAction href="/admin/agent-inbox" label="Player chat" detail="Open messages from players on this account." />
       </div>
-      <GlassCard className="mt-6 p-5">
-        <h2 className="font-bold">Newest players</h2>
-        <ul className="mt-3 divide-y divide-border">
+      <div className="mt-6">
+      <AdminSectionCard title="Newest players" description="Stored wallet balance for each player. Opening a player does not change that balance.">
+        <ul className="divide-y divide-white/10">
           {list.length === 0 ? (
-            <li className="py-3 text-sm text-muted-foreground">No players yet. Share your referral code from Sub-creators.</li>
+            <li className="py-3 text-sm text-[#9fb0d0]">No players yet. Share your signup code from Stores and sub-creators.</li>
           ) : (
             list.map((row) => (
               <li key={row.id} className="flex items-center justify-between py-3 text-sm">
-                <Link href={`/admin/users/${row.id}`} className="font-semibold">
+                <Link href={`/admin/users/${row.id}`} className="font-semibold text-white">
                   {row.full_name?.trim() || row.email || "Player"}
                 </Link>
-                <span>${Number(row.wallet_balance ?? 0).toFixed(2)}</span>
+                <span className="tabular-nums text-[#e8eefc]">${Number(row.wallet_balance ?? 0).toFixed(2)}</span>
               </li>
             ))
           )}
         </ul>
-      </GlassCard>
+      </AdminSectionCard>
+      </div>
     </div>
   );
 }

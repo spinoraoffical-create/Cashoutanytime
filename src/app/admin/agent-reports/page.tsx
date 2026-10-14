@@ -2,7 +2,8 @@ import type { Metadata } from "next";
 import { redirect } from "next/navigation";
 
 import { AdminPageHeader } from "@/components/admin/admin-page-header";
-import { AdminToolGrid } from "@/components/admin/admin-tool-grid";
+import { StoreHierarchyNote } from "@/components/admin/store-hierarchy";
+import { AdminQuickAction } from "@/components/admin/ui/admin-quick-action";
 import { getAgentScope } from "@/lib/agents/scope";
 import { requireStaff } from "@/lib/data/admin";
 
@@ -16,23 +17,22 @@ export default async function AgentReportsPage() {
 
   const description =
     scope.level === "platform"
-      ? "Super Admin. Player transactions include every store."
+      ? "You are on the platform. Player transactions include every store."
       : scope.level === "store"
-        ? `Store Creator. Player transactions include your players and ${scope.subCreatorIds.length} sub creators.`
-        : "Sub Creator. Player transactions include players who registered with your code.";
+        ? `You are a store. Player transactions include your players and ${scope.subCreatorIds.length} sub-creators.`
+        : "You are a sub-creator. Player transactions include players who registered with your code.";
 
   return (
     <div className="mx-auto max-w-6xl">
-      <AdminPageHeader title="Agent reports" description={description} />
-      <AdminToolGrid
-        tools={[
-          {
-            href: "/admin/player-transactions",
-            title: "Player transactions",
-            body: "Deposits, loads, and cash outs for the players in your scope. This is not a commission payout.",
-          },
-        ]}
-      />
+      <AdminPageHeader title="Store reports" description={description} />
+      <StoreHierarchyNote />
+      <div className="grid gap-3 sm:grid-cols-2">
+        <AdminQuickAction
+          href="/admin/player-transactions"
+          label="Player transactions"
+          detail="Deposits, loads, and cash outs for the players in your scope. This is not a commission payout."
+        />
+      </div>
     </div>
   );
 }

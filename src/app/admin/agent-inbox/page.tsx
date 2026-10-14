@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 
 import { AdminPageHeader } from "@/components/admin/admin-page-header";
+import { AdminEmptyState } from "@/components/admin/ui/admin-empty-state";
 import { AgentThread } from "@/components/agents/agent-thread";
 import { adminDb } from "@/lib/actions/admin/core";
 import { requireAgentScope } from "@/lib/agents/scope";
@@ -45,20 +46,27 @@ export default async function AgentInboxPage({
   return (
     <div className="mx-auto grid max-w-5xl gap-4 lg:grid-cols-[16rem_1fr]">
       <div>
-        <AdminPageHeader title="Player chat" description="Only your players." />
-        <ul className="space-y-1">
-          {players.length === 0 ? <li className="text-sm text-muted-foreground">No chats yet.</li> : null}
-          {players.map((player) => (
-            <li key={player.id}>
-              <Link
-                href={`/admin/agent-inbox?player=${player.id}`}
-                className="block rounded-xl px-3 py-2 text-sm hover:bg-muted"
-              >
-                {player.full_name?.trim() || player.email || "Player"}
-              </Link>
-            </li>
-          ))}
-        </ul>
+        <AdminPageHeader title="Player chat" description="Only players assigned to this store or sub-creator. A player outside this account is not listed." />
+        {players.length === 0 ? (
+          <AdminEmptyState title="No chats yet" body="Messages appear here after a player assigned to this account writes in." />
+        ) : (
+          <ul className="space-y-1">
+            {players.map((player) => (
+              <li key={player.id}>
+                <Link
+                  href={`/admin/agent-inbox?player=${player.id}`}
+                  className={
+                    current?.id === player.id
+                      ? "block rounded-xl bg-gradient-to-r from-[#6d28d9] to-[#2563eb] px-3 py-2 text-sm font-semibold text-white"
+                      : "block rounded-xl px-3 py-2 text-sm text-[#d5def2] hover:bg-white/5"
+                  }
+                >
+                  {player.full_name?.trim() || player.email || "Player"}
+                </Link>
+              </li>
+            ))}
+          </ul>
+        )}
       </div>
       {current ? (
         <AgentThread playerId={current.id} agentId={scope.userId} selfId={scope.userId} />

@@ -79,6 +79,7 @@ export function NetworkPlayers({
             ))}
           </select>
           <Button type="submit" disabled={busy}>Move selected</Button>
+          <p className="w-full text-sm text-[#9fb0d0]">This changes which store or sub-creator the selected players are assigned to. It does not change their wallets.</p>
         </form>
       ) : null}
 

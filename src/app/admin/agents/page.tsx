@@ -2,7 +2,8 @@ import type { Metadata } from "next";
 import { redirect } from "next/navigation";
 
 import { AdminPageHeader } from "@/components/admin/admin-page-header";
-import { AdminToolGrid } from "@/components/admin/admin-tool-grid";
+import { StoreHierarchyNote } from "@/components/admin/store-hierarchy";
+import { AdminQuickAction } from "@/components/admin/ui/admin-quick-action";
 import { getAgentScope } from "@/lib/agents/scope";
 import { can, requireStaff } from "@/lib/data/admin";
 
@@ -10,13 +11,13 @@ export const metadata: Metadata = { title: "Stores and agents" };
 
 function scopeLine(scope: NonNullable<Awaited<ReturnType<typeof getAgentScope>>>) {
   if (scope.level === "platform") {
-    return `Super Admin. You can open every store. ${scope.subCreatorIds.length} sub creators are on file.`;
+    return `You are on the platform. You can open every store. ${scope.subCreatorIds.length} sub-creators are on file.`;
   }
   if (scope.level === "store") {
-    return `Store Creator. You can manage your own players and ${scope.subCreatorIds.length} sub creators.`;
+    return `You are a store. You can manage your own players and ${scope.subCreatorIds.length} sub-creators under this store.`;
   }
-  const limit = scope.approveLimit == null ? "not set" : String(scope.approveLimit);
-  return `Sub Creator. You can see players who registered with your code. Deposit approval limit on file: ${limit}.`;
+  const limit = scope.approveLimit == null ? "not set" : `$${scope.approveLimit}`;
+  return `You are a sub-creator. You can see players who registered with your code. The deposit approval limit on file is ${limit}.`;
 }
 
 export default async function AgentsPage() {
@@ -27,11 +28,11 @@ export default async function AgentsPage() {
   if (scope && scope.level !== "sub" && (ctx.isSuperAdmin || can(ctx, "users.manage") || ctx.roles.includes("store_creator"))) {
     tools.push({
       href: "/admin/sub-creators",
-      title: "Store and sub creators",
+      title: "Stores and sub-creators",
       body:
         scope.level === "platform"
-          ? "Create a store and review each store's sub creators."
-          : "Review the sub creators under your store and the players on their codes.",
+          ? "Create a store and review each store's sub-creators."
+          : "Review the sub-creators under your store and the players on their codes.",
     });
   }
   if (scope?.level === "store" || scope?.level === "sub") {
@@ -51,10 +52,15 @@ export default async function AgentsPage() {
   return (
     <div className="mx-auto max-w-6xl">
       <AdminPageHeader
-        title="Stores and agents"
-        description={scope ? scopeLine(scope) : "Store creators and the sub creators under them."}
+        title="Store center"
+        description={scope ? scopeLine(scope) : "Stores, the sub-creators under them, and the players assigned to those accounts."}
       />
-      <AdminToolGrid tools={tools} />
+      <StoreHierarchyNote />
+      <div className="grid gap-3 sm:grid-cols-2">
+        {tools.map((tool) => (
+          <AdminQuickAction key={tool.href} href={tool.href} label={tool.title} detail={tool.body} />
+        ))}
+      </div>
     </div>
   );
 }

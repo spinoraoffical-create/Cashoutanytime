@@ -13,10 +13,21 @@ import {
   updateAgentAction,
   type AgentRow,
 } from "@/lib/actions/agents";
-import { Badge } from "@/components/ui/badge";
+import { AdminSectionCard } from "@/components/admin/ui/admin-section-card";
+import { AdminStatCard } from "@/components/admin/ui/admin-stat-card";
+import { AdminStatusBadge } from "@/components/admin/ui/admin-status-badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+
+const fieldClass = "h-9 rounded-md border border-white/10 bg-[#0b1224] px-2 text-sm text-white";
+const inputClass = "border-white/10 bg-[#0b1224] text-white placeholder:text-[#8ea0c3]";
+
+function roleName(label: string) {
+  if (label === "store_creator") return "Store";
+  if (label === "sub_creator") return "Sub-creator";
+  if (label === "store_sub_creator") return "Store sub-creator";
+  return label.replaceAll("_", " ");
+}
 
 export function SubCreatorsManager({
   rows,
@@ -56,33 +67,38 @@ export function SubCreatorsManager({
   return (
     <div className="space-y-4">
       <div className="grid gap-3 sm:grid-cols-3">
-        <Stat label="Total sub-creators" value={rows.length.toLocaleString()} />
-        <Stat label="Active" value={active.toLocaleString()} />
-        <Stat label="Wallet balance" value={`$${wallet.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`} />
+        <AdminStatCard label="Accounts in this list" value={rows.length.toLocaleString()} hint="Stores and sub-creators that match the current search and status filter." />
+        <AdminStatCard label="Active" value={active.toLocaleString()} hint="Accounts marked active in this list." />
+        <AdminStatCard
+          label="Wallet balance"
+          value={`$${wallet.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`}
+          hint="Sum of the wallet balances stored on these accounts. This is not profit and it is not a payout."
+        />
       </div>
 
       <form className="flex flex-wrap gap-2" action="/admin/sub-creators">
-        <Input name="q" defaultValue={query.q} placeholder="Search name, email, phone, code" className="max-w-xs" />
-        <select name="status" defaultValue={query.status ?? "all"} className="h-9 rounded-md border border-border bg-background px-2 text-sm">
+        <Input name="q" defaultValue={query.q} placeholder="Search name, email, phone, code" aria-label="Search stores and sub-creators" className={`max-w-xs ${inputClass}`} />
+        <select name="status" defaultValue={query.status ?? "all"} aria-label="Account status" className={fieldClass}>
           <option value="all">All statuses</option>
           <option value="active">Active</option>
           <option value="inactive">Inactive</option>
         </select>
-        <select name="sort" defaultValue={query.sort ?? "newest"} className="h-9 rounded-md border border-border bg-background px-2 text-sm">
+        <select name="sort" defaultValue={query.sort ?? "newest"} aria-label="Sort accounts" className={fieldClass}>
           <option value="newest">Newest</option>
           <option value="name">Name</option>
           <option value="wallet">Wallet</option>
         </select>
-        <Button type="submit" variant="outline">Filter</Button>
-        <Button variant="outline" asChild>
+        <Button type="submit" variant="outline" className="border-white/15 bg-transparent text-white">Filter</Button>
+        <Button variant="outline" className="border-white/15 bg-transparent text-white" asChild>
           <a href={`/admin/sub-creators/export?q=${encodeURIComponent(query.q ?? "")}&status=${query.status ?? "all"}&sort=${query.sort ?? "newest"}`}>Export</a>
         </Button>
-        {canAddStore ? <Button type="button" onClick={() => setOpen("store")}>Add store creator</Button> : null}
+        {canAddStore ? <Button type="button" onClick={() => setOpen("store")}>Add store</Button> : null}
         <Button type="button" onClick={() => setOpen("sub")}>Add sub-creator</Button>
         {selected.length ? (
           <Button
             type="button"
             variant="outline"
+            className="border-white/15 bg-transparent text-white"
             disabled={busy}
             onClick={() => {
               if (!window.confirm(`Deactivate ${selected.length} agent(s)?`)) return;
@@ -93,101 +109,108 @@ export function SubCreatorsManager({
           </Button>
         ) : null}
       </form>
+      <p className="text-sm text-[#9fb0d0]">
+        Add store and add sub-creator create accounts. Deactivate, edit, and password reset change an existing account. None of these buttons send a payment or change a player wallet.
+      </p>
 
-      <div className="overflow-x-auto rounded-2xl border border-border">
-        <Table>
-          <TableHeader>
-            <TableRow>
-              <TableHead />
-              <TableHead>Username</TableHead>
-              <TableHead>Email</TableHead>
-              <TableHead>Phone</TableHead>
-              <TableHead>Role</TableHead>
-              <TableHead>Wallet</TableHead>
-              <TableHead>Registered</TableHead>
-              <TableHead>Manager</TableHead>
-              <TableHead>Players</TableHead>
-              <TableHead>Status</TableHead>
-              <TableHead>Actions</TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {rows.length === 0 ? (
-              <TableRow>
-                <TableCell colSpan={11} className="py-8 text-center text-muted-foreground">No agents in your network yet.</TableCell>
-              </TableRow>
-            ) : (
-              rows.map((row) => (
-                <TableRow key={row.userId}>
-                  <TableCell>
-                    <input
-                      type="checkbox"
-                      checked={selected.includes(row.userId)}
-                      onChange={(event) =>
-                        setSelected((current) =>
-                          event.target.checked ? [...current, row.userId] : current.filter((id) => id !== row.userId)
-                        )
-                      }
-                      aria-label={`Select ${row.name}`}
-                    />
-                  </TableCell>
-                  <TableCell>
-                    <p className="font-semibold">{row.name}</p>
-                    <p className="text-xs text-muted-foreground">{row.promoCode}</p>
-                  </TableCell>
-                  <TableCell>{row.email}</TableCell>
-                  <TableCell>{row.phone || "—"}</TableCell>
-                  <TableCell>{row.roleLabel.replaceAll("_", " ")}</TableCell>
-                  <TableCell>${row.wallet.toFixed(2)}</TableCell>
-                  <TableCell>{new Date(row.createdAt).toLocaleDateString()}</TableCell>
-                  <TableCell>{row.managerName}</TableCell>
-                  <TableCell>{row.playerCount}</TableCell>
-                  <TableCell>
-                    <Badge variant={row.active ? "default" : "outline"}>{row.active ? "Active" : "Inactive"}</Badge>
-                  </TableCell>
-                  <TableCell>
-                    <div className="flex flex-wrap gap-1">
-                      <Button
-                        type="button"
-                        size="sm"
-                        variant="outline"
-                        onClick={() => {
-                          const url = `${window.location.origin}/r/${row.promoCode}`;
-                          void navigator.clipboard.writeText(url).then(
-                            () => toast.success("Referral link copied."),
-                            () => toast.error("Could not copy the referral link.")
-                          );
-                        }}
-                      >
-                        Referral Link
-                      </Button>
-                      <Button type="button" size="sm" variant="outline" onClick={() => setEdit(row)}>Edit</Button>
-                      <Button type="button" size="sm" variant="outline" asChild>
-                        <Link href={`/admin/players?parent=${row.userId}`}>Players</Link>
-                      </Button>
-                      <Button
-                        type="button"
-                        size="sm"
-                        variant="outline"
-                        onClick={() => {
-                          if (!window.confirm(row.active ? "Deactivate this agent?" : "Activate this agent?")) return;
-                          void run(() => setAgentActiveAction(row.userId, !row.active));
-                        }}
-                      >
-                        {row.active ? "Deactivate" : "Activate"}
-                      </Button>
-                      <Button type="button" size="sm" variant="outline" onClick={() => setReset(row)}>Reset password</Button>
-                      <Button type="button" size="sm" variant="outline" asChild>
-                        <Link href={`/admin/sub-creators?focus=${row.userId}`}>Performance</Link>
-                      </Button>
-                    </div>
-                  </TableCell>
-                </TableRow>
-              ))
-            )}
-          </TableBody>
-        </Table>
-      </div>
+      <AdminSectionCard title="Directory" description="A store sits under the platform. A sub-creator sits under one store. Players are assigned separately.">
+        <div className="overflow-x-auto">
+          <table className="w-full min-w-[64rem] text-left text-sm">
+            <thead>
+              <tr className="border-b border-white/10 text-xs uppercase tracking-wide text-[#8ea0c3]">
+                <th className="px-2 py-2 font-medium" />
+                <th className="px-2 py-2 font-medium">Account</th>
+                <th className="px-2 py-2 font-medium">Email</th>
+                <th className="px-2 py-2 font-medium">Phone</th>
+                <th className="px-2 py-2 font-medium">Kind</th>
+                <th className="px-2 py-2 font-medium">Wallet</th>
+                <th className="px-2 py-2 font-medium">Opened</th>
+                <th className="px-2 py-2 font-medium">Managed by</th>
+                <th className="px-2 py-2 font-medium">Players</th>
+                <th className="px-2 py-2 font-medium">Status</th>
+                <th className="px-2 py-2 font-medium">Account actions</th>
+              </tr>
+            </thead>
+            <tbody>
+              {rows.length === 0 ? (
+                <tr>
+                  <td colSpan={11} className="py-8 text-center text-[#9fb0d0]">No stores or sub-creators match this view.</td>
+                </tr>
+              ) : (
+                rows.map((row) => (
+                  <tr key={row.userId} className="border-b border-white/5 last:border-0">
+                    <td className="px-2 py-3">
+                      <input
+                        type="checkbox"
+                        checked={selected.includes(row.userId)}
+                        onChange={(event) =>
+                          setSelected((current) =>
+                            event.target.checked ? [...current, row.userId] : current.filter((id) => id !== row.userId)
+                          )
+                        }
+                        aria-label={`Select ${row.name}`}
+                      />
+                    </td>
+                    <td className="px-2 py-3">
+                      <p className="font-semibold text-white">{row.name}</p>
+                      <p className="text-xs text-[#9fb0d0]">{row.promoCode}</p>
+                    </td>
+                    <td className="px-2 py-3 text-[#e8eefc]">{row.email}</td>
+                    <td className="px-2 py-3 text-[#e8eefc]">{row.phone || "—"}</td>
+                    <td className="px-2 py-3 text-[#e8eefc]">{roleName(row.roleLabel)}</td>
+                    <td className="px-2 py-3 text-[#e8eefc]">${row.wallet.toFixed(2)}</td>
+                    <td className="px-2 py-3 text-[#e8eefc]">{new Date(row.createdAt).toLocaleDateString()}</td>
+                    <td className="px-2 py-3 text-[#e8eefc]">{row.managerName}</td>
+                    <td className="px-2 py-3 text-[#e8eefc]">{row.playerCount}</td>
+                    <td className="px-2 py-3">
+                      <AdminStatusBadge status={row.active ? "Active" : "Inactive"} />
+                    </td>
+                    <td className="px-2 py-3">
+                      <div className="flex flex-wrap gap-1">
+                        <Button
+                          type="button"
+                          size="sm"
+                          variant="outline"
+                          className="border-white/15 bg-transparent text-white"
+                          onClick={() => {
+                            const url = `${window.location.origin}/r/${row.promoCode}`;
+                            void navigator.clipboard.writeText(url).then(
+                              () => toast.success("Referral link copied."),
+                              () => toast.error("Could not copy the referral link.")
+                            );
+                          }}
+                        >
+                          Referral Link
+                        </Button>
+                        <Button type="button" size="sm" variant="outline" className="border-white/15 bg-transparent text-white" onClick={() => setEdit(row)}>Edit</Button>
+                        <Button type="button" size="sm" variant="outline" className="border-white/15 bg-transparent text-white" asChild>
+                          <Link href={`/admin/players?parent=${row.userId}`}>Players</Link>
+                        </Button>
+                        <Button
+                          type="button"
+                          size="sm"
+                          variant="outline"
+                          className="border-white/15 bg-transparent text-white"
+                          onClick={() => {
+                            if (!window.confirm(row.active ? "Deactivate this agent?" : "Activate this agent?")) return;
+                            void run(() => setAgentActiveAction(row.userId, !row.active));
+                          }}
+                        >
+                          {row.active ? "Deactivate" : "Activate"}
+                        </Button>
+                        <Button type="button" size="sm" variant="outline" className="border-white/15 bg-transparent text-white" onClick={() => setReset(row)}>Reset password</Button>
+                        <Button type="button" size="sm" variant="outline" className="border-white/15 bg-transparent text-white" asChild>
+                          <Link href={`/admin/sub-creators?focus=${row.userId}`}>Account</Link>
+                        </Button>
+                      </div>
+                    </td>
+                  </tr>
+                ))
+              )}
+            </tbody>
+          </table>
+        </div>
+      </AdminSectionCard>
 
       {open ? (
         <AgentForm
@@ -208,7 +231,7 @@ export function SubCreatorsManager({
       ) : null}
       {reset ? (
         <form
-          className="rounded-2xl border border-border p-4"
+          className="rounded-2xl border border-white/10 bg-[#10182e]/80 p-4"
           onSubmit={(event) => {
             event.preventDefault();
             const password = new FormData(event.currentTarget).get("password");
@@ -217,23 +240,15 @@ export function SubCreatorsManager({
             void run(() => resetAgentPasswordAction(reset.userId, password));
           }}
         >
-          <p className="font-semibold">New password for {reset.name}</p>
-          <Input name="password" type="password" minLength={8} required className="mt-2 max-w-xs" />
+          <p className="font-semibold text-white">New password for {reset.name}</p>
+          <p className="mt-1 text-sm text-[#9fb0d0]">This changes the sign-in password. It does not change a wallet.</p>
+          <Input name="password" type="password" minLength={8} required className={`mt-2 max-w-xs ${inputClass}`} />
           <div className="mt-2 flex gap-2">
             <Button type="submit" disabled={busy}>Save password</Button>
-            <Button type="button" variant="outline" onClick={() => setReset(null)}>Cancel</Button>
+            <Button type="button" variant="outline" className="border-white/15 bg-transparent text-white" onClick={() => setReset(null)}>Cancel</Button>
           </div>
         </form>
       ) : null}
-    </div>
-  );
-}
-
-function Stat({ label, value }: { label: string; value: string }) {
-  return (
-    <div className="rounded-2xl border border-border bg-card p-4">
-      <p className="text-sm text-muted-foreground">{label}</p>
-      <p className="mt-1 text-2xl font-black">{value}</p>
     </div>
   );
 }
@@ -263,7 +278,7 @@ function AgentForm({
 }) {
   return (
     <form
-      className="grid gap-2 rounded-2xl border border-border p-4 sm:grid-cols-2"
+      className="grid gap-2 rounded-2xl border border-white/10 bg-[#10182e]/80 p-4 sm:grid-cols-2"
       onSubmit={(event) => {
         event.preventDefault();
         const form = new FormData(event.currentTarget);
@@ -280,29 +295,37 @@ function AgentForm({
         });
       }}
     >
-      <p className="font-semibold sm:col-span-2">{kind === "store" ? "Add store creator" : "Add sub-creator"}</p>
-      <Input name="name" placeholder="Name" required />
-      <Input name="email" type="email" placeholder="Email" required />
-      <Input name="phone" placeholder="Phone" />
-      <Input name="password" type="password" placeholder="Temporary password" minLength={8} required />
+      <div className="sm:col-span-2">
+        <p className="font-semibold text-white">{kind === "store" ? "Add store" : "Add sub-creator"}</p>
+        <p className="mt-1 text-sm text-[#9fb0d0]">
+          {kind === "store"
+            ? "This creates a store account under the platform. It does not move money."
+            : "This creates a sub-creator under the store you choose. It does not move money."}
+        </p>
+      </div>
+      <Input name="name" placeholder="Name" required className={inputClass} />
+      <Input name="email" type="email" placeholder="Email" required className={inputClass} />
+      <Input name="phone" placeholder="Phone" className={inputClass} />
+      <Input name="password" type="password" placeholder="Temporary password" minLength={8} required className={inputClass} />
       {kind === "sub" ? (
         <>
-          <select name="parentId" className="h-9 rounded-md border border-border bg-background px-2 text-sm" required={stores.length > 1}>
+          <select name="parentId" aria-label="Store" className={fieldClass} required={stores.length > 1}>
             {stores.map((store) => (
               <option key={store.id} value={store.id}>{store.name}</option>
             ))}
           </select>
-          <select name="roleLabel" className="h-9 rounded-md border border-border bg-background px-2 text-sm">
+          <select name="roleLabel" aria-label="Sub-creator kind" className={fieldClass}>
             <option value="sub_creator">Sub-creator</option>
             <option value="store_sub_creator">Store sub-creator</option>
           </select>
-          <Input name="approveLimit" type="number" min={0} step="1" defaultValue={100} placeholder="Approve limit ($)" />
+          <Input name="approveLimit" type="number" min={0} step="1" defaultValue={100} placeholder="Approve limit ($)" aria-label="Deposit approval limit" className={inputClass} />
         </>
       ) : null}
-      <Input name="commissionBps" type="number" min={0} max={10000} defaultValue={0} placeholder="Commission bps" />
+      <Input name="commissionBps" type="number" min={0} max={10000} defaultValue={0} placeholder="Commission bps" aria-label="Commission rate in basis points" className={inputClass} />
+      <p className="text-xs text-[#8ea0c3] sm:col-span-2">Commission is stored in basis points. 100 basis points is 1%. Saving it does not pay commission.</p>
       <div className="flex gap-2 sm:col-span-2">
         <Button type="submit" disabled={busy}>Create</Button>
-        <Button type="button" variant="outline" onClick={onClose}>Cancel</Button>
+        <Button type="button" variant="outline" className="border-white/15 bg-transparent text-white" onClick={onClose}>Cancel</Button>
       </div>
     </form>
   );
@@ -327,7 +350,7 @@ function EditForm({
 }) {
   return (
     <form
-      className="grid gap-2 rounded-2xl border border-border p-4 sm:grid-cols-2"
+      className="grid gap-2 rounded-2xl border border-white/10 bg-[#10182e]/80 p-4 sm:grid-cols-2"
       onSubmit={(event) => {
         event.preventDefault();
         const form = new FormData(event.currentTarget);
@@ -340,21 +363,23 @@ function EditForm({
         });
       }}
     >
-      <p className="font-semibold sm:col-span-2">Edit {row.name}</p>
-      <p className="text-sm text-muted-foreground sm:col-span-2">
-        Promo code {row.promoCode} stays on this account. Estimated commission {row.commissionBps / 100}% · Players {row.playerCount}
-      </p>
-      <Input name="phone" defaultValue={row.phone} placeholder="Phone" />
-      <select name="roleLabel" defaultValue={row.roleLabel} className="h-9 rounded-md border border-border bg-background px-2 text-sm">
+      <div className="sm:col-span-2">
+        <p className="font-semibold text-white">Edit {row.name}</p>
+        <p className="mt-1 text-sm text-[#9fb0d0]">
+          Signup code {row.promoCode} stays on this account. Stored commission rate {(row.commissionBps / 100).toFixed(2)}%. Players assigned directly: {row.playerCount}. Saving does not move money.
+        </p>
+      </div>
+      <Input name="phone" defaultValue={row.phone} placeholder="Phone" className={inputClass} />
+      <select name="roleLabel" defaultValue={row.roleLabel} aria-label="Account kind" className={fieldClass}>
         <option value="sub_creator">Sub-creator</option>
         <option value="store_sub_creator">Store sub-creator</option>
-        {row.tier === "store_creator" ? <option value="store_creator">Store creator</option> : null}
+        {row.tier === "store_creator" ? <option value="store_creator">Store</option> : null}
       </select>
-      <Input name="commissionBps" type="number" min={0} max={10000} defaultValue={row.commissionBps} />
-      <Input name="approveLimit" type="number" min={0} defaultValue={row.approveLimit ?? 0} />
+      <Input name="commissionBps" type="number" min={0} max={10000} defaultValue={row.commissionBps} aria-label="Commission rate in basis points" className={inputClass} />
+      <Input name="approveLimit" type="number" min={0} defaultValue={row.approveLimit ?? 0} aria-label="Deposit approval limit" className={inputClass} />
       <div className="flex gap-2 sm:col-span-2">
         <Button type="submit" disabled={busy}>Save</Button>
-        <Button type="button" variant="outline" onClick={onClose}>Cancel</Button>
+        <Button type="button" variant="outline" className="border-white/15 bg-transparent text-white" onClick={onClose}>Cancel</Button>
       </div>
     </form>
   );
