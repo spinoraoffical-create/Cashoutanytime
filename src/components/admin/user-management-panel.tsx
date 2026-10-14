@@ -6,7 +6,7 @@ import { Ban, Loader2, ShieldCheck, Sparkles, Trash2, Wallet } from "lucide-reac
 import { toast } from "sonner";
 
 import { ConfirmActionButton } from "@/components/admin/confirm-action-button";
-import { GlassCard } from "@/components/shared/glass-card";
+import { AdminSectionCard } from "@/components/admin/ui/admin-section-card";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import {
@@ -33,10 +33,10 @@ import {
 type AdjustKind = "balance" | "coins" | "xp" | "redeem";
 
 const KIND_META: Record<AdjustKind, { label: string; hint: string }> = {
-  balance: { label: "Balance", hint: "Credit or debit the real-money wallet. Use a negative amount to debit." },
-  coins: { label: "Rewards", hint: "Credit or debit reward points. Use a negative amount to debit." },
-  xp: { label: "XP", hint: "Grant XP. XP cannot be reduced below zero." },
-  redeem: { label: "Redeem", hint: "Record a cash-out payout — debits the member's cash-out balance." },
+  balance: { label: "Balance", hint: "Adds or removes money from the play wallet. Use a negative amount to remove money." },
+  coins: { label: "Rewards", hint: "Adds or removes reward points. Use a negative amount to remove points." },
+  xp: { label: "XP", hint: "Adds experience. Experience cannot go below zero." },
+  redeem: { label: "Redeem", hint: "Records a cash-out and removes that amount from the cash-out wallet." },
 };
 
 type RoleOption = { key: string; name: string };
@@ -142,34 +142,29 @@ export function UserManagementPanel({
 
   return (
     <div className="space-y-4">
-      {/* ── balance / rewards / xp / redeem ── */}
-      <GlassCard className="p-6">
-        <h3 className="flex items-center gap-2 font-bold">
-          <Wallet className="size-4 text-ws-gold-deep dark:text-ws-gold" aria-hidden />
-          Balance &amp; rewards
-        </h3>
-        <p className="mt-1 text-xs text-muted-foreground">
-          Credit/debit the real-money wallet, adjust rewards/XP, or record a cash-out
-          payout. Every action is audit-logged.
-        </p>
-        <dl className="mt-4 grid grid-cols-3 gap-3">
+      <AdminSectionCard
+        title="Account actions"
+        description="These buttons change the player. The account details beside this card are read-only. Every change is logged."
+      >
+        <p className="text-sm text-[#9fb0d0]">Use a button only when you mean to change a balance, a role, or access.</p>
+      </AdminSectionCard>
+      <AdminSectionCard
+        title="Balance changes"
+        description="Choose Balance, Rewards, XP, or Redeem. Balance changes the play wallet. Redeem records a cash-out from the cash-out wallet."
+        action={<Wallet className="size-4 text-cyan-200" aria-hidden />}
+      >
+        <dl className="grid grid-cols-3 gap-3">
           <div>
-            <dt className="hud-label text-muted-foreground">Wallet</dt>
-            <dd className="tnum mt-1 font-bold text-ws-gold-deep dark:text-ws-gold">
-              ${walletBalance.toFixed(2)}
-            </dd>
+            <dt className="text-xs uppercase tracking-wide text-[#8ea0c3]">Play wallet</dt>
+            <dd className="mt-1 font-semibold tabular-nums text-white">${walletBalance.toFixed(2)}</dd>
           </div>
           <div>
-            <dt className="hud-label text-muted-foreground">Cash-out</dt>
-            <dd className="tnum mt-1 font-bold text-ws-emerald">
-              ${cashoutWallet.toFixed(2)}
-            </dd>
+            <dt className="text-xs uppercase tracking-wide text-[#8ea0c3]">Cash-out</dt>
+            <dd className="mt-1 font-semibold tabular-nums text-white">${cashoutWallet.toFixed(2)}</dd>
           </div>
           <div>
-            <dt className="hud-label text-muted-foreground">Coins</dt>
-            <dd className="tnum mt-1 font-bold text-ws-green-deep dark:text-ws-green">
-              {coinsBalance.toLocaleString()}
-            </dd>
+            <dt className="text-xs uppercase tracking-wide text-[#8ea0c3]">Coins</dt>
+            <dd className="mt-1 font-semibold tabular-nums text-white">{coinsBalance.toLocaleString()}</dd>
           </div>
         </dl>
         <Dialog open={adjustOpen} onOpenChange={setAdjustOpen}>
@@ -185,7 +180,7 @@ export function UserManagementPanel({
               <DialogDescription>{KIND_META[kind].hint}</DialogDescription>
             </DialogHeader>
             <div className="space-y-4">
-              <div className="grid grid-cols-4 gap-2">
+              <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
                 {(Object.keys(KIND_META) as AdjustKind[]).map((k) => (
                   <Button
                     key={k}
@@ -229,23 +224,19 @@ export function UserManagementPanel({
             </DialogFooter>
           </DialogContent>
         </Dialog>
-      </GlassCard>
+      </AdminSectionCard>
 
-      {/* ── roles ── */}
       {canManageRoles && (
-        <GlassCard className="p-6">
-          <h3 className="flex items-center gap-2 font-bold">
-            <ShieldCheck className="size-4 text-ws-emerald" aria-hidden />
-            Roles
-          </h3>
-          <p className="mt-1 text-xs text-muted-foreground">
-            Grant staff access. Changes take effect on the member&apos;s next request.
-          </p>
+        <AdminSectionCard
+          title="Staff roles"
+          description="Changes who this person can act as. The new roles apply on their next request."
+          action={<ShieldCheck className="size-4 text-emerald-200" aria-hidden />}
+        >
           <div className="mt-4 space-y-2">
             {allRoles.map((role) => (
               <label
                 key={role.key}
-                className="flex cursor-pointer items-center gap-3 rounded-lg px-2 py-1.5 hover:bg-foreground/5"
+                className="flex cursor-pointer items-center gap-3 rounded-lg px-2 py-1.5 text-[#e8eefc] hover:bg-white/5"
               >
                 <Checkbox
                   checked={selectedRoles.has(role.key)}
@@ -271,20 +262,19 @@ export function UserManagementPanel({
             {pending && <Loader2 className="size-4 animate-spin" aria-hidden />}
             Save roles
           </Button>
-        </GlassCard>
+        </AdminSectionCard>
       )}
 
-      {/* ── ban ── */}
-      <GlassCard className="border-ws-danger/20 p-6">
-        <h3 className="flex items-center gap-2 font-bold text-ws-danger">
-          <Ban className="size-4" aria-hidden />
-          {isBanned ? "Reinstate member" : "Ban member"}
-        </h3>
-        <p className="mt-1 text-xs text-muted-foreground">
-          {isBanned
-            ? "This member is currently banned and cannot claim rewards or sign in to play."
-            : "Banning blocks claims, referrals and gameplay immediately."}
-        </p>
+      <AdminSectionCard
+        className="border-rose-400/30"
+        title={isBanned ? "Restore access" : "Block access"}
+        description={
+          isBanned
+            ? "This player is currently blocked from rewards and play. Restoring access uses the existing ban action."
+            : "Blocking stops claims, referrals, and play immediately. This uses the existing ban action."
+        }
+        action={<Ban className="size-4 text-rose-200" aria-hidden />}
+      >
         {!isBanned && (
           <Input
             value={banReason}
@@ -301,21 +291,17 @@ export function UserManagementPanel({
           disabled={pending}
         >
           {pending && <Loader2 className="size-4 animate-spin" aria-hidden />}
-          {isBanned ? "Reinstate member" : "Ban member"}
+          {isBanned ? "Restore access" : "Block access"}
         </Button>
-      </GlassCard>
+      </AdminSectionCard>
 
-      {/* ── delete ── */}
       {canDelete && (
-        <GlassCard className="border-ws-danger/20 p-6">
-          <h3 className="flex items-center gap-2 font-bold text-ws-danger">
-            <Trash2 className="size-4" aria-hidden />
-            Delete account
-          </h3>
-          <p className="mt-1 text-xs text-muted-foreground">
-            Permanently deletes the login, profile, wallet and ledger history. This cannot
-            be undone.
-          </p>
+        <AdminSectionCard
+          className="border-rose-400/30"
+          title="Delete account"
+          description="Permanently deletes the login, profile, wallet, and ledger history. This cannot be undone."
+          action={<Trash2 className="size-4 text-rose-200" aria-hidden />}
+        >
           <div className="mt-4">
             <ConfirmActionButton
               action={deleteUserAccountAction.bind(null, userId)}
@@ -326,7 +312,7 @@ export function UserManagementPanel({
               redirectTo="/admin/users"
             />
           </div>
-        </GlassCard>
+        </AdminSectionCard>
       )}
     </div>
   );

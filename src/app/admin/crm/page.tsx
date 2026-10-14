@@ -1,11 +1,8 @@
 import type { Metadata } from "next";
 import { redirect } from "next/navigation";
-import { DollarSign, TrendingUp, UserCheck, Users } from "lucide-react";
-
 import { CrmPlayersPanel } from "@/components/admin/crm-players-panel";
 import { AdminPageHeader } from "@/components/admin/admin-page-header";
-import { GlassCard } from "@/components/shared/glass-card";
-import { StatCard } from "@/components/shared/stat-card";
+import { AdminStatCard } from "@/components/admin/ui/admin-stat-card";
 import { adminListScope } from "@/lib/admin/list-scope";
 import { readAgentScope } from "@/lib/agents/scope";
 import { can, getStaffContext } from "@/lib/data/admin";
@@ -16,7 +13,7 @@ import {
   type CrmSegment,
 } from "@/lib/data/admin-crm";
 
-export const metadata: Metadata = { title: "CRM" };
+export const metadata: Metadata = { title: "Player follow-up" };
 
 const SEGMENTS = [
   { key: "all", label: "All Players" },
@@ -59,34 +56,18 @@ export default async function AdminCrmPage({
   return (
     <div className="mx-auto max-w-7xl">
       <AdminPageHeader
-        title="CRM"
-        description="Customer intelligence — player activity, deposit history and contact details."
+        title="Player follow-up"
+        description="Filter players by recent activity. The totals are counts and the stored fulfilled deposit amount. This page does not move money."
       />
 
       <div className="mb-6 grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-        <StatCard
-          label="Total players"
-          value={stats.totalPlayers.toLocaleString()}
-          icon={<Users />}
-          accent="cyan"
-        />
-        <StatCard
-          label="New this week"
-          value={stats.newThisWeek.toLocaleString()}
-          icon={<TrendingUp />}
-          accent="emerald"
-        />
-        <StatCard
-          label="Active last 7 days"
-          value={stats.activeLast7d.toLocaleString()}
-          icon={<UserCheck />}
-          accent="purple"
-        />
-        <StatCard
-          label="Total fulfilled ($)"
+        <AdminStatCard label="Total players" value={stats.totalPlayers.toLocaleString()} hint="Players in this view." />
+        <AdminStatCard label="New this week" value={stats.newThisWeek.toLocaleString()} hint="Accounts created in the last 7 days." />
+        <AdminStatCard label="Active last 7 days" value={stats.activeLast7d.toLocaleString()} hint="Players seen in the last 7 days." />
+        <AdminStatCard
+          label="Fulfilled deposits"
           value={`$${stats.totalFulfilled.toLocaleString(undefined, { maximumFractionDigits: 0 })}`}
-          icon={<DollarSign />}
-          accent="gold"
+          hint="Stored fulfilled deposit total. This is not profit."
         />
       </div>
 

@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 
 import { AdminPageHeader } from "@/components/admin/admin-page-header";
 import { NetworkPlayers } from "@/components/admin/network-players";
+import { AdminErrorState } from "@/components/admin/ui/admin-error-state";
 import { loadNetworkPlayers } from "@/lib/actions/agents";
 import { requireAgentScope } from "@/lib/agents/scope";
 
@@ -22,13 +23,13 @@ export default async function NetworkPlayersPage({
         title="Players"
         description={
           scope.level === "sub"
-            ? "Players who registered with your code."
+            ? "Players who registered with your code. Opening a player does not change their balance."
             : scope.level === "store"
-              ? "Players under you and your sub-creators."
-              : "Every player, with the sub-creator who owns them."
+              ? "Players under you and your sub-creators. You can move a player to another sub-creator. Opening a player does not change their balance."
+              : "Every player, with the store or sub-creator they belong to. Moving a player changes that assignment. Opening a player does not change their balance."
         }
       />
-      {loaded.error ? <p className="mb-4 text-sm text-destructive">{loaded.error}</p> : null}
+      {loaded.error ? <div className="mb-4"><AdminErrorState title="Player list unavailable" body={loaded.error} /></div> : null}
       <NetworkPlayers
         rows={loaded.rows}
         parents={loaded.parents}

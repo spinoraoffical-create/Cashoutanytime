@@ -120,7 +120,7 @@ export default async function AdminOverviewPage() {
     ctx.isSuperAdmin ? { href: "/admin/fraud", label: "Fraud flags", count: fraudFlags } : null,
     money ? { href: "/admin/failed-loads", label: "Failed game loads", count: await statusCount("game_load_requests", "failed") } : null,
     money ? { href: "/admin/cashout-holds", label: "Held cash outs", count: await statusCount("cashout_holds", "held") } : null,
-    ctx.isSuperAdmin ? { href: "/admin/failed-loads", label: "Failed webhooks", count: await statusCount("webhook_events", "failed") } : null,
+    ctx.isSuperAdmin ? { href: "/admin/failed-loads", label: "Failed Game Loads", count: await statusCount("webhook_events", "failed") } : null,
   ].filter((item): item is { href: string; label: string; count: number | null } => Boolean(item));
 
   const dayStart = utcDayStart();

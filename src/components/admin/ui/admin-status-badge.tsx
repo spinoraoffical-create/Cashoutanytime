@@ -13,6 +13,16 @@ const TONE: Record<string, string> = {
   failed: "bg-rose-400/15 text-rose-100",
   rejected: "bg-rose-400/15 text-rose-100",
   held: "bg-violet-400/15 text-violet-100",
+  active: "bg-emerald-400/15 text-emerald-200",
+  open: "bg-emerald-400/15 text-emerald-200",
+  contacted: "bg-sky-400/15 text-sky-100",
+  fulfilled: "bg-emerald-400/15 text-emerald-200",
+  suspended: "bg-rose-400/15 text-rose-100",
+  banned: "bg-rose-400/15 text-rose-100",
+  resolved: "bg-white/10 text-[#d5def2]",
+  closed: "bg-white/10 text-[#d5def2]",
+  "in progress": "bg-sky-400/15 text-sky-100",
+  "not on file": "bg-white/10 text-[#d5def2]",
 };
 
 export function AdminStatusBadge({ status }: { status: string }) {

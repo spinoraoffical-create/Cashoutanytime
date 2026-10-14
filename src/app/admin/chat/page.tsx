@@ -24,9 +24,9 @@ export default async function AdminChatPage({
   return (
     <div className={CHAT_PAGE_SHELL_CLASS}>
       <div className="mb-4 sm:mb-6 shrink-0">
-        <h1 className="text-2xl sm:text-3xl font-bold">Customer Chat</h1>
-        <p className="text-muted-foreground text-sm sm:text-base">
-          Search any user to message them, or reply to existing chats in real time.
+        <h1 className="text-2xl font-semibold tracking-tight text-white sm:text-3xl">Live chat</h1>
+        <p className="text-sm leading-6 text-[#9fb0d0] sm:text-base">
+          Search a player to message them, or reply to an existing chat. This screen does not change a wallet.
         </p>
       </div>
 

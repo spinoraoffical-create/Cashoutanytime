@@ -54,7 +54,7 @@ export const ADMIN_NAV: AdminNavSection[] = [
         permission: "users.manage",
         roleAny: ["store_creator", "sub_creator"],
       },
-      { href: "/admin/crm", label: "CRM", permission: "users.manage" },
+      { href: "/admin/crm", label: "Player follow-up", permission: "users.manage" },
       { href: "/admin/support", label: "Tickets", permission: null, superOnly: true, hiddenFromStore: true },
       { href: "/admin/chat", label: "Live chat", permission: "support.manage", hiddenFromStore: true },
     ],

@@ -2,14 +2,15 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { format } from "date-fns";
-import { ArrowLeft, Ban } from "lucide-react";
+import { ArrowLeft } from "lucide-react";
 
 import { AdminPageHeader } from "@/components/admin/admin-page-header";
 import { UserManagementPanel } from "@/components/admin/user-management-panel";
-import { GlassCard } from "@/components/shared/glass-card";
+import { AdminEmptyState } from "@/components/admin/ui/admin-empty-state";
+import { AdminSectionCard } from "@/components/admin/ui/admin-section-card";
+import { AdminStatusBadge } from "@/components/admin/ui/admin-status-badge";
 import { TierBadge } from "@/components/shared/tier-badge";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { adminDb } from "@/lib/actions/admin/core";
 import {
@@ -26,30 +27,7 @@ import { platformTicketAccess } from "@/lib/support/ticket-access";
 import { listPlayerTickets } from "@/lib/support/ticket-store";
 import type { VipTierKey } from "@/lib/database.types";
 
-export const metadata: Metadata = { title: "Member" };
-
-const STATUS_COLORS: Record<string, string> = {
-  pending:   "bg-ws-green/15 text-ws-green-deep dark:text-ws-green",
-  contacted: "bg-blue-500/15 text-blue-400",
-  fulfilled: "bg-ws-emerald/15 text-ws-emerald",
-  rejected:  "bg-red-500/15 text-red-400",
-};
-
-const ENTRY_TYPE_COLORS: Record<string, string> = {
-  daily_claim:  "bg-ws-emerald/15 text-ws-emerald",
-  referral:     "bg-ws-purple/15 text-ws-purple",
-  promotion:    "bg-ws-green/15 text-ws-green-deep dark:text-ws-green",
-  achievement:  "bg-blue-500/15 text-blue-400",
-  admin_grant:  "bg-ws-cyan/15 text-ws-cyan",
-};
-
-const TICKET_STATUS_COLORS: Record<string, string> = {
-  open:        "bg-ws-emerald/15 text-ws-emerald",
-  in_progress: "bg-blue-500/15 text-blue-400",
-  pending:     "bg-ws-green/15 text-ws-green-deep dark:text-ws-green",
-  resolved:    "bg-foreground/10 text-muted-foreground",
-  closed:      "bg-foreground/8 text-muted-foreground",
-};
+export const metadata: Metadata = { title: "Player" };
 
 const CATEGORY_LABEL: Record<string, string> = {
   account: "Account", rewards: "Rewards", vip: "VIP",
@@ -134,57 +112,48 @@ export default async function AdminUserDetailPage({
     <div className="mx-auto max-w-5xl">
       <Link
         href={scope.level === "platform" ? "/admin/users" : "/admin/players"}
-        className="mb-4 inline-flex items-center gap-1.5 text-sm text-muted-foreground transition-colors hover:text-foreground"
+        className="mb-4 inline-flex items-center gap-1.5 text-sm text-[#9fb0d0] transition-colors hover:text-white"
       >
         <ArrowLeft className="size-4" aria-hidden />
-        {scope.level === "platform" ? "All users" : "Players"}
+        {scope.level === "platform" ? "All players" : "Network players"}
       </Link>
 
       <AdminPageHeader
         title={profileDisplayName(p)}
-        description={`${profileHandle(p)}${email ? ` · ${email}` : ""} · Parent ${parentName} · joined ${format(new Date(p.created_at!), "MMMM d, yyyy")}`}
+        description={`${profileHandle(p)}${email ? ` · ${email}` : ""} · Assigned store or sub-creator: ${parentName} · Joined ${format(new Date(p.created_at!), "MMMM d, yyyy")}`}
         action={
           <div className="flex flex-wrap gap-2">
-            {profileIsBanned(p) ? (
-              <Badge className="bg-ws-danger/15 text-ws-danger">
-                <Ban className="size-3" aria-hidden />
-                Banned
-              </Badge>
-            ) : (
-              <Badge className="bg-ws-emerald/15 text-ws-emerald">Not banned</Badge>
-            )}
-            {p.is_suspended ? <Badge className="bg-ws-gold/15 text-ws-gold-deep dark:text-ws-gold">Suspended</Badge> : null}
-            <Badge variant="outline">
-              Identity {(p as ProfileRow & { kyc_status?: string | null }).kyc_status || "not on file"}
-            </Badge>
+            <AdminStatusBadge status={profileIsBanned(p) ? "Banned" : "Active"} />
+            {p.is_suspended ? <AdminStatusBadge status="Suspended" /> : null}
+            <AdminStatusBadge status={(p as ProfileRow & { kyc_status?: string | null }).kyc_status || "Not on file"} />
           </div>
         }
       />
 
       <Tabs defaultValue="profile" className="space-y-6">
-        <TabsList>
-          <TabsTrigger value="profile">Profile</TabsTrigger>
-          <TabsTrigger value="ledger">
-            Coin Ledger
+        <TabsList className="h-auto w-full flex-wrap justify-start gap-2 rounded-none bg-transparent p-0">
+          <TabsTrigger value="profile" className="h-9 flex-none rounded-full border border-white/10 px-3 text-[#9fb0d0] data-[state=active]:border-transparent data-[state=active]:bg-gradient-to-r data-[state=active]:from-[#6d28d9] data-[state=active]:to-[#2563eb] data-[state=active]:text-white">Profile</TabsTrigger>
+          <TabsTrigger value="ledger" className="h-9 flex-none rounded-full border border-white/10 px-3 text-[#9fb0d0] data-[state=active]:border-transparent data-[state=active]:bg-gradient-to-r data-[state=active]:from-[#6d28d9] data-[state=active]:to-[#2563eb] data-[state=active]:text-white">
+            Coin ledger
             {ledger.length > 0 && (
-              <span className="ml-1.5 rounded-full bg-foreground/10 px-1.5 py-0.5 text-[10px] font-semibold">
+              <span className="ml-1.5 rounded-full bg-white/15 px-1.5 py-0.5 text-[10px] font-semibold">
                 {ledger.length}
               </span>
             )}
           </TabsTrigger>
-          <TabsTrigger value="deposits">
-            Deposits
-            {deposits.length > 0 && (
-              <span className="ml-1.5 rounded-full bg-foreground/10 px-1.5 py-0.5 text-[10px] font-semibold">
-                {deposits.length}
+          <TabsTrigger value="deposits" className="h-9 flex-none rounded-full border border-white/10 px-3 text-[#9fb0d0] data-[state=active]:border-transparent data-[state=active]:bg-gradient-to-r data-[state=active]:from-[#6d28d9] data-[state=active]:to-[#2563eb] data-[state=active]:text-white">
+            Deposits and games
+            {spinoraDeposits.length + deposits.length > 0 && (
+              <span className="ml-1.5 rounded-full bg-white/15 px-1.5 py-0.5 text-[10px] font-semibold">
+                {spinoraDeposits.length + deposits.length}
               </span>
             )}
           </TabsTrigger>
           {ticketAccess.tickets ? (
-            <TabsTrigger value="support">
+            <TabsTrigger value="support" className="h-9 flex-none rounded-full border border-white/10 px-3 text-[#9fb0d0] data-[state=active]:border-transparent data-[state=active]:bg-gradient-to-r data-[state=active]:from-[#6d28d9] data-[state=active]:to-[#2563eb] data-[state=active]:text-white">
               Support
               {tickets.length > 0 && (
-                <span className="ml-1.5 rounded-full bg-foreground/10 px-1.5 py-0.5 text-[10px] font-semibold">
+                <span className="ml-1.5 rounded-full bg-white/15 px-1.5 py-0.5 text-[10px] font-semibold">
                   {tickets.length}
                 </span>
               )}
@@ -196,12 +165,14 @@ export default async function AdminUserDetailPage({
         <TabsContent value="profile">
           <div className="grid gap-6 lg:grid-cols-3">
             <div className="space-y-6 lg:col-span-2">
-              {/* Avatar + stats */}
-              <GlassCard className="p-6">
+              <AdminSectionCard
+                title="Account details"
+                description="Read-only. These values come from the player record. They do not change until an action on the right is used."
+              >
                 <div className="flex items-center gap-4">
                   <Avatar className="size-16">
                     <AvatarImage src={p.avatar_url ?? undefined} alt="" />
-                    <AvatarFallback className="bg-ws-surface-3 text-lg font-bold">
+                    <AvatarFallback className="bg-[#1a2450] text-lg font-bold text-white">
                       {profileInitials(p)}
                     </AvatarFallback>
                   </Avatar>
@@ -210,90 +181,69 @@ export default async function AdminUserDetailPage({
                     {userRoleKeys
                       .filter((k) => k !== "customer")
                       .map((k) => (
-                        <Badge key={k} className="bg-ws-purple/15 text-ws-purple uppercase">
-                          {k.replace("_", " ")}
-                        </Badge>
+                        <AdminStatusBadge key={k} status={k.replaceAll("_", " ")} />
                       ))}
                   </div>
                 </div>
 
                 <dl className="mt-6 grid grid-cols-2 gap-4 sm:grid-cols-3">
                   {[
-                    { label: "Level",    value: profileNum(p.level, 1).toLocaleString() },
+                    { label: "Level", value: profileNum(p.level, 1).toLocaleString() },
                     { label: "Total XP", value: profileNum(p.xp).toLocaleString() },
-                    { label: "Coins",    value: profileNum(p.coins_balance).toLocaleString() },
-                    { label: "Streak",   value: `${profileNum(p.current_streak)}d` },
-                    {
-                      label: "Wallet",
-                      value: `$${profileNum(p.wallet_balance).toFixed(2)}`,
-                      accent: "text-ws-gold-deep dark:text-ws-gold",
-                    },
-                    {
-                      label: "Cash-out",
-                      value: `$${profileNum(p.cashout_wallet).toFixed(2)}`,
-                      accent: "text-ws-emerald",
-                    },
+                    { label: "Coins", value: profileNum(p.coins_balance).toLocaleString() },
+                    { label: "Streak", value: `${profileNum(p.current_streak)} days` },
+                    { label: "Play wallet", value: `$${profileNum(p.wallet_balance).toFixed(2)}` },
+                    { label: "Cash-out wallet", value: `$${profileNum(p.cashout_wallet).toFixed(2)}` },
+                    { label: "Identity status", value: (p as ProfileRow & { kyc_status?: string | null }).kyc_status || "Not on file" },
+                    { label: "Assigned store or sub-creator", value: parentName },
                   ].map((s) => (
                     <div key={s.label}>
-                      <dt className="hud-label text-muted-foreground">{s.label}</dt>
-                      <dd className={`tnum mt-1 text-lg font-bold ${s.accent ?? ""}`}>{s.value}</dd>
+                      <dt className="text-xs font-medium uppercase tracking-wide text-[#8ea0c3]">{s.label}</dt>
+                      <dd className="mt-1 text-lg font-semibold tabular-nums text-white">{s.value}</dd>
                     </div>
                   ))}
                 </dl>
 
-                {p.referral_code && (
-                  <p className="mt-4 text-xs text-muted-foreground">
-                    Referral code:{" "}
-                    <span className="tnum font-semibold text-foreground">
-                      {p.referral_code}
-                    </span>
+                {p.referral_code ? (
+                  <p className="mt-4 text-xs text-[#9fb0d0]">
+                    Referral code: <span className="font-semibold text-white">{p.referral_code}</span>
                   </p>
-                )}
-              </GlassCard>
+                ) : null}
+              </AdminSectionCard>
 
-              {/* Recent ledger preview */}
-              <GlassCard className="p-6">
-                <div className="flex items-center justify-between">
-                  <h3 className="font-bold">Recent ledger</h3>
-                  <button
-                    className="text-xs font-medium text-ws-cyan underline-offset-4 hover:underline"
-                    onClick={undefined}
-                    data-tab-target="ledger"
-                  >
-                    View all →
-                  </button>
-                </div>
-                <ul className="mt-4 divide-y divide-foreground/8">
-                  {ledger.length === 0 ? (
-                    <li className="py-3 text-sm text-muted-foreground">No ledger entries yet.</li>
-                  ) : (
-                    ledger.slice(0, 10).map((e) => (
+              <AdminSectionCard
+                title="Recent coin activity"
+                description="The latest 10 coin and XP rows. The Coin ledger tab has the longer list. This view does not change a balance."
+              >
+                {ledger.length === 0 ? (
+                  <AdminEmptyState title="No coin activity yet" body="Coin and XP rows will show here after this player earns or spends them." />
+                ) : (
+                  <ul className="divide-y divide-white/10">
+                    {ledger.slice(0, 10).map((e) => (
                       <li key={e.id} className="flex items-center justify-between gap-3 py-2.5">
                         <div className="min-w-0">
-                          <p className="truncate text-sm">{e.description || e.entry_type}</p>
-                          <p className="text-xs text-muted-foreground">
+                          <p className="truncate text-sm text-white">{e.description || e.entry_type}</p>
+                          <p className="text-xs text-[#9fb0d0]">
                             {format(new Date(e.created_at), "MMM d, HH:mm")}
                           </p>
                         </div>
-                        <span
-                          className={`tnum shrink-0 text-sm font-semibold ${
-                            e.amount >= 0 ? "text-ws-emerald" : "text-ws-danger"
-                          }`}
-                        >
+                        <span className={`shrink-0 text-sm font-semibold tabular-nums ${e.amount >= 0 ? "text-emerald-200" : "text-rose-200"}`}>
                           {e.amount >= 0 ? "+" : ""}
                           {e.amount.toLocaleString()}
-                          <span className="ml-1 text-[10px] text-muted-foreground uppercase">
-                            {e.currency}
-                          </span>
+                          <span className="ml-1 text-[10px] uppercase text-[#8ea0c3]">{e.currency}</span>
                         </span>
                       </li>
-                    ))
-                  )}
-                </ul>
-              </GlassCard>
+                    ))}
+                  </ul>
+                )}
+              </AdminSectionCard>
             </div>
 
-            {scope.level === "sub" ? null : (
+            {scope.level === "sub" ? (
+              <AdminSectionCard title="View only" description="You can read this player's details. Account changes stay with platform staff.">
+                <p className="text-sm text-[#9fb0d0]">No balance, role, ban, or delete actions are shown for this login.</p>
+              </AdminSectionCard>
+            ) : (
               <UserManagementPanel
                 userId={id}
                 isBanned={profileIsBanned(p)}
@@ -311,46 +261,38 @@ export default async function AdminUserDetailPage({
 
         {/* ── Coin Ledger tab ── */}
         <TabsContent value="ledger">
-          <GlassCard className="overflow-hidden">
-            <div className="flex items-center justify-between border-b border-foreground/8 px-6 py-4">
-              <h3 className="font-bold">Coin &amp; XP Ledger</h3>
-              <p className="text-xs text-muted-foreground">
-                Showing last {ledger.length} entries
-              </p>
-            </div>
+          <AdminSectionCard title="Coin and XP ledger" description={`Read-only. Showing the last ${ledger.length} stored entries.`}>
             {ledger.length === 0 ? (
-              <p className="px-6 py-8 text-sm text-muted-foreground">No ledger entries yet.</p>
+              <AdminEmptyState title="No ledger entries yet" body="Coin and XP history will appear after this player has activity." />
             ) : (
               <div className="overflow-x-auto">
-                <table className="w-full text-sm">
+                <table className="w-full min-w-[36rem] text-left text-sm">
                   <thead>
-                    <tr className="border-b border-foreground/8 text-xs text-muted-foreground">
-                      <th className="px-6 py-3 text-left font-medium">Date</th>
-                      <th className="px-6 py-3 text-left font-medium">Description</th>
-                      <th className="px-6 py-3 text-left font-medium">Type</th>
-                      <th className="px-6 py-3 text-right font-medium">Amount</th>
-                      <th className="px-6 py-3 text-right font-medium">Currency</th>
+                    <tr className="border-b border-white/10 text-xs uppercase tracking-wide text-[#8ea0c3]">
+                      <th className="px-2 py-2 font-medium">Date</th>
+                      <th className="px-2 py-2 font-medium">Description</th>
+                      <th className="px-2 py-2 font-medium">Type</th>
+                      <th className="px-2 py-2 text-right font-medium">Amount</th>
+                      <th className="px-2 py-2 text-right font-medium">Currency</th>
                     </tr>
                   </thead>
-                  <tbody className="divide-y divide-foreground/8">
+                  <tbody>
                     {ledger.map((e) => (
-                      <tr key={e.id} className="hover:bg-foreground/[0.02]">
-                        <td className="tnum whitespace-nowrap px-6 py-3 text-xs text-muted-foreground">
+                      <tr key={e.id} className="border-b border-white/5 last:border-0">
+                        <td className="whitespace-nowrap px-2 py-3 text-xs text-[#9fb0d0]">
                           {format(new Date(e.created_at), "MMM d, yyyy HH:mm")}
                         </td>
-                        <td className="max-w-xs truncate px-6 py-3">
+                        <td className="max-w-xs truncate px-2 py-3 text-[#e8eefc]">
                           {e.description || e.entry_type}
                         </td>
-                        <td className="px-6 py-3">
-                          <span className={`rounded-full px-2 py-0.5 text-[10px] font-semibold ${ENTRY_TYPE_COLORS[e.entry_type] ?? "bg-foreground/10 text-muted-foreground"}`}>
-                            {e.entry_type.replace(/_/g, " ")}
-                          </span>
+                        <td className="px-2 py-3">
+                          <AdminStatusBadge status={e.entry_type.replace(/_/g, " ")} />
                         </td>
-                        <td className={`tnum px-6 py-3 text-right font-semibold ${e.amount >= 0 ? "text-ws-emerald" : "text-ws-danger"}`}>
+                        <td className={`px-2 py-3 text-right font-semibold tabular-nums ${e.amount >= 0 ? "text-emerald-200" : "text-rose-200"}`}>
                           {e.amount >= 0 ? "+" : ""}
                           {e.amount.toLocaleString()}
                         </td>
-                        <td className="px-6 py-3 text-right text-[10px] uppercase text-muted-foreground">
+                        <td className="px-2 py-3 text-right text-[10px] uppercase text-[#8ea0c3]">
                           {e.currency}
                         </td>
                       </tr>
@@ -359,120 +301,91 @@ export default async function AdminUserDetailPage({
                 </table>
               </div>
             )}
-          </GlassCard>
+          </AdminSectionCard>
         </TabsContent>
 
         {/* ── Deposits tab ── */}
         <TabsContent value="deposits">
+          <AdminSectionCard
+            title="Deposits and game requests"
+            description="Read-only history already stored for this player. This tab does not approve, load, or refund anything."
+          >
           {spinoraDeposits.length === 0 && deposits.length === 0 ? (
-            <GlassCard className="py-10 text-center text-sm text-muted-foreground">
-              No deposit requests found for this player.
-            </GlassCard>
+            <AdminEmptyState title="No deposit or game requests" body="Completed and pending requests for this player will show here." />
           ) : (
             <div className="space-y-3">
               {spinoraDeposits.map((dep) => (
-                <GlassCard key={dep.id} className="p-5">
+                <div key={dep.id} className="rounded-xl border border-white/10 bg-[#0b1224] p-4">
                   <div className="flex flex-wrap items-start justify-between gap-3">
                     <div className="min-w-0 flex-1">
                       <div className="flex flex-wrap items-center gap-2">
-                        <span className="font-semibold">{dep.game_name}</span>
-                        <span className={`rounded-full px-2.5 py-0.5 text-[11px] font-semibold ${STATUS_COLORS[dep.status] ?? "bg-foreground/10 text-muted-foreground"}`}>
-                          {dep.status}
-                        </span>
+                        <span className="font-semibold text-white">{dep.game_name}</span>
+                        <AdminStatusBadge status={dep.status} />
                       </div>
-                      <div className="mt-2 flex flex-wrap gap-4 text-sm text-muted-foreground">
-                        <span className="font-semibold text-foreground">
-                          ${Number(dep.amount ?? 0).toFixed(2)}
-                        </span>
+                      <div className="mt-2 flex flex-wrap gap-4 text-sm text-[#9fb0d0]">
+                        <span className="font-semibold text-white">${Number(dep.amount ?? 0).toFixed(2)}</span>
                         <span className="capitalize">{dep.payment_method}</span>
                       </div>
                     </div>
-                    <div className="text-right text-xs text-muted-foreground">
-                      <p>{format(new Date(dep.created_at), "MMM d, yyyy")}</p>
-                    </div>
+                    <p className="text-right text-xs text-[#9fb0d0]">{format(new Date(dep.created_at), "MMM d, yyyy")}</p>
                   </div>
-                </GlassCard>
+                </div>
               ))}
               {deposits.map((dep) => (
-                <GlassCard key={dep.id} className="p-5">
+                <div key={dep.id} className="rounded-xl border border-white/10 bg-[#0b1224] p-4">
                   <div className="flex flex-wrap items-start justify-between gap-3">
                     <div className="min-w-0 flex-1">
                       <div className="flex flex-wrap items-center gap-2">
-                        <span className="tnum font-mono text-sm font-bold text-ws-green-deep dark:text-ws-green">
-                          {dep.reference_code}
-                        </span>
-                        <span className={`rounded-full px-2.5 py-0.5 text-[11px] font-semibold ${STATUS_COLORS[dep.status] ?? "bg-foreground/10 text-muted-foreground"}`}>
-                          {dep.status}
-                        </span>
-                        {dep.games?.name && (
-                          <span className="rounded-full border border-ws-green/20 bg-ws-green/10 px-2.5 py-0.5 text-[11px] font-medium text-ws-green-deep dark:text-ws-green">
-                            {dep.games.name}
-                          </span>
-                        )}
+                        <span className="font-mono text-sm font-bold text-cyan-200">{dep.reference_code}</span>
+                        <AdminStatusBadge status={dep.status} />
+                        {dep.games?.name ? <AdminStatusBadge status={dep.games.name} /> : null}
                       </div>
-                      <div className="mt-2 flex flex-wrap gap-4 text-sm text-muted-foreground">
-                        <span>{dep.request_type === "new_account" ? "New Account" : "Reload"}</span>
-                        <span className="font-semibold text-foreground">
-                          ${dep.deposit_amount.toFixed(2)}
-                        </span>
+                      <div className="mt-2 flex flex-wrap gap-4 text-sm text-[#9fb0d0]">
+                        <span>{dep.request_type === "new_account" ? "New account" : "Reload"}</span>
+                        <span className="font-semibold text-white">${dep.deposit_amount.toFixed(2)}</span>
                         <span className="capitalize">{dep.payment_method}</span>
                       </div>
                     </div>
-                    <div className="text-right text-xs text-muted-foreground">
+                    <div className="text-right text-xs text-[#9fb0d0]">
                       <p>{format(new Date(dep.created_at), "MMM d, yyyy")}</p>
-                      {dep.resolved_at && (
-                        <p className="text-ws-emerald">
-                          Fulfilled {format(new Date(dep.resolved_at), "MMM d")}
-                        </p>
-                      )}
+                      {dep.resolved_at ? <p className="text-emerald-200">Fulfilled {format(new Date(dep.resolved_at), "MMM d")}</p> : null}
                     </div>
                   </div>
-                </GlassCard>
+                </div>
               ))}
             </div>
           )}
+          </AdminSectionCard>
         </TabsContent>
 
         {/* ── Support History tab ── */}
         {ticketAccess.tickets ? <TabsContent value="support">
+          <AdminSectionCard title="Support tickets" description="Read-only list. Open a ticket to reply. Store and sub logins do not see this tab.">
           {tickets.length === 0 ? (
-            <GlassCard className="py-10 text-center text-sm text-muted-foreground">
-              No support tickets found for this player.
-            </GlassCard>
+            <AdminEmptyState title="No support tickets" body="Tickets this player sends to Super Admin will show here." />
           ) : (
-            <GlassCard className="overflow-hidden">
-              <ul className="divide-y divide-foreground/8">
-                {tickets.map((t) => (
-                  <li key={t.id}>
-                    <Link
-                      href={`/admin/support/${t.id}`}
-                      className="flex items-center gap-4 px-6 py-4 transition-colors hover:bg-foreground/[0.03]"
-                    >
-                      <div className="min-w-0 flex-1">
-                        <div className="flex items-center gap-2">
-                          <span className="tnum text-xs text-muted-foreground">
-                            #{t.ticket_no}
-                          </span>
-                          <span className="text-xs text-ws-text-faint">
-                            {CATEGORY_LABEL[t.category] ?? t.category}
-                          </span>
-                        </div>
-                        <p className="mt-0.5 truncate text-sm font-semibold">
-                          {t.subject}
-                        </p>
-                        <p className="text-xs text-muted-foreground">
-                          {format(new Date(t.last_message_at), "MMM d, yyyy HH:mm")}
-                        </p>
+            <ul className="divide-y divide-white/10">
+              {tickets.map((t) => (
+                <li key={t.id}>
+                  <Link
+                    href={`/admin/support/${t.id}`}
+                    className="flex items-center gap-4 py-4 transition-colors hover:text-cyan-200"
+                  >
+                    <div className="min-w-0 flex-1">
+                      <div className="flex items-center gap-2 text-xs text-[#9fb0d0]">
+                        <span>#{t.ticket_no}</span>
+                        <span>{CATEGORY_LABEL[t.category] ?? t.category}</span>
                       </div>
-                      <span className={`shrink-0 rounded-full px-2.5 py-0.5 text-[11px] font-semibold ${TICKET_STATUS_COLORS[t.status] ?? "bg-foreground/10 text-muted-foreground"}`}>
-                        {t.status.replace("_", " ")}
-                      </span>
-                    </Link>
-                  </li>
-                ))}
-              </ul>
-            </GlassCard>
+                      <p className="mt-0.5 truncate text-sm font-semibold text-white">{t.subject}</p>
+                      <p className="text-xs text-[#8ea0c3]">{format(new Date(t.last_message_at), "MMM d, yyyy HH:mm")}</p>
+                    </div>
+                    <AdminStatusBadge status={t.status.replaceAll("_", " ")} />
+                  </Link>
+                </li>
+              ))}
+            </ul>
           )}
+          </AdminSectionCard>
         </TabsContent> : null}
       </Tabs>
     </div>

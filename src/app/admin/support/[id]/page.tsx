@@ -10,7 +10,7 @@ import {
   TicketPriorityBadge,
   TicketStatusBadge,
 } from "@/components/dashboard/ticket-status-badge";
-import { GlassCard } from "@/components/shared/glass-card";
+import { AdminSectionCard } from "@/components/admin/ui/admin-section-card";
 import { profileDisplayName } from "@/lib/admin/spinora-profile";
 import { staffReplyAction } from "@/lib/actions/admin/support";
 import { platformTicketAccess } from "@/lib/support/ticket-access";
@@ -47,10 +47,10 @@ export default async function AdminTicketDetailPage({
     <div className="mx-auto max-w-3xl">
       <Link
         href="/admin/support"
-        className="mb-4 inline-flex items-center gap-1.5 text-sm text-muted-foreground transition-colors hover:text-foreground"
+        className="mb-4 inline-flex items-center gap-1.5 text-sm text-[#9fb0d0] transition-colors hover:text-white"
       >
         <ArrowLeft className="size-4" aria-hidden />
-        Chat inbox
+        Tickets
       </Link>
 
       <AdminPageHeader
@@ -65,7 +65,7 @@ export default async function AdminTicketDetailPage({
       />
 
       {/* Conversation + reply (realtime, optimistic) */}
-      <GlassCard className="p-4">
+      <AdminSectionCard title="Conversation" description="Replies go to this player. Status changes are in the next card.">
         <ChatContainer
           ticketId={ticket.id}
           initialMessages={thread}
@@ -73,16 +73,17 @@ export default async function AdminTicketDetailPage({
           perspective="staff"
           onSend={staffReplyAction}
         />
-      </GlassCard>
+      </AdminSectionCard>
 
-      {/* Status + assign controls */}
-      <GlassCard className="mt-4 p-4">
+      <div className="mt-4">
+      <AdminSectionCard title="Ticket actions" description="These controls change the ticket status or assignment. They do not change a wallet.">
         <StaffTicketActions
           ticketId={ticket.id}
           status={ticket.status}
           assigned={Boolean(ticket.assigned_to)}
         />
-      </GlassCard>
+      </AdminSectionCard>
+      </div>
     </div>
   );
 }

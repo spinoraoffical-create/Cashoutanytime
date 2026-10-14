@@ -1,15 +1,15 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { formatDistanceToNow } from "date-fns";
-import { ChevronRight, LifeBuoy } from "lucide-react";
+import { ChevronRight } from "lucide-react";
 
 import { AdminPageHeader } from "@/components/admin/admin-page-header";
 import {
   TicketPriorityBadge,
   TicketStatusBadge,
 } from "@/components/dashboard/ticket-status-badge";
-import { EmptyState } from "@/components/shared/empty-state";
-import { GlassCard } from "@/components/shared/glass-card";
+import { AdminEmptyState } from "@/components/admin/ui/admin-empty-state";
+import { AdminSectionCard } from "@/components/admin/ui/admin-section-card";
 import { profileDisplayName } from "@/lib/admin/spinora-profile";
 import { platformTicketAccess } from "@/lib/support/ticket-access";
 import { listAdminTickets } from "@/lib/support/ticket-store";
@@ -43,13 +43,13 @@ export default async function AdminSupportPage({
     <div className="mx-auto max-w-5xl">
       <AdminPageHeader
         title="Tickets"
-        description="Player tickets. Only Super Admin can open them."
+        description="Player tickets sent to Super Admin. Choose Active, Resolved, or Closed. Opening a ticket does not change a balance."
       />
 
       <div
         role="tablist"
         aria-label="Ticket filter"
-        className="glass mb-4 inline-flex gap-1 rounded-full p-1"
+        className="mb-4 inline-flex flex-wrap gap-2"
       >
         {FILTERS.map((f) => {
           const active = f.key === filterKey;
@@ -60,10 +60,10 @@ export default async function AdminSupportPage({
               role="tab"
               aria-selected={active}
               className={cn(
-                "min-h-9 rounded-full px-4 py-1.5 text-sm font-medium transition-colors",
+                "inline-flex min-h-9 items-center rounded-full border px-4 py-1.5 text-sm font-semibold transition-colors",
                 active
-                  ? "bg-emerald-500 text-foreground"
-                  : "text-muted-foreground hover:text-foreground"
+                  ? "border-transparent bg-gradient-to-r from-[#6d28d9] to-[#2563eb] text-white"
+                  : "border-white/10 text-[#9fb0d0] hover:text-white"
               )}
             >
               {f.label}
@@ -73,19 +73,18 @@ export default async function AdminSupportPage({
       </div>
 
       {tickets.length === 0 ? (
-        <EmptyState
-          icon={<LifeBuoy />}
+        <AdminEmptyState
           title={`No ${filter.label.toLowerCase()} tickets`}
-          description="When players open tickets, they show up here."
+          body="When players open tickets, they show up here."
         />
       ) : (
-        <GlassCard className="overflow-hidden">
-          <ul className="divide-y divide-foreground/8">
+        <AdminSectionCard title={`${filter.label} tickets`} description="Select a ticket to read the thread and reply.">
+          <ul className="divide-y divide-white/10">
             {tickets.map((t) => (
               <li key={t.id}>
                 <Link
                   href={`/admin/support/${t.id}`}
-                  className="flex items-center gap-4 px-4 py-4 transition-colors hover:bg-foreground/[0.03] sm:px-6"
+                  className="flex items-center gap-4 py-4 transition-colors hover:text-cyan-200"
                 >
                   <div className="min-w-0 flex-1">
                     <div className="flex items-center gap-2">
@@ -99,7 +98,7 @@ export default async function AdminSupportPage({
                         )}
                       </span>
                     </div>
-                    <p className="mt-0.5 truncate text-sm font-semibold">
+                    <p className="mt-0.5 truncate text-sm font-semibold text-white">
                       {t.subject}
                     </p>
                     <p className="text-xs text-muted-foreground">
@@ -119,7 +118,7 @@ export default async function AdminSupportPage({
               </li>
             ))}
           </ul>
-        </GlassCard>
+        </AdminSectionCard>
       )}
     </div>
   );

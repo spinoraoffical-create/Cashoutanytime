@@ -6,6 +6,8 @@ import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 
 import { movePlayerAction, type NetworkPlayer } from "@/lib/actions/agents";
+import { AdminEmptyState } from "@/components/admin/ui/admin-empty-state";
+import { AdminStatusBadge } from "@/components/admin/ui/admin-status-badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
@@ -32,18 +34,18 @@ export function NetworkPlayers({
 
   return (
     <div className="space-y-4">
-      <form className="flex flex-wrap gap-2" action="/admin/players">
-        <Input name="q" defaultValue={query.q} placeholder="Search name, phone, email, sub-creator, or store" className="max-w-md" />
+      <form className="flex flex-col gap-2 lg:flex-row lg:flex-wrap" action="/admin/players">
+        <Input name="q" defaultValue={query.q} placeholder="Search name, phone, email, sub-creator, or store" className="max-w-md border-white/10 bg-[#0b1224] text-white placeholder:text-[#8ea0c3]" aria-label="Search network players" />
         {showParentFilter ? (
-          <select name="parent" defaultValue={query.parent ?? "all"} className="h-9 rounded-md border border-border bg-background px-2 text-sm">
-            <option value="all">All parents</option>
+          <select name="parent" defaultValue={query.parent ?? "all"} aria-label="Filter by store or sub-creator" className="h-9 rounded-md border border-white/10 bg-[#0b1224] px-2 text-sm text-white">
+            <option value="all">All stores and sub-creators</option>
             {parents.map((parent) => (
               <option key={parent.id} value={parent.id}>{parent.name}</option>
             ))}
           </select>
         ) : null}
-        <Button type="submit" variant="outline">Filter</Button>
-        <Button variant="outline" asChild>
+        <Button type="submit" variant="outline" className="border-white/15 bg-transparent text-white">Filter</Button>
+        <Button variant="outline" className="border-white/15 bg-transparent text-white" asChild>
           <a href={`/admin/players/export?q=${encodeURIComponent(query.q ?? "")}&parent=${query.parent ?? "all"}`}>Export</a>
         </Button>
       </form>
@@ -71,7 +73,7 @@ export function NetworkPlayers({
             })();
           }}
         >
-          <select value={parentId} onChange={(event) => setParentId(event.target.value)} className="h-9 rounded-md border border-border bg-background px-2 text-sm">
+          <select value={parentId} onChange={(event) => setParentId(event.target.value)} aria-label="Move selected players to" className="h-9 rounded-md border border-white/10 bg-[#0b1224] px-2 text-sm text-white">
             {parents.map((parent) => (
               <option key={parent.id} value={parent.id}>{parent.name}</option>
             ))}
@@ -80,10 +82,10 @@ export function NetworkPlayers({
         </form>
       ) : null}
 
-      <div className="overflow-x-auto rounded-2xl border border-border">
+      <div className="overflow-x-auto rounded-2xl border border-white/10 bg-[#10182e]/80">
         <Table>
           <TableHeader>
-            <TableRow>
+            <TableRow className="border-white/10 hover:bg-transparent">
               {canMove ? <TableHead /> : null}
               <TableHead>Name</TableHead>
               <TableHead>Phone</TableHead>
@@ -103,8 +105,8 @@ export function NetworkPlayers({
           <TableBody>
             {rows.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={(canMove ? 13 : 12) + (showIp ? 1 : 0)} className="py-8 text-center text-muted-foreground">
-                  No players in this view.
+                <TableCell colSpan={(canMove ? 13 : 12) + (showIp ? 1 : 0)} className="py-4">
+                  <AdminEmptyState title="No players in this view" body="Try another name, phone, email, or store filter." />
                 </TableCell>
               </TableRow>
             ) : (
@@ -124,7 +126,7 @@ export function NetworkPlayers({
                       />
                     </TableCell>
                   ) : null}
-                  <TableCell className="font-semibold">{row.name}</TableCell>
+                  <TableCell className="font-semibold text-white">{row.name}</TableCell>
                   <TableCell>{row.phone}</TableCell>
                   <TableCell>{row.email}</TableCell>
                   <TableCell>{row.subCreator}</TableCell>
@@ -134,7 +136,7 @@ export function NetworkPlayers({
                   <TableCell>{row.coins}</TableCell>
                   <TableCell>{row.level ?? "—"}</TableCell>
                   <TableCell>{row.createdAt ? new Date(row.createdAt).toLocaleDateString() : "—"}</TableCell>
-                  <TableCell>{row.status}</TableCell>
+                  <TableCell><AdminStatusBadge status={row.status} /></TableCell>
                   {showIp ? (
                     <TableCell className="text-xs">
                       {row.signupIp === "—" && row.lastSeenIp === "—" ? (
@@ -148,8 +150,8 @@ export function NetworkPlayers({
                     </TableCell>
                   ) : null}
                   <TableCell>
-                    <Button size="sm" variant="outline" asChild>
-                      <Link href={`/admin/users/${row.id}`}>Open</Link>
+                    <Button size="sm" variant="outline" className="border-white/15 bg-transparent text-white" asChild>
+                      <Link href={`/admin/users/${row.id}`}>Open profile</Link>
                     </Button>
                   </TableCell>
                 </TableRow>
