@@ -44,6 +44,11 @@ export default async function MoneyCenterPage() {
           body: "Players with a cash-out balance. Mark paid records the payout and removes that amount.",
         },
         {
+          href: "/admin/payout-operations",
+          title: "Payout activity",
+          body: "Read-only list of payout records and their stored status. Opening it does not send or refund a payment.",
+        },
+        {
           href: "/admin/transactions",
           title: "Transaction history",
           body: "Search one player and open their stored deposit and redeem history.",

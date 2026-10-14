@@ -120,8 +120,7 @@ export default async function AdminOverviewPage() {
     ctx.isSuperAdmin ? { href: "/admin/fraud", label: "Fraud flags", count: fraudFlags, hint: "Open this queue to take the next action." } : null,
     money ? { href: "/admin/failed-loads", label: "Failed game loads", count: await statusCount("game_load_requests", "failed"), hint: "Game-load records marked failed. Opens the failed-load list." } : null,
     money ? { href: "/admin/cashout-holds", label: "Held cash outs", count: await statusCount("cashout_holds", "held"), hint: "Cash outs marked held. The wallet is not debited while they stay held." } : null,
-    ctx.isSuperAdmin ? { label: "Failed webhooks", count: await statusCount("webhook_events", "failed"), hint: "Webhook events marked failed. There is no webhook list to open." } : null,
-  ].filter((item): item is { href?: string; label: string; count: number | null; hint: string } => Boolean(item));
+  ].filter((item): item is { href: string; label: string; count: number | null; hint: string } => Boolean(item));
 
   const dayStart = utcDayStart();
   const [depositsToday, cashoutsToday, seenToday, storesOnFile, subsOnFile, linkedPlayers] = await Promise.all([
@@ -255,9 +254,6 @@ export default async function AdminOverviewPage() {
     analytics ? { href: "/admin/analytics", label: "View reports" } : null,
   ].filter((item): item is { href: string; label: string } => Boolean(item));
 
-  const held = attention.find((item) => item.label === "Held cash outs")?.count ?? null;
-  const failedLoads = attention.find((item) => item.label === "Failed game loads")?.count ?? null;
-
   return (
     <div className="mx-auto max-w-6xl space-y-4">
       <AdminPageHeader
@@ -274,15 +270,6 @@ export default async function AdminOverviewPage() {
         ) : null}
         {players ? (
           <AdminStatCard href="/admin/users" label="Players seen today" value={showCount(seenToday)} hint="Profiles with a last-seen time since 00:00 UTC." />
-        ) : null}
-        {money ? (
-          <AdminStatCard href="/admin/cashout-holds" label="Held cash outs" value={showCount(held)} hint="Cash outs waiting for a person to review." />
-        ) : null}
-        {kyc ? (
-          <AdminStatCard href="/admin/kyc" label="Identity checks waiting" value={showCount(pendingKyc)} hint="Players who uploaded an ID and are still pending." />
-        ) : null}
-        {money ? (
-          <AdminStatCard href="/admin/failed-loads" label="Failed game loads" value={showCount(failedLoads)} hint="Game loads marked failed. Open the list before retrying one." />
         ) : null}
       </div>
 

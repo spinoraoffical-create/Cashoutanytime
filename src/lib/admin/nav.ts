@@ -80,6 +80,7 @@ export const ADMIN_NAV: AdminNavSection[] = [
         roleAny: ["store_creator", "sub_creator"],
       },
       { href: "/admin/payouts", label: "Cash outs", permission: "requests.manage" },
+      { href: "/admin/payout-operations", label: "Payout activity", permission: "requests.manage" },
       { href: "/admin/transactions", label: "All transactions", permission: "requests.manage" },
       { href: "/admin/cashout-holds", label: "Held cash outs", permission: "requests.manage" },
       {
