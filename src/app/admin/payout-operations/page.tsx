@@ -9,36 +9,15 @@ import { AdminSectionCard } from "@/components/admin/ui/admin-section-card";
 import { AdminStatusBadge } from "@/components/admin/ui/admin-status-badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { adminDb } from "@/lib/actions/admin/core";
-import { adminListScope, idsOrNone } from "@/lib/admin/list-scope";
 import {
   PAYOUT_STATUSES,
   loadPayoutOperations,
   payoutStatusHelp,
+  resolvePayoutReadPlan,
 } from "@/lib/admin/payout-operations";
-import { readAgentScope } from "@/lib/agents/scope";
-import { can, getStaffContext } from "@/lib/data/admin";
 import { cn } from "@/lib/utils";
 
 export const metadata: Metadata = { title: "Payout activity" };
-
-async function scopedPlayerIds() {
-  const ctx = await getStaffContext();
-  const scopeResult = await readAgentScope();
-  const decision = adminListScope({
-    isSuperAdmin: Boolean(ctx?.isSuperAdmin),
-    hasStaffPermission: Boolean(ctx && can(ctx, "requests.manage")),
-    scopeStatus: scopeResult.status,
-    scope: scopeResult.scope
-      ? { level: scopeResult.scope.level, parentIds: scopeResult.scope.parentIds }
-      : null,
-  });
-  if (decision.mode === "deny") redirect("/admin");
-  if (decision.mode === "all") return null;
-  const db = adminDb();
-  const { data } = await db.from("profiles").select("id").in("parent_agent_id", idsOrNone(decision.parentIds)).limit(1000);
-  return ((data ?? []) as { id: string }[]).map((row) => row.id);
-}
 
 function hrefFor(q: string, status: string, page: number) {
   const params = new URLSearchParams();
@@ -54,20 +33,28 @@ export default async function PayoutOperationsPage({
 }: {
   searchParams: Promise<{ q?: string; status?: string; page?: string }>;
 }) {
-  const scopedUserIds = await scopedPlayerIds();
+  const plan = await resolvePayoutReadPlan();
+  if (plan.action === "deny") redirect("/admin");
+
   const params = await searchParams;
   const q = (params.q ?? "").trim();
   const status = params.status ?? "";
   const page = Math.max(1, Number(params.page) || 1);
-  const loaded = await loadPayoutOperations({ scopedUserIds, q, status, page });
+  const loaded =
+    plan.action === "query"
+      ? await loadPayoutOperations({ scope: plan.scope, q, status, page })
+      : { rows: [], total: 0, error: plan.action === "error" ? plan.message : null, page, pageSize: 20 };
   const totalPages = Math.max(1, Math.ceil(loaded.total / loaded.pageSize));
 
   return (
     <div className="mx-auto max-w-6xl">
       <AdminPageHeader
         title="Payout activity"
-        description="Read-only payout records. This page does not send, retry, or refund a payment. A failed status does not by itself mean a refund was posted."
+        description="Read-only payout records. This page does not send, retry, or refund a payment. Submitted does not mean paid. Failed does not mean refunded."
       />
+      <p className="mb-4 text-sm text-[#9fb0d0]">
+        Manual review requires investigation before any further money action. A failed status does not by itself show that a refund was posted.
+      </p>
 
       <div className="mb-4 flex flex-wrap gap-2">
         <Link
