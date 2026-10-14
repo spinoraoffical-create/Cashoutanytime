@@ -7,8 +7,8 @@ import {
   EntityEditDialog,
   type FieldValue,
 } from "@/components/admin/entity-edit-dialog";
-import { GlassCard } from "@/components/shared/glass-card";
-import { Badge } from "@/components/ui/badge";
+import { AdminSectionCard } from "@/components/admin/ui/admin-section-card";
+import { AdminStatusBadge } from "@/components/admin/ui/admin-status-badge";
 import { adminDb, authorize } from "@/lib/actions/admin/core";
 import { upsertGameAction } from "@/lib/actions/admin/cms";
 import { requirePermission } from "@/lib/data/admin";
@@ -23,14 +23,23 @@ async function saveGameServerConfig(
   if ("error" in auth) return { ok: false, error: auth.error };
 
   const db = adminDb();
+  const { data: current } = await db
+    .from("game_server_configs")
+    .select("webhook_secret, api_username, api_password")
+    .eq("game_id", gameId)
+    .maybeSingle();
+  const keepSecret = (next: FieldValue | undefined, previous: string | null | undefined) => {
+    const text = next == null ? "" : String(next).trim();
+    return text ? text : previous ?? null;
+  };
   const { error } = await db.from("game_server_configs").upsert(
     {
       game_id:        gameId,
-      webhook_secret: values.webhook_secret ? String(values.webhook_secret) : null,
+      webhook_secret: keepSecret(values.webhook_secret, current?.webhook_secret),
       is_enabled:     Boolean(values.is_enabled),
-      api_base_url:   values.api_base_url   ? String(values.api_base_url)   : null,
-      api_username:   values.api_username   ? String(values.api_username)   : null,
-      api_password:   values.api_password   ? String(values.api_password)   : null,
+      api_base_url:   values.api_base_url ? String(values.api_base_url) : null,
+      api_username:   keepSecret(values.api_username, current?.api_username),
+      api_password:   keepSecret(values.api_password, current?.api_password),
       notes:          values.notes          ? String(values.notes)          : null,
     },
     { onConflict: "game_id" }
@@ -129,19 +138,17 @@ export default async function AdminGamesPage() {
     <div className="mx-auto max-w-6xl">
       <AdminPageHeader
         title="Games"
-        description="Set each game's thumbnail image, play URL and download URL. Upload images to Supabase Storage → cms-media bucket, then paste the public URL here."
+        description="Turn a game on, edit its public name and links, and see whether a provider connection is saved. This page does not show saved passwords or webhook secrets."
       />
 
-      {/* Image upload guide */}
-      <GlassCard className="mb-6 p-4">
-        <p className="text-sm font-medium text-ws-green-deep dark:text-ws-green">How to add game images</p>
-        <ol className="mt-2 space-y-1 text-sm text-muted-foreground">
-          <li>1. Go to <strong className="text-foreground">Supabase dashboard → Storage → cms-media</strong></li>
-          <li>2. Click <strong className="text-foreground">Upload file</strong> and upload your game image (PNG/JPG/WebP, max 8 MB)</li>
-          <li>3. Click the uploaded file → <strong className="text-foreground">Copy URL</strong></li>
-          <li>4. Click <strong className="text-foreground">Edit</strong> on the game below and paste the URL into Image URL</li>
+      <AdminSectionCard className="mb-6" title="How to add game images" description="Images stay in the existing cms-media storage bucket.">
+        <ol className="space-y-1 text-sm text-[#9fb0d0]">
+          <li>1. Open Supabase Storage, then the cms-media bucket.</li>
+          <li>2. Upload the game image. PNG, JPG, and WebP are accepted, up to 8 MB.</li>
+          <li>3. Copy the public URL from the uploaded file.</li>
+          <li>4. Choose Edit game below and paste that URL into Image URL.</li>
         </ol>
-      </GlassCard>
+      </AdminSectionCard>
 
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
         {games.map((game, i) => {
@@ -156,7 +163,7 @@ export default async function AdminGamesPage() {
           const webhookUrl = `${siteUrl}/api/webhooks/game/${game.slug}`;
 
           return (
-            <GlassCard key={game.id} className="flex flex-col overflow-hidden p-0">
+            <article key={game.id} className="flex flex-col overflow-hidden rounded-2xl border border-white/10 bg-[#10182e]/80">
               {/* Thumbnail */}
               <div className="relative aspect-video w-full shrink-0 bg-foreground/5">
                 {game.image_url ? (
@@ -171,9 +178,9 @@ export default async function AdminGamesPage() {
                   </div>
                 )}
                 {game.badge_text && (
-                  <Badge className="absolute top-2 right-2 bg-emerald-500 text-foreground text-xs uppercase">
-                    {game.badge_text}
-                  </Badge>
+                  <span className="absolute top-2 right-2">
+                    <AdminStatusBadge status={game.badge_text} />
+                  </span>
                 )}
               </div>
 
@@ -181,22 +188,10 @@ export default async function AdminGamesPage() {
               <div className="flex flex-1 flex-col gap-3 p-4">
                 <div>
                   <div className="flex items-center gap-2">
-                    <p className="font-semibold">{game.name}</p>
-                    {!game.is_active && (
-                      <Badge className="bg-foreground/8 text-muted-foreground text-xs">
-                        Inactive
-                      </Badge>
-                    )}
-                    {game.is_featured && (
-                      <Badge className="bg-ws-green/15 text-ws-green-deep dark:text-ws-green text-xs">
-                        Featured
-                      </Badge>
-                    )}
-                    {game.is_live ? (
-                      <Badge className="bg-emerald-500/15 text-emerald-400 text-xs">Live</Badge>
-                    ) : (
-                      <Badge className="bg-foreground/8 text-muted-foreground text-xs">Not live</Badge>
-                    )}
+                    <p className="font-semibold text-white">{game.name}</p>
+                    <AdminStatusBadge status={game.is_active ? "Active" : "Inactive"} />
+                    {game.is_featured ? <AdminStatusBadge status="Featured" /> : null}
+                    <AdminStatusBadge status={game.is_live ? "Live" : "Not live"} />
                   </div>
                   {game.description && (
                     <p className="mt-1 line-clamp-2 text-xs text-muted-foreground">
@@ -210,22 +205,20 @@ export default async function AdminGamesPage() {
                   <UrlStatus label="Play URL" value={game.play_url} />
                   <UrlStatus label="Download URL" value={game.download_url} />
                   <UrlStatus label="Image URL" value={game.image_url} />
-                  <p className="text-foreground">
+                  <p className="text-[#d5def2]">
                     First deposit {Number(game.first_deposit_bonus_percent ?? 50)}% · Reload {Number(game.reload_bonus_percent ?? 10)}%
                   </p>
-                  <p className="text-muted-foreground">
-                    Agent API {cfg?.is_enabled && (cfg.api_username || cfg.api_password) ? "configured" : "not configured"}
+                  <p className="text-[#9fb0d0]">
+                    Provider connection {cfg?.is_enabled && (cfg.api_username || cfg.api_password) ? "saved" : "not saved"}
                   </p>
                 </div>
 
                 {/* Webhook config */}
-                <div className="rounded-lg border border-foreground/8 bg-foreground/4 p-3 text-xs">
-                  <div className="flex items-center gap-1.5 font-medium text-muted-foreground">
+                <div className="rounded-lg border border-white/10 bg-[#0b1224] p-3 text-xs">
+                  <div className="flex items-center gap-1.5 font-medium text-[#9fb0d0]">
                     <Webhook className="size-3.5" aria-hidden />
                     Webhook
-                    {cfg?.is_enabled && (
-                      <span className="ml-auto text-ws-emerald">Active</span>
-                    )}
+                    {cfg?.is_enabled ? <span className="ml-auto text-emerald-200">On</span> : <span className="ml-auto">Off</span>}
                   </div>
                   <p className="mt-1.5 break-all font-mono text-ws-text-faint">
                     {webhookUrl}
@@ -239,8 +232,8 @@ export default async function AdminGamesPage() {
                           name: "webhook_secret",
                           label: "Webhook Secret",
                           type: "text",
-                          defaultValue: cfg?.webhook_secret ?? "",
-                          hint: "Shared secret — paste this into the game portal's webhook settings",
+                          defaultValue: "",
+                          hint: "Leave blank to keep the saved secret. This page does not show the saved value.",
                         },
                         {
                           name: "is_enabled",
@@ -252,22 +245,22 @@ export default async function AdminGamesPage() {
                           name: "api_username",
                           label: "Agent Portal Username",
                           type: "text",
-                          defaultValue: cfg?.api_username ?? "",
-                          hint: "Your agent.gamevault999.com login username — enables auto account creation & recharge",
+                          defaultValue: "",
+                          hint: "Leave blank to keep the saved username. This page does not show the saved value.",
                         },
                         {
                           name: "api_password",
                           label: "Agent Portal Password",
                           type: "text",
-                          defaultValue: cfg?.api_password ?? "",
-                          hint: "Your agent portal password — stored server-side only, never visible to players",
+                          defaultValue: "",
+                          hint: "Leave blank to keep the saved password. This page does not show the saved value.",
                         },
                         {
                           name: "api_base_url",
                           label: "API Base URL (override)",
                           type: "text",
                           defaultValue: cfg?.api_base_url ?? "",
-                          hint: "Leave blank to use the default agent.gamevault999.com endpoint",
+                          hint: "Leave blank to use the provider default.",
                         },
                         {
                           name: "notes",
@@ -399,7 +392,7 @@ export default async function AdminGamesPage() {
                   />
                 </div>
               </div>
-            </GlassCard>
+            </article>
           );
         })}
       </div>

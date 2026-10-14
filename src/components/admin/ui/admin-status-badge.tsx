@@ -23,6 +23,7 @@ const TONE: Record<string, string> = {
   banned: "bg-rose-400/15 text-rose-100",
   resolved: "bg-white/10 text-[#d5def2]",
   closed: "bg-white/10 text-[#d5def2]",
+  cancelled: "bg-white/10 text-[#d5def2]",
   "in progress": "bg-sky-400/15 text-sky-100",
   "not on file": "bg-white/10 text-[#d5def2]",
 };

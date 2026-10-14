@@ -56,6 +56,9 @@ export function GameLoadActions({ load }: GameLoadActionsProps) {
           Failed
         </Button>
       </div>
+      <p className="text-xs leading-5 text-[#9fb0d0]">
+        Complete and Failed change this request and can change the player wallet. This screen does not ask for a second confirmation.
+      </p>
       {load.game_username && (
         <p className="text-xs text-[#6b6d8f]">User: {load.game_username}</p>
       )}

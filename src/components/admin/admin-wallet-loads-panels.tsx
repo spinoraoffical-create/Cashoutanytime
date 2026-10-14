@@ -7,11 +7,12 @@ import { useSearchParams } from "next/navigation";
 import { Search, Radio } from "lucide-react";
 
 import { AdminWalletLoadsSidebarPanel } from "@/components/admin/admin-wallet-loads-sidebar-panel";
-import { Badge } from "@/components/ui/badge";
+import { AdminStatusBadge } from "@/components/admin/ui/admin-status-badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { createClient } from "@/lib/supabase/client";
 import { cn, formatRelativeTime } from "@/lib/utils";
+import { gameLoadStatusHelp } from "@/lib/admin/game-load-status";
 import type { GameLoadRequest } from "@/lib/game-automation/types";
 
 export interface AdminGameLoadRow extends GameLoadRequest {
@@ -207,7 +208,7 @@ export function AdminWalletLoadsPanels({ loads: initialLoads, users }: AdminWall
                     {loadLabel(load)} · {formatRelativeTime(load.created_at)}
                   </p>
                 </div>
-                <Badge variant="warning" className="shrink-0 text-[10px]">{load.status}</Badge>
+                <AdminStatusBadge status={load.status} />
               </button>
             ))}
           </div>
@@ -239,18 +240,9 @@ export function AdminWalletLoadsPanels({ loads: initialLoads, users }: AdminWall
                     {loadLabel(load)} · {formatRelativeTime(load.created_at)}
                   </p>
                 </div>
-                <Badge
-                  variant={
-                    load.status === "completed"
-                      ? "success"
-                      : load.status === "pending" || load.status === "processing"
-                        ? "warning"
-                        : "destructive"
-                  }
-                  className="shrink-0 text-[10px]"
-                >
-                  {load.status}
-                </Badge>
+                <span title={gameLoadStatusHelp(load.status)}>
+                  <AdminStatusBadge status={load.status} />
+                </span>
               </button>
             ))
           )}
@@ -268,7 +260,7 @@ export function AdminWalletLoadsPanels({ loads: initialLoads, users }: AdminWall
       <p className="text-sm text-[#9fb0d0]">
         {failedOnly
           ? "Showing game loads marked failed. Pending and completed loads stay on All statuses."
-          : "Pending, processing, completed, and failed loads are listed together. Pending players stay at the top."}
+          : "Pending means waiting. Processing means work has started and is not finished. A slow response is not proof the provider transaction failed. Completed means the request is marked finished. Failed means it is marked failed. Cancelled means it is marked cancelled."}
       </p>
 
       <div className="relative max-w-md">
@@ -337,9 +329,9 @@ export function AdminWalletLoadsPanels({ loads: initialLoads, users }: AdminWall
                       </td>
                       <td className="px-4 py-3 text-right">
                         {(stats?.pending ?? 0) > 0 ? (
-                          <Badge variant="warning" className="text-[10px]">
+                          <span className="inline-flex rounded-full bg-amber-300/15 px-2.5 py-1 text-[10px] font-semibold text-amber-100">
                             {stats!.pending}
-                          </Badge>
+                          </span>
                         ) : (
                           <span className="text-slate-500">—</span>
                         )}

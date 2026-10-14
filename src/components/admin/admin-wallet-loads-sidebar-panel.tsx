@@ -4,22 +4,15 @@ import Link from "next/link";
 import { X, Radio, Wallet } from "lucide-react";
 
 import { GameLoadActions } from "@/components/admin/game-load-actions";
+import { AdminStatusBadge } from "@/components/admin/ui/admin-status-badge";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { gameLoadStatusHelp } from "@/lib/admin/game-load-status";
 import { formatDate, formatRelativeTime, cn } from "@/lib/utils";
-import type { GameLoadStatus } from "@/lib/game-automation/types";
 import type {
   AdminGameLoadRow,
   AdminGameLoadUser,
 } from "@/components/admin/admin-wallet-loads-panels";
-
-const statusVariant: Record<GameLoadStatus, "default" | "warning" | "success" | "destructive"> = {
-  pending: "warning",
-  processing: "default",
-  completed: "success",
-  failed: "destructive",
-  cancelled: "destructive",
-};
 
 function loadSummary(load: AdminGameLoadRow): string {
   if (load.load_type === "redeem") {
@@ -40,9 +33,7 @@ function LoadEntry({ load, compact }: { load: AdminGameLoadRow; compact?: boolea
         <div className="min-w-0 flex-1">
           <div className="mb-1 flex flex-wrap items-center gap-1.5">
             <span className="text-sm font-semibold text-white">{load.game_name}</span>
-            <Badge variant={statusVariant[load.status]} className="text-[10px]">
-              {load.status}
-            </Badge>
+            <AdminStatusBadge status={load.status} />
             <Badge variant="outline" className="text-[10px]">
               {isRedeem ? "redeem" : "load"}
             </Badge>
@@ -58,6 +49,7 @@ function LoadEntry({ load, compact }: { load: AdminGameLoadRow; compact?: boolea
           {load.game_username && (
             <p className="mt-1 text-xs text-slate-400">Game login: {load.game_username}</p>
           )}
+          <p className="mt-1 text-xs leading-5 text-[#9fb0d0]">{gameLoadStatusHelp(load.status)}</p>
           <p className="mt-1 text-[11px] text-slate-500">
             {formatDate(load.created_at)} · {formatRelativeTime(load.created_at)}
           </p>
