@@ -14,9 +14,11 @@ function isCurrent(pathname: string, href: string) {
 export function AdminSectionTabs({
   items,
   badges = {},
+  hints = {},
 }: {
   items: AdminNavItem[];
   badges?: Record<string, number>;
+  hints?: Record<string, string>;
 }) {
   const pathname = usePathname();
   const section = items.find(
@@ -45,7 +47,7 @@ export function AdminSectionTabs({
           >
             {tab.label}
             {badges[tab.href] ? (
-              <span className={cn("text-xs", active ? "text-background/80" : "text-[#f3264f]")}>
+              <span title={hints[tab.href]} className={cn("text-xs", active ? "text-background/80" : "text-[#f3264f]")}>
                 {badges[tab.href]}
               </span>
             ) : null}

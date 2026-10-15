@@ -31,14 +31,28 @@ function sectionActive(pathname: string, item: AdminNavItem) {
   return (item.children ?? []).some((child) => isCurrent(pathname, child.href));
 }
 
+function sectionBadge(item: AdminNavItem, badges: Record<string, number>) {
+  const seen = new Set<string>();
+  let total = 0;
+  for (const child of item.children ?? []) {
+    if (seen.has(child.href)) continue;
+    seen.add(child.href);
+    total += badges[child.href] ?? 0;
+  }
+  if (!seen.has(item.href)) total += badges[item.href] ?? 0;
+  return total;
+}
+
 export function AdminSidebar({
   items,
   onNavigate,
   badges = {},
+  hints = {},
 }: {
   items: AdminNavItem[];
   onNavigate?: () => void;
   badges?: Record<string, number>;
+  hints?: Record<string, string>;
 }) {
   const pathname = usePathname();
   const [query, setQuery] = React.useState("");
@@ -77,9 +91,7 @@ export function AdminSidebar({
           const active = sectionActive(pathname, item);
           const kids = item.children ?? [];
           const expanded = Boolean(needle) || openLabel === item.label || (openLabel === null && active);
-          const badge =
-            badges[item.href] ||
-            kids.reduce((sum, child) => sum + (badges[child.href] ?? 0), 0);
+          const badge = sectionBadge(item, badges);
           return (
             <div key={item.label}>
               <div className="flex items-center gap-1">
@@ -99,7 +111,10 @@ export function AdminSidebar({
                   <AdminIcon name={item.icon} className="size-4.5 shrink-0" />
                   <span className="flex-1">{item.label}</span>
                   {badge > 0 ? (
-                    <span className="flex min-w-5 items-center justify-center rounded-full bg-cyan-400/20 px-1.5 text-[11px] font-bold leading-5 text-cyan-100">
+                    <span
+                      title={hints[item.href]}
+                      className="flex min-w-5 items-center justify-center rounded-full bg-cyan-400/20 px-1.5 text-[11px] font-bold leading-5 text-cyan-100"
+                    >
                       {badge > 99 ? "99+" : badge}
                     </span>
                   ) : null}
@@ -135,7 +150,9 @@ export function AdminSidebar({
                         >
                           <span className="flex-1">{child.label}</span>
                           {badges[child.href] ? (
-                            <span className="text-xs font-bold text-cyan-200">{badges[child.href]}</span>
+                            <span title={hints[child.href]} className="text-xs font-bold text-cyan-200">
+                              {badges[child.href]}
+                            </span>
                           ) : null}
                         </Link>
                       </li>

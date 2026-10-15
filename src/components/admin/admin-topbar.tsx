@@ -26,11 +26,13 @@ export function AdminTopbar({
   email,
   topRole,
   badges = {},
+  hints = {},
 }: {
   items: AdminNavItem[];
   email: string | null;
   topRole: string;
   badges?: Record<string, number>;
+  hints?: Record<string, string>;
 }) {
   const [open, setOpen] = React.useState(false);
 
@@ -55,7 +57,7 @@ export function AdminTopbar({
                 </span>
               </SheetTitle>
             </SheetHeader>
-            <AdminSidebar items={items} onNavigate={() => setOpen(false)} badges={badges} />
+            <AdminSidebar items={items} onNavigate={() => setOpen(false)} badges={badges} hints={hints} />
           </SheetContent>
         </Sheet>
 

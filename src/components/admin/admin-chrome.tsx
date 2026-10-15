@@ -8,6 +8,7 @@ import { AdminSidebar, type AdminNavItem } from "@/components/admin/admin-sideba
 import { AdminTopbar } from "@/components/admin/admin-topbar";
 import { Logo } from "@/components/shared/logo";
 import { getAdminSidebarBadgesAction } from "@/lib/actions/admin/badges";
+import { SIDEBAR_BADGE_HINTS } from "@/lib/admin/badge-hints";
 
 export function AdminShell({
   items,
@@ -52,14 +53,14 @@ export function AdminShell({
             <p className="text-xs font-medium text-[#c4b5fd]">Control Center</p>
           </div>
         </div>
-        <AdminSidebar items={items} badges={badges} />
+        <AdminSidebar items={items} badges={badges} hints={SIDEBAR_BADGE_HINTS} />
       </aside>
 
       <div className="flex min-w-0 flex-1 flex-col overflow-hidden">
-        <AdminTopbar items={items} email={email} topRole={topRole} badges={badges} />
+        <AdminTopbar items={items} email={email} topRole={topRole} badges={badges} hints={SIDEBAR_BADGE_HINTS} />
         <main id="admin-content" className="flex-1 overflow-y-auto bg-[radial-gradient(ellipse_at_top,rgba(109,40,217,0.18),transparent_42%),#070b18] px-3 py-4 pb-[max(1rem,env(safe-area-inset-bottom))] sm:px-6 sm:py-6 lg:px-8">
           <AdminBreadcrumbs items={items} />
-          <AdminSectionTabs items={items} badges={badges} />
+          <AdminSectionTabs items={items} badges={badges} hints={SIDEBAR_BADGE_HINTS} />
           {children}
         </main>
       </div>
