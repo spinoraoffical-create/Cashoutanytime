@@ -13,16 +13,11 @@ const balances = readFileSync(new URL("../src/app/admin/game-balances/page.tsx",
 assert.match(loadsPage, /redirect\("\/admin"\)/);
 assert.match(loadsPage, /game_load_requests/);
 assert.match(loadsPage, /parent_agent_id/);
-assert.equal(actions.includes('mark("completed")'), true);
-assert.equal(actions.includes('mark("failed")'), true);
-assert.match(actions, /adminUpdateGameLoadStatus/);
+assert.equal(actions.includes('mark("completed")'), false);
+assert.equal(actions.includes('mark("failed")'), false);
+assert.equal(actions.includes("adminUpdateGameLoadStatus"), false);
+assert.match(actions, /PROVIDER_OUTCOME_UNVERIFIED/);
 assert.match(actions, /disabled=\{busy\}/);
-
-const markFn = actions.slice(actions.indexOf("async function mark"), actions.indexOf("if (load.status"));
-assert.ok(markFn.indexOf('confirmActionDecision({ pending: busy') < markFn.indexOf("window.confirm"));
-assert.ok(markFn.indexOf("window.confirm") < markFn.indexOf("adminUpdateGameLoadStatus"));
-assert.match(markFn, /decision !== "run"\) return/);
-assert.equal((markFn.match(/adminUpdateGameLoadStatus\(/g) ?? []).length, 1);
 
 let gameLoadRuns = 0;
 function attemptGameLoad(pending, confirmed) {

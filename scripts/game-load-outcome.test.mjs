@@ -1,10 +1,16 @@
 import assert from "node:assert/strict";
 
+import { readFileSync } from "node:fs";
+
 import {
+  adminFinancialStatusDecision,
   classifyProviderOutcome,
   completionApplies,
   mayRefundLoad,
+  PROVIDER_OUTCOME_UNVERIFIED,
   secondLoadBlocked,
+  STALE_LOAD_CHECK_FAILED,
+  staleLoadRpcDecision,
 } from "../src/lib/game-automation/load-outcome.ts";
 
 assert.equal(classifyProviderOutcome({ success: true }), "confirmed_success");
@@ -63,5 +69,120 @@ assert.equal(mayRefundLoad({
 
 assert.equal(classifyProviderOutcome({ success: false, error: "socket hang up" }), "unknown");
 assert.equal(completionApplies("pending"), true);
+
+const misleadingHold = "Needs review abc. ";
+assert.equal(classifyProviderOutcome({ success: false, error: misleadingHold }), "confirmed_failure");
+assert.equal(
+  adminFinancialStatusDecision({ status: "pending", loadType: "load" }).reason,
+  PROVIDER_OUTCOME_UNVERIFIED
+);
+
+assert.equal(classifyProviderOutcome({ success: false, error: "Account not found" }), "confirmed_failure");
+assert.equal(mayRefundLoad({
+  outcome: "confirmed_failure",
+  loadType: "load",
+  gameApiDebited: false,
+  walletRefunded: false,
+}), true);
+assert.equal(
+  adminFinancialStatusDecision({ status: "pending", loadType: "load" }).reason,
+  PROVIDER_OUTCOME_UNVERIFIED
+);
+
+assert.equal(classifyProviderOutcome({ success: false, error: "provider timed out" }), "unknown");
+assert.equal(mayRefundLoad({
+  outcome: "unknown",
+  loadType: "load",
+  gameApiDebited: false,
+  walletRefunded: false,
+}), false);
+assert.equal(
+  adminFinancialStatusDecision({ status: "processing", loadType: "load" }).reason,
+  PROVIDER_OUTCOME_UNVERIFIED
+);
+
+assert.equal(classifyProviderOutcome({ success: false, error: "" }), "unknown");
+assert.equal(
+  adminFinancialStatusDecision({ status: "pending", loadType: "reload" }).reason,
+  PROVIDER_OUTCOME_UNVERIFIED
+);
+
+assert.equal(mayRefundLoad({
+  outcome: "confirmed_failure",
+  loadType: "create_account",
+  gameApiDebited: false,
+  walletRefunded: false,
+}), false);
+assert.equal(
+  adminFinancialStatusDecision({ status: "pending", loadType: "create_account" }).reason,
+  PROVIDER_OUTCOME_UNVERIFIED
+);
+assert.equal(
+  adminFinancialStatusDecision({ status: "pending", loadType: "new_account" }).reason,
+  PROVIDER_OUTCOME_UNVERIFIED
+);
+
+function clickFailed(row) {
+  const decision = adminFinancialStatusDecision(row);
+  if (decision.reason !== "already_settled") return row;
+  return row;
+}
+let openLoad = { status: "pending", loadType: "load", refunds: 0 };
+openLoad = clickFailed(openLoad);
+openLoad = clickFailed(openLoad);
+assert.equal(openLoad.refunds, 0);
+assert.equal(openLoad.status, "pending");
+assert.equal(adminFinancialStatusDecision({ status: "failed", loadType: "load" }).reason, "already_settled");
+
+const rpcSuccess = staleLoadRpcDecision({ rpcFailed: false, healedCount: 2 });
+assert.equal(rpcSuccess.healed, 2);
+assert.equal(rpcSuccess.appRefund, false);
+assert.equal(rpcSuccess.error, undefined);
+
+const rpcFailure = staleLoadRpcDecision({ rpcFailed: true, healedCount: 4 });
+assert.equal(rpcFailure.healed, 0);
+assert.equal(rpcFailure.appRefund, false);
+assert.equal(rpcFailure.error, STALE_LOAD_CHECK_FAILED);
+
+assert.equal(classifyProviderOutcome({ success: false, error: "provider timed out" }), "unknown");
+let openAfterRpcFailure = { status: "pending", refunds: 0, outcome: "unknown" };
+if (rpcFailure.appRefund) {
+  openAfterRpcFailure = { status: "failed", refunds: 1, outcome: "confirmed_failure" };
+}
+assert.equal(openAfterRpcFailure.status, "pending");
+assert.equal(openAfterRpcFailure.refunds, 0);
+assert.equal(openAfterRpcFailure.outcome, "unknown");
+assert.equal(mayRefundLoad({
+  outcome: "unknown",
+  loadType: "load",
+  gameApiDebited: false,
+  walletRefunded: false,
+}), false);
+assert.equal(mayRefundLoad({
+  outcome: "confirmed_failure",
+  loadType: "load",
+  gameApiDebited: false,
+  walletRefunded: false,
+}), true);
+
+const adminAction = readFileSync(new URL("../src/lib/actions/game-loads.ts", import.meta.url), "utf8");
+const healFn = adminAction.slice(
+  adminAction.indexOf("export async function healStaleGameLoads"),
+  adminAction.indexOf("export async function cancelMyGameLoad")
+);
+assert.match(healFn, /fail_my_stale_game_load/);
+assert.match(healFn, /staleLoadRpcDecision/);
+assert.equal(healFn.includes("finishGameLoad"), false);
+assert.match(adminAction, /finishGameLoad\(\{/);
+const adminFn = adminAction.slice(adminAction.indexOf("export async function adminUpdateGameLoadStatus"));
+assert.match(adminFn, /adminFinancialStatusDecision/);
+assert.equal(adminFn.includes("finishGameLoad"), false);
+assert.equal(adminFn.includes("cancel_game_load_service"), false);
+assert.match(adminAction, /holdUnknownGameLoad/);
+assert.match(adminAction, /finishGameLoad\(\{/);
+
+const panel = readFileSync(new URL("../src/components/admin/admin-wallet-loads-sidebar-panel.tsx", import.meta.url), "utf8");
+assert.match(panel, /Account creation/);
+assert.match(panel, /Game account creation/);
 
 console.log("game load outcome checks passed");

@@ -40,6 +40,11 @@ import { isVegasApiConfigured } from "@/lib/game-automation/vegas-api";
 import { userFacingGameLoadError } from "@/lib/game-automation/user-facing-errors";
 import { usernameForOwner } from "@/lib/games/owned-account";
 import { finishGameLoad } from "@/lib/game-automation/finish-game-load";
+import {
+  adminFinancialStatusDecision,
+  PROVIDER_OUTCOME_UNVERIFIED,
+  staleLoadRpcDecision,
+} from "@/lib/game-automation/load-outcome";
 import { classifyProviderOutcome } from "@/lib/game-automation/load-outcome";
 import { logIncident } from "@/lib/observability/incident";
 
@@ -1026,7 +1031,7 @@ export async function getMyGameAccount(gameSlug: string) {
   return { game_username: saved.username, game_password: saved.password };
 }
 
-/** Fail pending/processing jobs older than N minutes (frees blocked Replace / Load clicks). */
+/** Ask fail_my_stale_game_load about old open jobs. An RPC error leaves those rows unchanged. */
 export async function healStaleGameLoads(gameSlug: string, staleMinutes = 15) {
   const supabase = await createClient();
   const {
@@ -1039,42 +1044,12 @@ export async function healStaleGameLoads(gameSlug: string, staleMinutes = 15) {
     p_game_slug: gameSlug,
   });
 
-  if (!error) return { healed: Number(data ?? 0) };
-
-  const admin = createAdminClient();
-  if (!admin) return { healed: 0 };
-
-  const now = Date.now();
-  const cutoff = new Date(now - staleMinutes * 60 * 1000).toISOString();
-  const oldProcessingCutoff = new Date(now - 30 * 60 * 1000).toISOString();
-
-  const { data: oldRows } = await admin
-    .from("game_load_requests")
-    .select("id")
-    .eq("user_id", user.id)
-    .eq("game_slug", gameSlug)
-    .eq("status", "processing")
-    .lt("created_at", oldProcessingCutoff);
-
-  const { data: rows } = await admin
-    .from("game_load_requests")
-    .select("id")
-    .eq("user_id", user.id)
-    .eq("game_slug", gameSlug)
-    .in("status", ["pending", "processing"])
-    .lt("updated_at", cutoff);
-
-  const ids = new Set<string>();
-  for (const row of [...(oldRows ?? []), ...(rows ?? [])] as { id: string }[]) ids.add(row.id);
-  for (const id of ids) {
-    await finishGameLoad({
-      requestId: id,
-      success: false,
-      errorMessage: "This request timed out. Try again in a few minutes.",
-    });
-  }
-
-  return { healed: ids.size };
+  const decision = staleLoadRpcDecision({
+    rpcFailed: Boolean(error),
+    healedCount: typeof data === "number" ? data : null,
+  });
+  if (decision.error) return { healed: 0, error: decision.error };
+  return { healed: decision.healed };
 }
 
 export async function cancelMyGameLoad(requestId: string, gameSlug: string) {
@@ -1175,8 +1150,7 @@ export async function getAdminPanelUrlForGame(gameSlug: string) {
 
 export async function adminUpdateGameLoadStatus(
   requestId: string,
-  status: "completed" | "failed" | "cancelled",
-  notes?: string
+  status: "completed" | "failed" | "cancelled"
 ) {
   const supabase = await createClient();
   const {
@@ -1199,42 +1173,16 @@ export async function adminUpdateGameLoadStatus(
     .single();
 
   if (!existing) return { error: "Request not found" };
-
-  if (status === "cancelled") {
-    const admin = createAdminClient();
-    const { error } = await (admin ?? supabase).rpc("cancel_game_load_service", { p_request_id: requestId });
-    if (error) return { error: "Could not update that request." };
-  } else {
-    const finished = await finishGameLoad({
-      requestId,
-      success: status === "completed",
-      errorMessage: status === "completed" ? notes ?? null : notes || "Marked failed by staff",
-      redeemedAmount: status === "completed" && existing.load_type === "redeem" ? Number(existing.amount) : null,
-    });
-    if (!finished.ok) return { error: "Could not update that request." };
+  if (status !== "completed" && status !== "failed" && status !== "cancelled") {
+    return { error: PROVIDER_OUTCOME_UNVERIFIED };
   }
 
-  if (status === "completed") {
-    const isRedeem = existing.load_type === "redeem";
-    await createNotification(
-      existing.user_id,
-      isRedeem ? `${existing.game_name} redeem complete` : `${existing.game_name} load complete`,
-      isRedeem
-        ? `$${Number(existing.amount).toFixed(2)} was redeemed to your wallet.`
-        : `$${Number(existing.amount).toFixed(2)} was loaded to your ${existing.game_name} account.`,
-      "success"
-    );
+  const decision = adminFinancialStatusDecision({
+    status: existing.status,
+    loadType: existing.load_type,
+  });
+  if (decision.reason === "already_settled") {
+    return { success: true };
   }
-
-  if (status === "failed" || status === "cancelled") {
-    await createNotification(
-      existing.user_id,
-      `${existing.game_name} load update`,
-      `Your load request could not be completed. Contact support for help.`,
-      "warning"
-    );
-  }
-
-  revalidatePath("/admin/game-loads");
-  return { success: true };
+  return { error: decision.reason };
 }

@@ -1,11 +1,13 @@
 "use client";
 
 import { useState } from "react";
-import { useRouter } from "next/navigation";
 import { ExternalLink, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { adminUpdateGameLoadStatus, getAdminPanelUrlForGame } from "@/lib/actions/game-loads";
-import { confirmActionDecision } from "@/lib/admin/confirm-gate";
+import { getAdminPanelUrlForGame } from "@/lib/actions/game-loads";
+import {
+  adminFinancialStatusDecision,
+  PROVIDER_OUTCOME_UNVERIFIED,
+} from "@/lib/game-automation/load-outcome";
 import { toast } from "sonner";
 import type { GameLoadRequest } from "@/lib/game-automation/types";
 
@@ -16,8 +18,11 @@ interface GameLoadActionsProps {
 }
 
 export function GameLoadActions({ load }: GameLoadActionsProps) {
-  const router = useRouter();
   const [busy, setBusy] = useState(false);
+  const decision = adminFinancialStatusDecision({
+    status: load.status,
+    loadType: load.load_type,
+  });
 
   async function openPanel() {
     setBusy(true);
@@ -30,27 +35,9 @@ export function GameLoadActions({ load }: GameLoadActionsProps) {
     window.open(result.url, "_blank", "noopener,noreferrer");
   }
 
-  async function mark(status: "completed" | "failed" | "cancelled") {
-    if (confirmActionDecision({ pending: busy, confirmed: false }) === "pending") return;
-    const label = status === "completed" ? "complete" : status === "failed" ? "fail" : "cancel";
-    const decision = confirmActionDecision({
-      pending: false,
-      confirmed: window.confirm(`Mark this game load as ${label}? This can change the player wallet.`),
-    });
-    if (decision !== "run") return;
-    setBusy(true);
-    const result = await adminUpdateGameLoadStatus(load.id, status);
-    if (result.error) toast.error(result.error);
-    else toast.success(`Marked ${status}`);
-    router.refresh();
-    setBusy(false);
-  }
-
-  if (load.status === "completed" || load.status === "cancelled") {
+  if (decision.reason === "already_settled") {
     return null;
   }
-
-  const accountCreation = load.load_type === "create_account" || load.load_type === "new_account";
 
   return (
     <div className="flex flex-col gap-2 min-w-[180px]">
@@ -58,21 +45,7 @@ export function GameLoadActions({ load }: GameLoadActionsProps) {
         {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : <ExternalLink className="h-4 w-4" />}
         Open {load.game_name} panel
       </Button>
-      {accountCreation ? null : (
-        <>
-          <div className="flex flex-wrap gap-2">
-            <Button size="sm" onClick={() => mark("completed")} disabled={busy}>
-              Complete
-            </Button>
-            <Button size="sm" variant="destructive" onClick={() => mark("failed")} disabled={busy}>
-              Failed
-            </Button>
-          </div>
-          <p className="text-xs leading-5 text-[#9fb0d0]">
-            Complete and Failed ask you to confirm. They can change the player wallet.
-          </p>
-        </>
-      )}
+      <p className="text-xs leading-5 text-[#9fb0d0]">{PROVIDER_OUTCOME_UNVERIFIED}</p>
       {load.game_username && (
         <p className="text-xs text-[#6b6d8f]">User: {load.game_username}</p>
       )}

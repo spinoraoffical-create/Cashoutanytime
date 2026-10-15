@@ -43,3 +43,41 @@ export function secondLoadBlocked(status: string | null): boolean {
 export function completionApplies(status: string | null): boolean {
   return status === "pending" || status === "processing";
 }
+
+export const PROVIDER_OUTCOME_UNVERIFIED =
+  "Provider outcome unverified. Investigate before changing this request.";
+
+/**
+ * Admin Complete / Failed / Cancel must not move money from a stored row.
+ * game_load_requests has no provider-outcome column. error_message is not proof:
+ * an unknown hold is saved as "Needs review …", and reading that text back can
+ * classify as a confirmed failure. Pending is not a failed provider result.
+ * Confirmed failures are still refunded only by the automatic provider path.
+ */
+export function adminFinancialStatusDecision(input: {
+  status: string | null | undefined;
+  loadType?: string | null;
+}): { proceed: false; reason: string } {
+  if (input.status === "completed" || input.status === "failed" || input.status === "cancelled") {
+    return { proceed: false, reason: "already_settled" };
+  }
+  return { proceed: false, reason: PROVIDER_OUTCOME_UNVERIFIED };
+}
+
+export const STALE_LOAD_CHECK_FAILED =
+  "Stale-request check failed. Leave this request unchanged and investigate before closing it.";
+
+/**
+ * A failed fail_my_stale_game_load call is not a confirmed provider failure.
+ * The app must not refund or close the row from that error.
+ */
+export function staleLoadRpcDecision(input: {
+  rpcFailed: boolean;
+  healedCount?: number | null;
+}): { appRefund: false; healed: number; error?: string } {
+  if (input.rpcFailed) {
+    return { appRefund: false, healed: 0, error: STALE_LOAD_CHECK_FAILED };
+  }
+  const healed = Number(input.healedCount ?? 0);
+  return { appRefund: false, healed: Number.isFinite(healed) ? healed : 0 };
+}
