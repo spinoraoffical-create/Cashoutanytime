@@ -1,6 +1,7 @@
 "use server";
 
 import { adminDb } from "@/lib/actions/admin/core";
+import { GAME_LOAD_OPEN_STATUSES } from "@/lib/admin/game-load-status";
 import { can, getStaffContext } from "@/lib/data/admin";
 import { platformTicketAccess } from "@/lib/support/ticket-access";
 import { countOpenTickets } from "@/lib/support/ticket-store";
@@ -19,7 +20,7 @@ export async function getAdminSidebarBadgesAction(): Promise<
     if (can(ctx, "requests.manage")) {
       const [pendingDeposits, pendingLoads, openPayouts] = await Promise.all([
         db.from("deposit_requests").select("id", { count: "exact", head: true }).in("status", ["pending", "processing"]),
-        db.from("game_load_requests").select("id", { count: "exact", head: true }).in("status", ["pending", "processing"]),
+        db.from("game_load_requests").select("id", { count: "exact", head: true }).in("status", [...GAME_LOAD_OPEN_STATUSES]),
         db
           .from("paydora_payout_requests")
           .select("id", { count: "exact", head: true })

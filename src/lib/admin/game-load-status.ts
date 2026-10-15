@@ -1,5 +1,8 @@
 export const GAME_LOAD_STATUSES = ["pending", "processing", "completed", "failed", "cancelled"] as const;
 
+/** Open game-load requests. The sidebar badge and Loads and redeems page both use this list. */
+export const GAME_LOAD_OPEN_STATUSES = ["pending", "processing"] as const;
+
 export function gameLoadStatusHelp(status: string) {
   switch (status) {
     case "pending":

@@ -3,7 +3,6 @@
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useSearchParams } from "next/navigation";
 import { Search, Radio } from "lucide-react";
 
 import { AdminWalletLoadsSidebarPanel } from "@/components/admin/admin-wallet-loads-sidebar-panel";
@@ -11,7 +10,7 @@ import { AdminStatusBadge } from "@/components/admin/ui/admin-status-badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { createClient } from "@/lib/supabase/client";
-import { cn, formatRelativeTime } from "@/lib/utils";
+import { cn, formatDate, formatRelativeTime } from "@/lib/utils";
 import { gameLoadStatusHelp } from "@/lib/admin/game-load-status";
 import type { GameLoadRequest } from "@/lib/game-automation/types";
 
@@ -29,15 +28,33 @@ export interface AdminGameLoadUser {
   last_seen_at?: string | null;
 }
 
+export type GameLoadView = "attention" | "all" | "completed" | "failed";
+
+export type GameLoadCounts = {
+  pending: number | null;
+  processing: number | null;
+  completed: number | null;
+  failed: number | null;
+};
+
 interface AdminWalletLoadsPanelsProps {
   loads: AdminGameLoadRow[];
   users: AdminGameLoadUser[];
+  counts: GameLoadCounts;
+  view: GameLoadView;
+  showAllPlayers: boolean;
 }
 
 const PAGE_SIZE = 40;
 
-const CARD =
-  "overflow-hidden rounded-2xl border border-white/10 bg-[#10182e]/80";
+const CARD = "overflow-hidden rounded-2xl border border-white/10 bg-[#10182e]/80";
+
+const VIEW_LINKS: { view: GameLoadView; label: string; href: string }[] = [
+  { view: "attention", label: "Needs attention", href: "/admin/game-loads" },
+  { view: "all", label: "All loads", href: "/admin/game-loads?view=all" },
+  { view: "completed", label: "Completed", href: "/admin/game-loads?view=completed" },
+  { view: "failed", label: "Failed", href: "/admin/game-loads?status=failed" },
+];
 
 type UserLoadStats = {
   count: number;
@@ -58,32 +75,35 @@ function relativeTime(iso: string) {
   return new Date(iso).toLocaleDateString();
 }
 
-function loadLabel(load: AdminGameLoadRow): string {
-  if (load.load_type === "redeem") {
-    return load.redeem_all ? "Redeem all" : `Redeem $${Number(load.amount).toFixed(2)}`;
-  }
-  return `Load $${Number(load.amount).toFixed(2)} → ${load.game_name}`;
+function playerHref(href: string, showAllPlayers: boolean) {
+  if (!showAllPlayers) return href;
+  return href.includes("?") ? `${href}&players=all` : `${href}?players=all`;
 }
 
-export function AdminWalletLoadsPanels({ loads: initialLoads, users }: AdminWalletLoadsPanelsProps) {
+function amountLabel(load: AdminGameLoadRow) {
+  if (load.load_type === "redeem" && load.redeem_all) return "Redeem all";
+  return `$${Number(load.amount).toFixed(2)}`;
+}
+
+export function AdminWalletLoadsPanels({
+  loads: initialLoads,
+  users,
+  counts,
+  view,
+  showAllPlayers,
+}: AdminWalletLoadsPanelsProps) {
   const router = useRouter();
-  const searchParams = useSearchParams();
   const [loads, setLoads] = useState(initialLoads);
   const [query, setQuery] = useState("");
   const [visibleCount, setVisibleCount] = useState(PAGE_SIZE);
+  const [visiblePlayers, setVisiblePlayers] = useState(PAGE_SIZE);
   const [selectedUserId, setSelectedUserId] = useState<string | null>(null);
   const [live, setLive] = useState(false);
 
   useEffect(() => {
     setLoads(initialLoads);
+    setVisibleCount(PAGE_SIZE);
   }, [initialLoads]);
-
-  useEffect(() => {
-    const userId = searchParams.get("userId");
-    if (userId && users.some((user) => user.id === userId)) {
-      setSelectedUserId(userId);
-    }
-  }, [searchParams, users]);
 
   useEffect(() => {
     const supabase = createClient();
@@ -107,177 +127,214 @@ export function AdminWalletLoadsPanels({ loads: initialLoads, users }: AdminWall
     };
   }, [router]);
 
-  const failedOnly = searchParams.get("status") === "failed";
-  const depositLoads = useMemo(() => {
-    const rows = loads.filter(
-      (l) => l.wallet_type === "current" && ["load", "reload", "redeem"].includes(l.load_type)
-    );
-    return failedOnly ? rows.filter((l) => l.status === "failed") : rows;
-  }, [loads, failedOnly]);
-
   const loadStatsByUser = useMemo(() => {
     const map = new Map<string, UserLoadStats>();
-    for (const load of depositLoads) {
-      const userId = load.user_id;
-      const existing = map.get(userId) ?? { count: 0, pending: 0, lastAt: null, totalLoaded: 0 };
+    for (const load of loads) {
+      const existing = map.get(load.user_id) ?? { count: 0, pending: 0, lastAt: null, totalLoaded: 0 };
       existing.count += 1;
-      if (load.status === "pending" || load.status === "processing") {
-        existing.pending += 1;
-      }
-      if (!existing.lastAt || load.created_at > existing.lastAt) {
-        existing.lastAt = load.created_at;
-      }
-      if (
-        load.status === "completed" &&
-        (load.load_type === "load" || load.load_type === "reload")
-      ) {
-        existing.totalLoaded += Number(load.amount);
-      }
-      map.set(userId, existing);
+      if (load.status === "pending" || load.status === "processing") existing.pending += 1;
+      if (!existing.lastAt || load.created_at > existing.lastAt) existing.lastAt = load.created_at;
+      if (load.status === "completed" && load.load_type !== "redeem") existing.totalLoaded += Number(load.amount);
+      map.set(load.user_id, existing);
     }
     return map;
-  }, [depositLoads]);
+  }, [loads]);
 
-  const pendingLoads = useMemo(
-    () =>
-      depositLoads.filter((l) => l.status === "pending" || l.status === "processing").slice(0, 10),
-    [depositLoads]
-  );
+  const needle = query.trim().toLowerCase();
+  const viewLoads = useMemo(() => {
+    if (view === "attention") return loads.filter((load) => load.status === "pending" || load.status === "processing");
+    if (view === "completed") return loads.filter((load) => load.status === "completed");
+    if (view === "failed") return loads.filter((load) => load.status === "failed");
+    return loads;
+  }, [loads, view]);
 
-  const recentActivity = useMemo(() => depositLoads.slice(0, 8), [depositLoads]);
-
-  const filtered = useMemo(() => {
-    const q = query.trim().toLowerCase();
-    const list = users.filter((user) => {
-      const matches =
-        !q || user.full_name?.toLowerCase().includes(q) || user.email.toLowerCase().includes(q);
-      if (!matches) return false;
-      if (failedOnly && !depositLoads.some((load) => load.user_id === user.id)) return false;
-      return true;
+  const activeUsers = useMemo(() => {
+    const byId = new Map(users.map((user) => [user.id, user]));
+    const rows: AdminGameLoadUser[] = [];
+    const seen = new Set<string>();
+    for (const load of viewLoads) {
+      if (seen.has(load.user_id)) continue;
+      seen.add(load.user_id);
+      rows.push(
+        byId.get(load.user_id) ?? {
+          id: load.user_id,
+          full_name: load.user?.full_name ?? null,
+          email: load.user?.email ?? "",
+        }
+      );
+    }
+    return rows;
+  }, [viewLoads, users]);
+  const visibleRequests = useMemo(() => {
+    if (!needle) return viewLoads;
+    return viewLoads.filter((load) => {
+      const name = load.user?.full_name?.toLowerCase() ?? "";
+      const email = load.user?.email?.toLowerCase() ?? "";
+      return name.includes(needle) || email.includes(needle) || load.game_name.toLowerCase().includes(needle);
     });
+  }, [viewLoads, needle]);
 
+  const filteredPlayers = useMemo(() => {
+    const source = showAllPlayers ? users : activeUsers;
+    const list = source.filter((user) => {
+      if (!needle) return true;
+      return user.full_name?.toLowerCase().includes(needle) || user.email.toLowerCase().includes(needle);
+    });
     return [...list].sort((a, b) => {
       const aStats = loadStatsByUser.get(a.id);
       const bStats = loadStatsByUser.get(b.id);
-      if ((aStats?.pending ?? 0) !== (bStats?.pending ?? 0)) {
-        return (bStats?.pending ?? 0) - (aStats?.pending ?? 0);
-      }
+      if ((aStats?.pending ?? 0) !== (bStats?.pending ?? 0)) return (bStats?.pending ?? 0) - (aStats?.pending ?? 0);
       const aTime = aStats?.lastAt ?? a.created_at ?? "";
       const bTime = bStats?.lastAt ?? b.created_at ?? "";
       return bTime.localeCompare(aTime);
     });
-  }, [users, query, loadStatsByUser, failedOnly, depositLoads]);
+  }, [showAllPlayers, users, activeUsers, needle, loadStatsByUser]);
 
-  const visible = filtered.slice(0, visibleCount);
-  const hasMore = visibleCount < filtered.length;
-  const selectedUser = users.find((user) => user.id === selectedUserId) ?? null;
+  const requestRows = visibleRequests.slice(0, visibleCount);
+  const playerRows = filteredPlayers.slice(0, visiblePlayers);
+  const selectedUser = users.find((user) => user.id === selectedUserId) ?? activeUsers.find((user) => user.id === selectedUserId) ?? null;
+  const selectedUserLoads = useMemo(
+    () => (selectedUserId ? loads.filter((load) => load.user_id === selectedUserId) : []),
+    [loads, selectedUserId]
+  );
+  const openCount = (counts.pending ?? 0) + (counts.processing ?? 0);
+  const listTruncated =
+    (view === "attention" && counts.pending != null && counts.processing != null && viewLoads.length < openCount) ||
+    (view === "completed" && counts.completed != null && viewLoads.length < counts.completed) ||
+    (view === "failed" && counts.failed != null && viewLoads.length < counts.failed);
 
-  const selectedUserLoads = useMemo(() => {
-    if (!selectedUserId) return [];
-    return depositLoads.filter((l) => l.user_id === selectedUserId);
-  }, [depositLoads, selectedUserId]);
+  const emptyCopy =
+    view === "attention"
+      ? "No game loads are pending or processing."
+      : view === "completed"
+        ? "No completed game loads in this list."
+        : view === "failed"
+          ? "No failed game loads in this list."
+          : "No game loads in this list.";
 
   return (
     <div className="space-y-6">
-      {pendingLoads.length > 0 && (
-        <div className={cn(CARD, "border-amber-400/30")}>
-          <div className="flex items-center justify-between border-b border-amber-400/20 px-4 py-3">
-            <p className="text-xs font-semibold uppercase tracking-wider text-amber-300">
-              Pending loads — needs action ({pendingLoads.length})
-            </p>
-            {live && (
-              <span className="inline-flex items-center gap-1 text-xs text-emerald-400">
-                <Radio className="h-3 w-3 animate-pulse" />
-                Live
-              </span>
-            )}
-          </div>
-          <div className="divide-y divide-white/[0.04]">
-            {pendingLoads.map((load) => (
-              <button
-                key={load.id}
-                type="button"
-                className="flex w-full items-center justify-between gap-3 px-4 py-3 text-left transition-colors hover:bg-amber-400/10"
-                onClick={() => setSelectedUserId(load.user_id)}
-              >
-                <div className="min-w-0">
-                  <p className="truncate text-sm font-medium text-white">
-                    {load.user?.full_name || load.user?.email || "Unknown user"}
-                  </p>
-                  <p className="truncate text-xs text-slate-500">
-                    {loadLabel(load)} · {formatRelativeTime(load.created_at)}
-                  </p>
-                </div>
-                <AdminStatusBadge status={load.status} />
-              </button>
-            ))}
-          </div>
-        </div>
-      )}
+      <div className="flex flex-wrap items-center gap-2">
+        {VIEW_LINKS.map((item) => (
+          <Button
+            key={item.view}
+            variant="outline"
+            size="sm"
+            asChild
+            className={view === item.view ? "border-transparent bg-gradient-to-r from-[#6d28d9] to-[#2563eb] text-white" : "border-white/15 bg-transparent text-white"}
+          >
+            <Link href={playerHref(item.href, showAllPlayers)}>{item.label}</Link>
+          </Button>
+        ))}
+        {live ? (
+          <span className="inline-flex items-center gap-1 text-xs text-emerald-400">
+            <Radio className="h-3 w-3 animate-pulse" />
+            Live
+          </span>
+        ) : null}
+      </div>
 
       <div className={CARD}>
-        <div className="border-b border-violet-500/20 px-4 py-3">
-          <p className="text-xs font-semibold uppercase tracking-wider text-violet-300/70">
-            Recent loads (all users)
+        <div className="flex flex-wrap items-center justify-between gap-2 border-b border-white/10 px-4 py-3">
+          <p className="text-xs font-semibold uppercase tracking-wider text-[#c4b5fd]">
+            {view === "attention" ? "Requests that need attention" : view === "all" ? "Game loads" : view === "completed" ? "Completed game loads" : "Failed game loads"}
           </p>
+          <p className="text-xs text-[#9fb0d0]">{visibleRequests.length.toLocaleString()} shown</p>
         </div>
-        <div className="divide-y divide-white/[0.04]">
-          {recentActivity.length === 0 ? (
-            <p className="px-4 py-6 text-center text-sm text-slate-500">No loads yet.</p>
-          ) : (
-            recentActivity.map((load) => (
-              <button
-                key={load.id}
-                type="button"
-                className="flex w-full items-center justify-between gap-3 px-4 py-3 text-left transition-colors hover:bg-violet-500/10"
-                onClick={() => setSelectedUserId(load.user_id)}
-              >
-                <div className="min-w-0">
-                  <p className="truncate text-sm font-medium text-white">
-                    {load.user?.full_name || load.user?.email || "Unknown user"}
-                  </p>
-                  <p className="truncate text-xs text-slate-500">
-                    {loadLabel(load)} · {formatRelativeTime(load.created_at)}
-                  </p>
-                </div>
-                <span title={gameLoadStatusHelp(load.status)}>
-                  <AdminStatusBadge status={load.status} />
-                </span>
-              </button>
-            ))
-          )}
+        <div className="overflow-x-auto">
+          <table className="w-full text-left text-sm">
+            <thead className="border-b border-white/10 text-[11px] uppercase tracking-wider text-[#b7c3e4]">
+              <tr>
+                <th className="px-4 py-3 font-bold">Player</th>
+                <th className="px-4 py-3 font-bold">Game</th>
+                <th className="px-4 py-3 text-right font-bold">Amount</th>
+                <th className="px-4 py-3 font-bold">Date</th>
+                <th className="px-4 py-3 font-bold">Status</th>
+              </tr>
+            </thead>
+            <tbody>
+              {requestRows.length === 0 ? (
+                <tr>
+                  <td colSpan={5} className="px-4 py-10 text-center text-slate-400">
+                    {needle ? "No requests match your search." : emptyCopy}
+                  </td>
+                </tr>
+              ) : (
+                requestRows.map((load) => (
+                  <tr key={load.id} className="border-b border-white/[0.04]">
+                    <td className="px-4 py-3">
+                      <button type="button" className="text-left" onClick={() => setSelectedUserId(load.user_id)}>
+                        <p className="font-medium text-white">{load.user?.full_name || "Unnamed"}</p>
+                        <p className="max-w-[220px] truncate text-xs text-slate-500">{load.user?.email}</p>
+                      </button>
+                    </td>
+                    <td className="px-4 py-3 text-white">{load.game_name}</td>
+                    <td className="px-4 py-3 text-right font-semibold text-emerald-300">{amountLabel(load)}</td>
+                    <td className="px-4 py-3 text-xs text-slate-300">
+                      <p>{formatDate(load.created_at)}</p>
+                      <p className="text-slate-500">{formatRelativeTime(load.created_at)}</p>
+                    </td>
+                    <td className="px-4 py-3">
+                      <span title={gameLoadStatusHelp(load.status)}>
+                        <AdminStatusBadge status={load.status} />
+                      </span>
+                    </td>
+                  </tr>
+                ))
+              )}
+            </tbody>
+          </table>
         </div>
       </div>
 
+      {visibleCount < visibleRequests.length ? (
+        <div className="flex justify-center">
+          <Button variant="outline" onClick={() => setVisibleCount((count) => count + PAGE_SIZE)}>
+            Load more requests ({visibleRequests.length - visibleCount} remaining)
+          </Button>
+        </div>
+      ) : null}
+
+      {listTruncated ? (
+        <p className="text-sm text-[#9fb0d0]">The counts above include every stored request. This list shows the latest matching rows.</p>
+      ) : null}
+
       <div className="flex flex-wrap gap-2">
-        <Button variant="outline" size="sm" asChild className={failedOnly ? "border-white/15 bg-transparent text-white" : "border-transparent bg-gradient-to-r from-[#6d28d9] to-[#2563eb] text-white"}>
-          <Link href="/admin/game-loads">All statuses</Link>
+        <Button
+          variant="outline"
+          size="sm"
+          asChild
+          className={showAllPlayers ? "border-white/15 bg-transparent text-white" : "border-transparent bg-gradient-to-r from-[#6d28d9] to-[#2563eb] text-white"}
+        >
+          <Link href={VIEW_LINKS.find((item) => item.view === view)?.href ?? "/admin/game-loads"}>Players in this list</Link>
         </Button>
-        <Button variant="outline" size="sm" asChild className={failedOnly ? "border-transparent bg-gradient-to-r from-[#6d28d9] to-[#2563eb] text-white" : "border-white/15 bg-transparent text-white"}>
-          <Link href="/admin/game-loads?status=failed">Failed only</Link>
+        <Button
+          variant="outline"
+          size="sm"
+          asChild
+          className={showAllPlayers ? "border-transparent bg-gradient-to-r from-[#6d28d9] to-[#2563eb] text-white" : "border-white/15 bg-transparent text-white"}
+        >
+          <Link href={playerHref(VIEW_LINKS.find((item) => item.view === view)?.href ?? "/admin/game-loads", true)}>All players</Link>
         </Button>
       </div>
-      <p className="text-sm text-[#9fb0d0]">
-        {failedOnly
-          ? "Showing game loads marked failed. Pending and completed loads stay on All statuses."
-          : "Pending means waiting. Processing means work has started and is not finished. A slow response is not proof the provider transaction failed. Completed means the request is marked finished. Failed means it is marked failed. Cancelled means it is marked cancelled."}
-      </p>
 
       <div className="relative max-w-md">
         <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-500" />
         <Input
           value={query}
-          onChange={(e) => {
-            setQuery(e.target.value);
+          onChange={(event) => {
+            setQuery(event.target.value);
             setVisibleCount(PAGE_SIZE);
+            setVisiblePlayers(PAGE_SIZE);
           }}
-          placeholder="Filter players by name or email..."
+          placeholder="Search by player or game..."
           className="border-white/10 bg-[#0b1224] pl-9 text-white placeholder:text-[#8ea0c3]"
         />
       </div>
 
       <p className="text-sm text-slate-400">
-        {filtered.length} player{filtered.length === 1 ? "" : "s"} · pending loads shown first
+        {filteredPlayers.length.toLocaleString()} player{filteredPlayers.length === 1 ? "" : "s"}
+        {showAllPlayers ? " · all players" : " · players with a request in this list"}
       </p>
 
       <div className={CARD}>
@@ -294,14 +351,14 @@ export function AdminWalletLoadsPanels({ loads: initialLoads, users }: AdminWall
               </tr>
             </thead>
             <tbody>
-              {visible.length === 0 ? (
+              {playerRows.length === 0 ? (
                 <tr>
                   <td colSpan={6} className="px-4 py-10 text-center text-slate-400">
-                    No players match your filter.
+                    {showAllPlayers ? "No players match your search." : "No players have a request in this list."}
                   </td>
                 </tr>
               ) : (
-                visible.map((user) => {
+                playerRows.map((user) => {
                   const stats = loadStatsByUser.get(user.id);
                   return (
                     <tr
@@ -321,11 +378,9 @@ export function AdminWalletLoadsPanels({ loads: initialLoads, users }: AdminWall
                       </td>
                       <td className="px-4 py-3 text-right">
                         <p className="font-semibold text-white">{stats?.count ?? 0}</p>
-                        {(stats?.totalLoaded ?? 0) > 0 && (
-                          <p className="text-xs text-emerald-400">
-                            ${stats!.totalLoaded.toFixed(0)} loaded
-                          </p>
-                        )}
+                        {(stats?.totalLoaded ?? 0) > 0 ? (
+                          <p className="text-xs text-emerald-400">${stats!.totalLoaded.toFixed(0)} loaded</p>
+                        ) : null}
                       </td>
                       <td className="px-4 py-3 text-right">
                         {(stats?.pending ?? 0) > 0 ? (
@@ -337,11 +392,7 @@ export function AdminWalletLoadsPanels({ loads: initialLoads, users }: AdminWall
                         )}
                       </td>
                       <td className="px-4 py-3 text-xs text-slate-400">
-                        {stats?.lastAt
-                          ? relativeTime(stats.lastAt)
-                          : user.last_seen_at
-                            ? relativeTime(user.last_seen_at)
-                            : "No activity"}
+                        {stats?.lastAt ? relativeTime(stats.lastAt) : user.last_seen_at ? relativeTime(user.last_seen_at) : "No activity"}
                       </td>
                       <td className="px-4 py-3 text-right">
                         <Button
@@ -363,15 +414,15 @@ export function AdminWalletLoadsPanels({ loads: initialLoads, users }: AdminWall
         </div>
       </div>
 
-      {hasMore && (
+      {visiblePlayers < filteredPlayers.length ? (
         <div className="flex justify-center">
-          <Button variant="outline" onClick={() => setVisibleCount((count) => count + PAGE_SIZE)}>
-            Load more ({filtered.length - visibleCount} remaining)
+          <Button variant="outline" onClick={() => setVisiblePlayers((count) => count + PAGE_SIZE)}>
+            Load more players ({filteredPlayers.length - visiblePlayers} remaining)
           </Button>
         </div>
-      )}
+      ) : null}
 
-      {selectedUser && (
+      {selectedUser ? (
         <AdminWalletLoadsSidebarPanel
           user={selectedUser}
           loads={selectedUserLoads}
@@ -379,7 +430,7 @@ export function AdminWalletLoadsPanels({ loads: initialLoads, users }: AdminWall
           live={live}
           onClose={() => setSelectedUserId(null)}
         />
-      )}
+      ) : null}
     </div>
   );
 }
