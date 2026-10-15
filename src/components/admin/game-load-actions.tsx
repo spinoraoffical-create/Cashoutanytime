@@ -50,23 +50,29 @@ export function GameLoadActions({ load }: GameLoadActionsProps) {
     return null;
   }
 
+  const accountCreation = load.load_type === "create_account" || load.load_type === "new_account";
+
   return (
     <div className="flex flex-col gap-2 min-w-[180px]">
       <Button size="sm" variant="outline" onClick={openPanel} disabled={busy}>
         {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : <ExternalLink className="h-4 w-4" />}
         Open {load.game_name} panel
       </Button>
-      <div className="flex flex-wrap gap-2">
-        <Button size="sm" onClick={() => mark("completed")} disabled={busy}>
-          Complete
-        </Button>
-        <Button size="sm" variant="destructive" onClick={() => mark("failed")} disabled={busy}>
-          Failed
-        </Button>
-      </div>
-      <p className="text-xs leading-5 text-[#9fb0d0]">
-        Complete and Failed ask you to confirm. They can change the player wallet.
-      </p>
+      {accountCreation ? null : (
+        <>
+          <div className="flex flex-wrap gap-2">
+            <Button size="sm" onClick={() => mark("completed")} disabled={busy}>
+              Complete
+            </Button>
+            <Button size="sm" variant="destructive" onClick={() => mark("failed")} disabled={busy}>
+              Failed
+            </Button>
+          </div>
+          <p className="text-xs leading-5 text-[#9fb0d0]">
+            Complete and Failed ask you to confirm. They can change the player wallet.
+          </p>
+        </>
+      )}
       {load.game_username && (
         <p className="text-xs text-[#6b6d8f]">User: {load.game_username}</p>
       )}

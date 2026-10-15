@@ -14,7 +14,12 @@ import type {
   AdminGameLoadUser,
 } from "@/components/admin/admin-wallet-loads-panels";
 
+function isAccountCreation(load: AdminGameLoadRow) {
+  return load.load_type === "create_account" || load.load_type === "new_account";
+}
+
 function loadSummary(load: AdminGameLoadRow): string {
+  if (isAccountCreation(load)) return "Game account creation";
   if (load.load_type === "redeem") {
     if (load.redeem_all) {
       return `Redeem all → ${load.wallet_type === "bonus" ? "Bonus Redeem" : "Deposit Redeem"}`;
@@ -22,6 +27,12 @@ function loadSummary(load: AdminGameLoadRow): string {
     return `$${Number(load.amount).toFixed(2)} redeem`;
   }
   return `$${Number(load.amount).toFixed(2)} load to ${load.game_name}`;
+}
+
+function requestLabel(load: AdminGameLoadRow) {
+  if (isAccountCreation(load)) return "Account creation";
+  if (load.load_type === "redeem") return "redeem";
+  return "load";
 }
 
 function LoadEntry({ load, compact }: { load: AdminGameLoadRow; compact?: boolean }) {
@@ -35,7 +46,7 @@ function LoadEntry({ load, compact }: { load: AdminGameLoadRow; compact?: boolea
             <span className="text-sm font-semibold text-white">{load.game_name}</span>
             <AdminStatusBadge status={load.status} />
             <Badge variant="outline" className="text-[10px]">
-              {isRedeem ? "redeem" : "load"}
+              {requestLabel(load)}
             </Badge>
           </div>
           <p
