@@ -3,8 +3,6 @@
 import { useMemo, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { Card, CardContent } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { toast } from "sonner";
@@ -15,6 +13,8 @@ import {
   type AdminFraudRow,
 } from "@/lib/actions/admin-fraud";
 import { MessageCircle, Search, ShieldAlert, ShieldCheck } from "lucide-react";
+import { AdminEmptyState } from "@/components/admin/ui/admin-empty-state";
+import { AdminStatusBadge } from "@/components/admin/ui/admin-status-badge";
 
 interface AdminFraudListProps {
   users: AdminFraudRow[];
@@ -66,75 +66,74 @@ export function AdminFraudList({ users }: AdminFraudListProps) {
   return (
     <div className="space-y-4">
       <div className="relative max-w-md">
-        <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground pointer-events-none" />
+        <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[#8ea0c3]" />
         <Input
           value={query}
           onChange={(e) => setQuery(e.target.value)}
           placeholder="Search by name, email, phone, or user id..."
-          className="pl-9"
+          className="border-white/10 bg-[#0c1224] pl-9 text-white"
+          aria-label="Search flagged players"
         />
       </div>
 
-      <p className="text-sm text-muted-foreground">
-        {filtered.length} flagged user{filtered.length === 1 ? "" : "s"}
+      <p className="text-sm text-[#9fb0d0]">
+        {filtered.length} flagged player{filtered.length === 1 ? "" : "s"} in this view
       </p>
 
       {filtered.length === 0 ? (
-        <Card className="p-8 text-center">
-          <ShieldCheck className="h-10 w-10 text-green-500 mx-auto mb-3" />
-          <p className="font-medium">No flagged users</p>
-          <p className="text-sm text-muted-foreground mt-1">
-            Users appear here when multi-account or freeplay rules trigger.
-          </p>
-        </Card>
+        <AdminEmptyState
+          title={users.length === 0 ? "No flagged players" : "No matches"}
+          body={
+            users.length === 0
+              ? "Players appear here when the existing multi-account or freeplay rules flag them."
+              : "Try another name, email, phone, or user id."
+          }
+        />
       ) : (
         <div className="space-y-3">
           {filtered.map((user) => {
             const busy = loadingId === user.user_id;
             return (
-              <Card key={user.user_id}>
-                <CardContent className="p-4 flex flex-col gap-4">
-                  <div className="flex flex-col lg:flex-row lg:items-start justify-between gap-4">
+              <article key={user.user_id} className="rounded-2xl border border-[#7c3aed]/25 bg-gradient-to-br from-[#141432] to-[#0d1428] p-4 shadow-[0_16px_40px_rgba(49,46,129,0.2)]">
+                <div className="flex flex-col gap-4">
+                  <div className="flex flex-col justify-between gap-4 lg:flex-row lg:items-start">
                     <div className="min-w-0 flex-1">
-                      <div className="flex items-center gap-2 flex-wrap mb-1">
-                        <h3 className="font-semibold">{user.full_name || "Unnamed"}</h3>
-                        <Badge variant="outline">Risk {user.risk_score}</Badge>
-                        {user.rewards_blocked && (
-                          <Badge variant="destructive">Freeplay blocked</Badge>
-                        )}
-                        {user.blocked && <Badge variant="destructive">Blocked</Badge>}
-                        {user.manual_review && <Badge variant="secondary">Review</Badge>}
-                        {user.is_suspended && <Badge variant="destructive">Suspended</Badge>}
+                      <div className="mb-1 flex flex-wrap items-center gap-2">
+                        <h3 className="font-semibold text-white">{user.full_name || "Unnamed"}</h3>
+                        <span className="inline-flex rounded-full bg-white/10 px-2.5 py-1 text-xs font-semibold text-[#d5def2]">
+                          Risk {user.risk_score}
+                        </span>
+                        {user.rewards_blocked ? <AdminStatusBadge status="freeplay blocked" /> : null}
+                        {user.blocked ? <AdminStatusBadge status="blocked" /> : null}
+                        {user.manual_review ? <AdminStatusBadge status="manual review" /> : null}
+                        {user.is_suspended ? <AdminStatusBadge status="suspended" /> : null}
                       </div>
-                      <p className="text-sm text-muted-foreground break-all">{user.email}</p>
-                      {user.phone && (
-                        <p className="text-sm text-muted-foreground">{user.phone}</p>
-                      )}
-                      <p className="text-xs text-muted-foreground mt-2">
+                      <p className="break-all text-sm text-[#9fb0d0]">{user.email}</p>
+                      {user.phone ? <p className="text-sm text-[#9fb0d0]">{user.phone}</p> : null}
+                      <p className="mt-2 text-xs text-[#8ea0c3]">
                         Signup IP {user.signupIp} · Last seen IP {user.lastSeenIp}
                       </p>
-                      <p className="text-xs text-muted-foreground mt-1">
+                      <p className="mt-1 text-xs text-[#8ea0c3]">
                         Risk score {user.risk_score}
                         {user.flags.length ? ` · ${user.flags.join(", ")}` : ""}
                       </p>
-                      <p className="text-xs text-muted-foreground mt-2">
+                      <p className="mt-2 text-xs text-[#8ea0c3]">
                         Joined {formatDate(user.created_at)} · {user.device_count} linked device
-                        {user.device_count === 1 ? "" : "s"} · Updated{" "}
-                        {formatDate(user.last_calculated_at)}
+                        {user.device_count === 1 ? "" : "s"} · Updated {formatDate(user.last_calculated_at)}
                       </p>
-                      {user.flags.length > 0 && (
-                        <div className="flex flex-wrap gap-1.5 mt-2">
+                      {user.flags.length > 0 ? (
+                        <div className="mt-2 flex flex-wrap gap-1.5">
                           {user.flags.map((flag) => (
-                            <Badge key={flag} variant="outline" className="text-[10px]">
+                            <span key={flag} className="inline-flex rounded-full border border-white/10 px-2 py-0.5 text-[10px] text-[#d5def2]">
                               {flag.replace(/_/g, " ")}
-                            </Badge>
+                            </span>
                           ))}
                         </div>
-                      )}
+                      ) : null}
                     </div>
 
-                    <div className="flex flex-wrap gap-2 shrink-0">
-                      <Button variant="outline" size="sm" asChild className="gap-1.5">
+                    <div className="flex shrink-0 flex-wrap gap-2">
+                      <Button variant="outline" size="sm" asChild className="gap-1.5 border-white/15 text-[#e8eefc]">
                         <Link href={`/admin/chat?userId=${user.user_id}`}>
                           <MessageCircle className="h-4 w-4" />
                           Message
@@ -142,7 +141,7 @@ export function AdminFraudList({ users }: AdminFraudListProps) {
                       </Button>
                       <Button
                         size="sm"
-                        className="gap-1.5"
+                        className="gap-1.5 bg-gradient-to-r from-[#6d28d9] to-[#2563eb] text-white"
                         disabled={busy}
                         onClick={() => handleClear(user.user_id)}
                       >
@@ -160,8 +159,8 @@ export function AdminFraudList({ users }: AdminFraudListProps) {
                       </Button>
                     </div>
                   </div>
-                </CardContent>
-              </Card>
+                </div>
+              </article>
             );
           })}
         </div>

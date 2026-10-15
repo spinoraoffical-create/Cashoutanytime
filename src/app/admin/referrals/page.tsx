@@ -4,7 +4,6 @@ import { UserPlus } from "lucide-react";
 
 import { AdminPageHeader } from "@/components/admin/admin-page-header";
 import { EmptyState } from "@/components/shared/empty-state";
-import { GlassCard } from "@/components/shared/glass-card";
 import { StatCard } from "@/components/shared/stat-card";
 import {
   Table,
@@ -66,7 +65,7 @@ export default async function AdminReferralsPage() {
           description="Referral activity will appear here as members invite friends."
         />
       ) : (
-        <GlassCard className="overflow-hidden">
+        <div className="overflow-hidden rounded-2xl border border-[#7c3aed]/25 bg-[#0d1428]">
           <div className="overflow-x-auto">
             <Table>
               <TableHeader>
@@ -104,7 +103,7 @@ export default async function AdminReferralsPage() {
               </TableBody>
             </Table>
           </div>
-        </GlassCard>
+        </div>
       )}
     </div>
   );

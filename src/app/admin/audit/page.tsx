@@ -3,9 +3,9 @@ import Link from "next/link";
 import { format } from "date-fns";
 
 import { AdminPageHeader } from "@/components/admin/admin-page-header";
-import { EmptyState } from "@/components/shared/empty-state";
-import { GlassCard } from "@/components/shared/glass-card";
-import { Badge } from "@/components/ui/badge";
+import { AdminEmptyState } from "@/components/admin/ui/admin-empty-state";
+import { AdminErrorState } from "@/components/admin/ui/admin-error-state";
+import { AdminSectionCard } from "@/components/admin/ui/admin-section-card";
 import { Button } from "@/components/ui/button";
 import {
   Table,
@@ -18,7 +18,6 @@ import {
 import { profileDisplayName } from "@/lib/admin/spinora-profile";
 import { adminDb } from "@/lib/actions/admin/core";
 import { requireSuperAdmin } from "@/lib/data/admin";
-import { ScrollText } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 export const metadata: Metadata = { title: "Audit Logs" };
@@ -37,7 +36,7 @@ export default async function AdminAuditPage({
   const to = from + PAGE_SIZE - 1;
 
   const db = adminDb();
-  const { data, count } = await db
+  const { data, count, error } = await db
     .from("audit_logs")
     .select(
       "id, action, entity_type, entity_id, created_at, actor:profiles!audit_logs_actor_id_fkey(email, full_name)",
@@ -53,52 +52,50 @@ export default async function AdminAuditPage({
   return (
     <div className="mx-auto max-w-5xl">
       <AdminPageHeader
-        title="Audit Logs"
-        description={`${total.toLocaleString()} recorded actions. Append-only and immutable.`}
+        title="Audit log"
+        description={`${total.toLocaleString()} stored actions. This list is read only. It does not add or delete a row.`}
       />
 
-      {logs.length === 0 ? (
-        <EmptyState
-          icon={<ScrollText />}
+      {error ? (
+        <AdminErrorState title="The audit log could not be loaded" body="The stored actions are still unchanged. Try this page again in a moment." />
+      ) : logs.length === 0 ? (
+        <AdminEmptyState
           title="No audit entries yet"
-          description="Staff actions across the admin panel will be recorded here."
+          body="Staff actions that are already written to the audit log will show here."
         />
       ) : (
         <>
-          <GlassCard className="overflow-hidden">
+          <AdminSectionCard title="Recorded actions" description="Newest first. Each row is an action already stored.">
             <div className="overflow-x-auto">
               <Table>
                 <TableHeader>
-                  <TableRow className="border-foreground/8 hover:bg-transparent">
-                    <TableHead>Action</TableHead>
-                    <TableHead>Entity</TableHead>
-                    <TableHead>Actor</TableHead>
-                    <TableHead className="text-right">When</TableHead>
+                  <TableRow className="border-white/10 hover:bg-transparent">
+                    <TableHead className="text-[#8ea0c3]">Action</TableHead>
+                    <TableHead className="text-[#8ea0c3]">Entity</TableHead>
+                    <TableHead className="text-[#8ea0c3]">Actor</TableHead>
+                    <TableHead className="text-right text-[#8ea0c3]">When</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
                   {logs.map((log) => (
-                    <TableRow key={log.id} className="border-foreground/8">
+                    <TableRow key={log.id} className="border-white/5 hover:bg-white/[0.03]">
                       <TableCell>
-                        <Badge className="bg-foreground/8 font-mono text-xs text-foreground">
+                        <span className="inline-flex rounded-full bg-white/10 px-2.5 py-1 font-mono text-xs text-[#d5def2]">
                           {log.action}
-                        </Badge>
+                        </span>
                       </TableCell>
-                      <TableCell className="text-sm text-muted-foreground">
+                      <TableCell className="text-sm text-[#9fb0d0]">
                         {log.entity_type}
-                        {log.entity_id && (
-                          <span className="ml-1 text-xs text-ws-text-faint">
-                            {log.entity_id.slice(0, 8)}
-                          </span>
-                        )}
+                        {log.entity_id ? (
+                          <span className="ml-1 text-xs text-[#8ea0c3]">{log.entity_id.slice(0, 8)}</span>
+                        ) : null}
                       </TableCell>
-                      <TableCell className="text-sm">
-                        @
+                      <TableCell className="text-sm text-white">
                         {profileDisplayName(
                           (log.actor as { email?: string | null; full_name?: string | null } | null) ?? {}
                         ) || "system"}
                       </TableCell>
-                      <TableCell className="tnum text-right text-xs text-muted-foreground">
+                      <TableCell className="text-right text-xs tabular-nums text-[#9fb0d0]">
                         {format(new Date(log.created_at), "MMM d, yyyy HH:mm")}
                       </TableCell>
                     </TableRow>
@@ -106,7 +103,7 @@ export default async function AdminAuditPage({
                 </TableBody>
               </Table>
             </div>
-          </GlassCard>
+          </AdminSectionCard>
 
           {totalPages > 1 && (
             <div className="mt-4 flex items-center justify-between">
@@ -118,7 +115,7 @@ export default async function AdminAuditPage({
               >
                 <Link href={`/admin/audit?page=${page - 1}`}>Previous</Link>
               </Button>
-              <p className="tnum text-sm text-muted-foreground">
+              <p className="text-sm tabular-nums text-[#9fb0d0]">
                 Page {page} of {totalPages}
               </p>
               <Button

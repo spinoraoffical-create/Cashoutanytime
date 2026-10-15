@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { sendOfferAction } from "@/lib/actions/offers";
+import { confirmActionDecision } from "@/lib/admin/confirm-gate";
 
 export function OfferSendForm({ emailCount, smsCount }: { emailCount: number; smsCount: number }) {
   const [subject, setSubject] = useState("");
@@ -16,6 +17,14 @@ export function OfferSendForm({ emailCount, smsCount }: { emailCount: number; sm
 
   async function onSubmit(event: FormEvent) {
     event.preventDefault();
+    if (confirmActionDecision({ pending: busy, confirmed: false }) === "pending") return;
+    const decision = confirmActionDecision({
+      pending: false,
+      confirmed: window.confirm(
+        `Send this offer now to ${emailCount} email and ${smsCount} SMS recipients? People who opted out are already left out.`
+      ),
+    });
+    if (decision !== "run") return;
     setBusy(true);
     const result = await sendOfferAction({ subject, emailBody, smsBody });
     setBusy(false);
@@ -52,7 +61,7 @@ export function OfferSendForm({ emailCount, smsCount }: { emailCount: number; sm
         <Input id="offer-sms" value={smsBody} onChange={(event) => setSmsBody(event.target.value)} required maxLength={120} />
       </div>
       <p className="text-xs leading-5 text-[#9fb0d0]">
-        Send delivers this offer now. It does not ask for a second confirmation.
+        Send asks you to confirm, then delivers this offer. People who opted out stay off the list.
       </p>
       <Button type="submit" disabled={busy}>
         {busy ? "Sending..." : "Send"}

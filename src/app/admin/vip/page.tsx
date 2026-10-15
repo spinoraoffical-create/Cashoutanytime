@@ -5,7 +5,6 @@ import {
   EntityEditDialog,
   type FieldValue,
 } from "@/components/admin/entity-edit-dialog";
-import { GlassCard } from "@/components/shared/glass-card";
 import { TierBadge } from "@/components/shared/tier-badge";
 import { Badge } from "@/components/ui/badge";
 import {
@@ -48,7 +47,7 @@ export default async function AdminVipPage() {
         description="Configure XP thresholds and reward multipliers. Members re-evaluate on their next XP gain."
       />
 
-      <GlassCard className="overflow-hidden">
+      <div className="overflow-hidden rounded-2xl border border-[#7c3aed]/25 bg-[#0d1428]">
         <div className="overflow-x-auto">
           <Table>
             <TableHeader>
@@ -113,7 +112,7 @@ export default async function AdminVipPage() {
             </TableBody>
           </Table>
         </div>
-      </GlassCard>
+      </div>
     </div>
   );
 }

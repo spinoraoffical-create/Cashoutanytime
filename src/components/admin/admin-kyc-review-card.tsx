@@ -1,12 +1,23 @@
 "use client";
 
 import { useState } from "react";
-import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { GlassCard } from "@/components/shared/glass-card";
 import { toast } from "sonner";
-import { ShieldCheck, CheckCircle2, XCircle, User, FileText, Eye, X, Image as ImageIcon } from "lucide-react";
+import { CheckCircle2, Eye, FileText, X, XCircle } from "lucide-react";
 import { KYCSubmissionRecord, updateKYCStatus } from "@/lib/actions/kyc-actions";
+import { AdminEmptyState } from "@/components/admin/ui/admin-empty-state";
+import { AdminSectionCard } from "@/components/admin/ui/admin-section-card";
+import { AdminStatusBadge } from "@/components/admin/ui/admin-status-badge";
+
+const FILTERS = ["all", "pending", "approved", "rejected"] as const;
+type Filter = (typeof FILTERS)[number];
+
+const FILTER_LABEL: Record<Filter, string> = {
+  all: "All",
+  pending: "Pending review",
+  approved: "Approved",
+  rejected: "Rejected",
+};
 
 export function AdminKYCReviewCard({
   initialSubmissions = [],
@@ -15,8 +26,10 @@ export function AdminKYCReviewCard({
 }) {
   const [submissions, setSubmissions] = useState<KYCSubmissionRecord[]>(initialSubmissions);
   const [previewDoc, setPreviewDoc] = useState<KYCSubmissionRecord | null>(null);
+  const [filter, setFilter] = useState<Filter>("all");
 
   async function handleApprove(userId: string, name: string) {
+    if (!window.confirm(`Approve the identity check for ${name}?`)) return;
     const res = await updateKYCStatus(userId, "approved");
     if (res.ok) {
       setSubmissions((prev) =>
@@ -30,6 +43,7 @@ export function AdminKYCReviewCard({
   }
 
   async function handleReject(userId: string, name: string) {
+    if (!window.confirm(`Reject the identity check for ${name}?`)) return;
     const res = await updateKYCStatus(userId, "rejected");
     if (res.ok) {
       setSubmissions((prev) =>
@@ -42,67 +56,71 @@ export function AdminKYCReviewCard({
     }
   }
 
+  const visible = filter === "all" ? submissions : submissions.filter((s) => s.status === filter);
+  const counts: Record<Filter, number> = {
+    all: submissions.length,
+    pending: submissions.filter((s) => s.status === "pending").length,
+    approved: submissions.filter((s) => s.status === "approved").length,
+    rejected: submissions.filter((s) => s.status === "rejected").length,
+  };
+
   return (
-    <GlassCard className="p-6">
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between border-b border-border/50 pb-4 mb-6 gap-2">
-        <div>
-          <h2 className="text-lg font-semibold text-foreground flex items-center gap-2">
-            <ShieldCheck className="h-5 w-5 text-emerald-400" />
-            1-Click Non-Coder KYC Review Center
-          </h2>
-          <p className="text-sm text-muted-foreground">
-            Inspect player government ID documents, verify age (18+), and grant Verified Player Badges.
-          </p>
-        </div>
-        <Badge className="bg-emerald-500/20 text-emerald-400 font-mono shrink-0">
-          KYC VERIFICATION ({submissions.length})
-        </Badge>
+    <AdminSectionCard
+      title="Identity checks"
+      description="These are the checks already stored. The list filter only hides rows on this screen. Approve and Reject still use the existing review action, and each one asks you to confirm."
+    >
+      <div className="mb-4 flex flex-wrap gap-2">
+        {FILTERS.map((key) => (
+          <button
+            key={key}
+            type="button"
+            onClick={() => setFilter(key)}
+            className={
+              filter === key
+                ? "rounded-full bg-gradient-to-r from-[#6d28d9] to-[#2563eb] px-3 py-1.5 text-xs font-semibold text-white"
+                : "rounded-full border border-white/10 px-3 py-1.5 text-xs font-semibold text-[#9fb0d0]"
+            }
+          >
+            {FILTER_LABEL[key]} ({counts[key]})
+          </button>
+        ))}
       </div>
 
-      {submissions.length === 0 ? (
-        <div className="rounded-xl border border-border/60 bg-background/60 p-8 text-center space-y-2">
-          <ShieldCheck className="mx-auto h-8 w-8 text-muted-foreground" />
-          <h3 className="text-sm font-bold text-foreground">No Pending KYC Submissions</h3>
-          <p className="text-xs text-muted-foreground">
-            When a player uploads an ID on their dashboard, their submission will appear right here for 1-click review.
-          </p>
-        </div>
+      {visible.length === 0 ? (
+        <AdminEmptyState
+          title={submissions.length === 0 ? "No identity checks yet" : "Nothing in this view"}
+          body={
+            submissions.length === 0
+              ? "When a player uploads an ID, it will show here for review."
+              : "Choose All to see every check already loaded."
+          }
+        />
       ) : (
-        <div className="space-y-3">
-          {submissions.map((s) => (
-            <div
+        <ul className="space-y-3">
+          {visible.map((s) => (
+            <li
               key={s.id}
-              className="rounded-xl border border-border/60 bg-background/60 p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-4"
+              className="flex flex-col gap-4 rounded-2xl border border-white/10 bg-[#0c1224] p-4 sm:flex-row sm:items-center sm:justify-between"
             >
-              <div className="flex items-start gap-3">
-                <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-emerald-500/15 text-emerald-400 font-bold">
-                  <User className="h-5 w-5" />
+              <div className="min-w-0">
+                <div className="flex flex-wrap items-center gap-2">
+                  <p className="text-sm font-semibold text-white">{s.user_name}</p>
+                  <AdminStatusBadge status={s.status} />
                 </div>
-                <div>
-                  <span className="text-sm font-bold text-foreground">{s.user_name}</span>
-                  <p className="text-xs text-muted-foreground font-mono">{s.user_email}</p>
-                  <div className="flex items-center gap-2 mt-1">
-                    <button
-                      onClick={() => setPreviewDoc(s)}
-                      className="text-[11px] text-amber-300 hover:text-amber-200 underline flex items-center gap-1 font-mono"
-                    >
-                      <Eye className="h-3.5 w-3.5" /> View Uploaded Photo ({s.document_name})
-                    </button>
-                    <span className="text-[10px] text-muted-foreground">
-                      • {new Date(s.created_at).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
-                    </span>
-                  </div>
-                </div>
+                <p className="mt-1 break-all text-xs text-[#9fb0d0]">{s.user_email}</p>
+                <p className="mt-1 text-xs text-[#8ea0c3]">
+                  {s.document_name} · {new Date(s.created_at).toLocaleString()}
+                </p>
               </div>
 
-              <div className="flex items-center gap-2">
+              <div className="flex flex-wrap items-center gap-2">
                 <Button
                   size="sm"
                   variant="outline"
                   onClick={() => setPreviewDoc(s)}
-                  className="border-amber-500/40 text-amber-300 hover:bg-amber-500/10 font-bold text-xs gap-1"
+                  className="gap-1 border-white/15 text-[#e8eefc]"
                 >
-                  <Eye className="h-3.5 w-3.5" /> View Photo
+                  <Eye className="h-3.5 w-3.5" /> View photo
                 </Button>
 
                 {s.status === "pending" ? (
@@ -110,7 +128,7 @@ export function AdminKYCReviewCard({
                     <Button
                       size="sm"
                       onClick={() => handleApprove(s.user_id, s.user_name)}
-                      className="bg-emerald-500 text-black hover:bg-emerald-400 font-bold text-xs gap-1"
+                      className="gap-1 bg-emerald-500 text-black hover:bg-emerald-400"
                     >
                       <CheckCircle2 className="h-3.5 w-3.5" /> Approve
                     </Button>
@@ -118,105 +136,82 @@ export function AdminKYCReviewCard({
                       size="sm"
                       variant="outline"
                       onClick={() => handleReject(s.user_id, s.user_name)}
-                      className="border-rose-500/40 text-rose-400 hover:bg-rose-500/10 font-bold text-xs gap-1"
+                      className="gap-1 border-rose-400/40 text-rose-200 hover:bg-rose-500/10"
                     >
                       <XCircle className="h-3.5 w-3.5" /> Reject
                     </Button>
                   </>
-                ) : (
-                  <Badge
-                    className={
-                      s.status === "approved"
-                        ? "bg-emerald-500/20 text-emerald-400 font-bold"
-                        : "bg-rose-500/20 text-rose-400 font-bold"
-                    }
-                  >
-                    {s.status === "approved" ? "APPROVED" : "REJECTED"}
-                  </Badge>
-                )}
+                ) : null}
               </div>
-            </div>
+            </li>
           ))}
-        </div>
+        </ul>
       )}
 
-      {/* 🖼️ Actual Uploaded Photo Inspector Modal */}
-      {previewDoc && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-md animate-in fade-in duration-200">
-          <div className="relative w-full max-w-xl rounded-3xl border border-amber-500/40 bg-[#161618] p-6 shadow-2xl">
-            {/* Modal Header */}
-            <div className="flex items-center justify-between border-b border-border/50 pb-3 mb-4">
-              <div>
-                <h3 className="text-base font-bold text-foreground flex items-center gap-2">
-                  <ImageIcon className="h-5 w-5 text-amber-400" />
-                  Uploaded ID Photo — {previewDoc.user_name}
-                </h3>
-                <p className="text-xs text-muted-foreground font-mono">{previewDoc.user_email} • {previewDoc.document_name}</p>
+      {previewDoc ? (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-4" role="dialog" aria-modal="true" aria-label={`Uploaded ID photo for ${previewDoc.user_name}`}>
+          <div className="relative w-full max-w-xl rounded-3xl border border-[#7c3aed]/35 bg-[#0d1428] p-6 shadow-[0_18px_40px_rgba(76,29,149,0.28)]">
+            <div className="mb-4 flex items-start justify-between gap-3 border-b border-white/10 pb-3">
+              <div className="min-w-0">
+                <h3 className="text-base font-semibold text-white">Uploaded ID photo — {previewDoc.user_name}</h3>
+                <p className="mt-1 break-all text-xs text-[#9fb0d0]">
+                  {previewDoc.user_email} · {previewDoc.document_name}
+                </p>
               </div>
-
               <button
+                type="button"
                 onClick={() => setPreviewDoc(null)}
-                className="rounded-full p-1.5 text-muted-foreground hover:bg-white/10 hover:text-white transition-colors"
+                className="rounded-full p-1.5 text-[#9fb0d0] hover:bg-white/10 hover:text-white"
+                aria-label="Close photo"
               >
                 <X className="h-5 w-5" />
               </button>
             </div>
 
-            {/* Actual Uploaded Image Display */}
-            <div className="rounded-2xl border border-amber-500/30 bg-black p-3 text-center overflow-hidden my-4 min-h-[260px] flex flex-col items-center justify-center">
+            <div className="my-4 flex min-h-[260px] flex-col items-center justify-center overflow-hidden rounded-2xl border border-white/10 bg-black p-3 text-center">
               {previewDoc.document_url ? (
                 <img
                   src={previewDoc.document_url}
-                  alt={`ID Document uploaded by ${previewDoc.user_name}`}
-                  className="max-h-[360px] w-auto rounded-xl border border-border/40 object-contain shadow-lg"
+                  alt={`ID document uploaded by ${previewDoc.user_name}`}
+                  className="max-h-[360px] w-auto rounded-xl object-contain"
                 />
               ) : (
-                <div className="p-8 text-center space-y-2">
-                  <FileText className="mx-auto h-12 w-12 text-amber-400" />
-                  <p className="text-sm font-bold text-foreground">{previewDoc.document_name}</p>
-                  <p className="text-xs text-muted-foreground font-mono">Document uploaded via dashboard form</p>
+                <div className="space-y-2 p-8 text-center">
+                  <FileText className="mx-auto h-12 w-12 text-[#c4b5fd]" />
+                  <p className="text-sm font-semibold text-white">{previewDoc.document_name}</p>
+                  <p className="text-xs text-[#9fb0d0]">The stored photo link is empty for this check.</p>
                 </div>
               )}
             </div>
 
-            {/* Modal Actions */}
-            <div className="flex items-center justify-between border-t border-border/50 pt-4">
-              <span className="text-xs font-mono text-muted-foreground">
-                Uploaded: {new Date(previewDoc.created_at).toLocaleString()}
-              </span>
-
-              <div className="flex items-center gap-2">
-                <Button
-                  variant="outline"
-                  onClick={() => setPreviewDoc(null)}
-                  className="text-xs text-muted-foreground"
-                >
+            <div className="flex flex-col gap-3 border-t border-white/10 pt-4 sm:flex-row sm:items-center sm:justify-between">
+              <span className="text-xs text-[#8ea0c3]">Uploaded {new Date(previewDoc.created_at).toLocaleString()}</span>
+              <div className="flex flex-wrap items-center gap-2">
+                <Button variant="outline" onClick={() => setPreviewDoc(null)} className="border-white/15 text-[#e8eefc]">
                   Close
                 </Button>
-
-                {previewDoc.status === "pending" && (
+                {previewDoc.status === "pending" ? (
                   <>
                     <Button
                       onClick={() => handleReject(previewDoc.user_id, previewDoc.user_name)}
                       variant="outline"
-                      className="border-rose-500/40 text-rose-400 hover:bg-rose-500/10 font-bold text-xs gap-1"
+                      className="gap-1 border-rose-400/40 text-rose-200 hover:bg-rose-500/10"
                     >
-                      <XCircle className="h-4 w-4" /> Reject ID
+                      <XCircle className="h-4 w-4" /> Reject
                     </Button>
-
                     <Button
                       onClick={() => handleApprove(previewDoc.user_id, previewDoc.user_name)}
-                      className="bg-emerald-500 text-black hover:bg-emerald-400 font-bold text-xs gap-1"
+                      className="gap-1 bg-emerald-500 text-black hover:bg-emerald-400"
                     >
-                      <CheckCircle2 className="h-4 w-4" /> Approve & Verify Player
+                      <CheckCircle2 className="h-4 w-4" /> Approve
                     </Button>
                   </>
-                )}
+                ) : null}
               </div>
             </div>
           </div>
         </div>
-      )}
-    </GlassCard>
+      ) : null}
+    </AdminSectionCard>
   );
 }

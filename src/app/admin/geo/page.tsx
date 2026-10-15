@@ -9,14 +9,14 @@ import {
   EntityEditDialog,
   type FieldValue,
 } from "@/components/admin/entity-edit-dialog";
-import { GlassCard } from "@/components/shared/glass-card";
-import { Badge } from "@/components/ui/badge";
+import { AdminEmptyState } from "@/components/admin/ui/admin-empty-state";
+import { AdminStatusBadge } from "@/components/admin/ui/admin-status-badge";
 import { deleteCmsEntityAction } from "@/lib/actions/admin/cms";
 import { upsertGeoCityAction, upsertGeoStateAction } from "@/lib/actions/admin/geo";
 import { adminDb } from "@/lib/actions/admin/core";
 import { requirePermission } from "@/lib/data/admin";
 
-export const metadata: Metadata = { title: "Geo Pages" };
+export const metadata: Metadata = { title: "City pages" };
 
 export default async function AdminGeoPage() {
   await requirePermission("cms.manage");
@@ -45,8 +45,8 @@ export default async function AdminGeoPage() {
     <div className="mx-auto max-w-7xl space-y-6">
       <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
         <AdminPageHeader
-          title="Geo Pages & Landing Generator"
-          description="States and cities power the /[state] and /[state]/[city] landing pages. New entries appear without a redeploy."
+          title="City pages"
+          description="States and cities already stored for the public landing pages. A page is saved only when you press save. The generator below still publishes only when you press its button."
         />
         <EntityEditDialog
           title="Add state"
@@ -80,18 +80,19 @@ export default async function AdminGeoPage() {
       {/* 1-Click Bulk SEO Landing Page Generator */}
       <AdminBulkLandingGenerator />
 
+      {states.length === 0 ? (
+        <AdminEmptyState title="No states yet" body="Add a state when you are ready. Nothing is published until you save it." />
+      ) : (
       <div className="space-y-4">
         {states.map((state) => {
           const cities = citiesByState.get(state.id) ?? [];
           return (
-            <GlassCard key={state.id} className="p-4">
+            <section key={state.id} className="rounded-2xl border border-[#7c3aed]/25 bg-gradient-to-br from-[#141432] to-[#0d1428] p-4 shadow-[0_16px_40px_rgba(49,46,129,0.2)]">
               <div className="flex items-center justify-between gap-3">
                 <div className="flex items-center gap-2">
-                  <p className="font-semibold">{state.name}</p>
-                  <Badge className="bg-foreground/8 text-xs text-muted-foreground">{state.abbr}</Badge>
-                  {!state.is_active && (
-                    <Badge className="bg-foreground/8 text-xs text-muted-foreground">Inactive</Badge>
-                  )}
+                  <p className="font-semibold text-white">{state.name}</p>
+                  <span className="inline-flex rounded-full bg-white/10 px-2.5 py-1 text-xs font-semibold text-[#d5def2]">{state.abbr}</span>
+                  {!state.is_active ? <AdminStatusBadge status="inactive" /> : <AdminStatusBadge status="active" />}
                 </div>
                 <div className="flex items-center gap-2">
                   <EntityEditDialog
@@ -133,15 +134,13 @@ export default async function AdminGeoPage() {
                 </div>
               </div>
 
-              <div className="mt-4 space-y-2 border-t border-border pt-4">
+              <div className="mt-4 space-y-2 border-t border-white/10 pt-4">
                 {cities.map((city) => (
-                  <div key={city.id} className="flex items-center justify-between gap-3 text-sm">
-                    <div className="flex items-center gap-2">
-                      <span>{city.name}</span>
-                      {!city.is_active && (
-                        <Badge className="bg-foreground/8 text-xs text-muted-foreground">Inactive</Badge>
-                      )}
-                      <span className="text-xs text-muted-foreground">{city.description_snippet}</span>
+                  <div key={city.id} className="flex flex-col gap-3 text-sm sm:flex-row sm:items-center sm:justify-between">
+                    <div className="flex min-w-0 flex-wrap items-center gap-2">
+                      <span className="text-white">{city.name}</span>
+                      {!city.is_active ? <AdminStatusBadge status="inactive" /> : null}
+                      <span className="text-xs text-[#9fb0d0]">{city.description_snippet}</span>
                     </div>
                     <div className="flex items-center gap-2">
                       <EntityEditDialog
@@ -201,10 +200,11 @@ export default async function AdminGeoPage() {
                   }}
                 />
               </div>
-            </GlassCard>
+            </section>
           );
         })}
       </div>
+      )}
     </div>
   );
 }

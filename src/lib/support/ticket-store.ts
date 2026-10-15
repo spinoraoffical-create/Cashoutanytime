@@ -208,7 +208,7 @@ export async function countOpenTickets() {
       .in("status", OPEN_STATUSES);
     if (!error) return count ?? 0;
     if (missingTable(error)) tableReady = false;
-    else return 0;
+    else return null;
   }
   const tickets = (await activityRows())
     .map((row) => fromActivity(row, null))
@@ -216,7 +216,7 @@ export async function countOpenTickets() {
   return tickets.filter((ticket) => OPEN_STATUSES.includes(ticket.status)).length;
 }
 
-export async function listAdminTickets(statuses: TicketStatus[]): Promise<StoredTicket[]> {
+export async function listAdminTickets(statuses: TicketStatus[]): Promise<StoredTicket[] | null> {
   if (await usesTicketTable()) {
     const { data, error } = await adminDb()
       .from("support_tickets")
@@ -226,7 +226,7 @@ export async function listAdminTickets(statuses: TicketStatus[]): Promise<Stored
       .limit(100);
     if (!error) return (data ?? []).map((row) => fromTableRow(row, []));
     if (missingTable(error)) tableReady = false;
-    else return [];
+    else return null;
   }
   const rows = await activityRows();
   const matched = rows
@@ -236,8 +236,19 @@ export async function listAdminTickets(statuses: TicketStatus[]): Promise<Stored
   return matched.map((row) => ({ ...row, profiles: profiles.get(row.user_id) ?? null }));
 }
 
-export async function listRecentTickets(limit = 5): Promise<StoredTicket[]> {
+export async function listRecentTickets(limit = 5): Promise<StoredTicket[] | null> {
+  if (await usesTicketTable()) {
+    const { data, error } = await adminDb()
+      .from("support_tickets")
+      .select("id, ticket_no, subject, category, status, priority, assigned_to, last_message_at, created_at, user_id, profiles(email, full_name)")
+      .order("created_at", { ascending: false })
+      .limit(limit);
+    if (!error) return (data ?? []).map((row) => fromTableRow(row, []));
+    if (!missingTable(error)) return null;
+    tableReady = false;
+  }
   const tickets = await listAdminTickets(["open", "pending", "in_progress", "resolved", "closed"]);
+  if (tickets == null) return null;
   return tickets
     .sort((a, b) => (a.created_at < b.created_at ? 1 : -1))
     .slice(0, limit);

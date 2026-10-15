@@ -9,6 +9,7 @@ import {
   authorize,
   writeAudit,
 } from "@/lib/actions/admin/core";
+import { partialAuditResult } from "@/lib/admin/audit-result";
 import { adminLink, tgEsc, tgNotify } from "@/lib/telegram";
 import { getAgentScope, playerInScope } from "@/lib/agents/scope";
 
@@ -36,7 +37,7 @@ export async function setBanAction(input: {
 
   if (error) return { ok: false, error: "Could not update the member." };
 
-  await writeAudit({
+  const audited = await writeAudit({
     actorId: auth.staff.userId,
     action: input.banned ? "user.ban" : "user.unban",
     entityType: "profile",
@@ -47,7 +48,7 @@ export async function setBanAction(input: {
 
   revalidatePath("/admin/users");
   revalidatePath(`/admin/users/${input.userId}`);
-  return { ok: true, message: input.banned ? "Member banned." : "Member reinstated." };
+  return { ok: true, message: input.banned ? "Member banned." : "Member reinstated.", ...partialAuditResult(audited) };
 }
 
 export async function deleteUserAccountAction(userId: string): Promise<AdminActionResult> {
@@ -63,7 +64,7 @@ export async function deleteUserAccountAction(userId: string): Promise<AdminActi
   const { error } = await db.rpc("admin_delete_user_account", { target_user_id: userId });
   if (error) return { ok: false, error: "Could not delete the account." };
 
-  await writeAudit({
+  const audited = await writeAudit({
     actorId: auth.staff.userId,
     action: "user.delete",
     entityType: "profile",
@@ -72,7 +73,7 @@ export async function deleteUserAccountAction(userId: string): Promise<AdminActi
   });
 
   revalidatePath("/admin/users");
-  return { ok: true, message: "Account permanently deleted." };
+  return { ok: true, message: "Account permanently deleted.", ...partialAuditResult(audited) };
 }
 
 const adjustSchema = z.object({
@@ -119,7 +120,7 @@ export async function adjustBalanceAction(input: {
     };
   }
 
-  await writeAudit({
+  const audited = await writeAudit({
     actorId: auth.staff.userId,
     action: "user.balance_adjust",
     entityType: "profile",
@@ -133,7 +134,7 @@ export async function adjustBalanceAction(input: {
 
   revalidatePath(`/admin/users/${parsed.data.userId}`);
   revalidatePath("/admin/users");
-  return { ok: true, message: "Balance adjusted." };
+  return { ok: true, message: "Balance adjusted.", ...partialAuditResult(audited) };
 }
 
 // ── Real-money wallet: credit / debit (uses the same definer RPCs the app does) ──
@@ -183,7 +184,7 @@ export async function adjustWalletAction(input: {
     };
   }
 
-  await writeAudit({
+  const audited = await writeAudit({
     actorId,
     action: "user.wallet_adjust",
     entityType: "profile",
@@ -194,7 +195,7 @@ export async function adjustWalletAction(input: {
   await tgNotify("finance", `⚙️ <b>Wallet ${credit ? "credited" : "debited"}</b>\n${credit ? "+" : "-"}$${Math.abs(parsed.data.amount).toFixed(2)} · ${tgEsc(parsed.data.userId.slice(0, 8))}...\n${tgEsc(parsed.data.note)}\n${adminLink("/admin/users", "👉 View User")}`);
   revalidatePath(`/admin/users/${parsed.data.userId}`);
   revalidatePath("/admin/users");
-  return { ok: true, message: credit ? "Wallet credited." : "Wallet debited." };
+  return { ok: true, message: credit ? "Wallet credited." : "Wallet debited.", ...partialAuditResult(audited) };
 }
 
 // ── Redeem (cash-out) payout: debit cashout_wallet + ledger row ──
@@ -234,7 +235,7 @@ export async function recordCashoutPayoutAction(input: {
     };
   }
 
-  await writeAudit({
+  const audited = await writeAudit({
     actorId: auth.staff.userId,
     action: "user.cashout_payout",
     entityType: "profile",
@@ -245,7 +246,7 @@ export async function recordCashoutPayoutAction(input: {
   await tgNotify("finance", `💸 <b>Cashout payout</b>\n$${parsed.data.amount.toFixed(2)} · ${tgEsc(parsed.data.userId.slice(0, 8))}...${parsed.data.note ? `\n${tgEsc(parsed.data.note)}` : ""}\n${adminLink("/admin/payouts", "👉 View Payouts")}`);
   revalidatePath(`/admin/users/${parsed.data.userId}`);
   revalidatePath("/admin/users");
-  return { ok: true, message: "Cash-out payout recorded." };
+  return { ok: true, message: "Cash-out payout recorded.", ...partialAuditResult(audited) };
 }
 
 export async function setUserRolesAction(input: {
@@ -286,10 +287,23 @@ export async function setUserRolesAction(input: {
         granted_by: auth.staff.userId,
       }))
     );
-    if (insError) return { ok: false, error: "Could not assign the new roles." };
+    if (insError) {
+      const previous = (before ?? []).map((row) => ({
+        user_id: input.userId,
+        role_id: row.role_id,
+        granted_by: auth.staff.userId,
+      }));
+      if (previous.length > 0) {
+        const { error: restoreError } = await db.from("user_roles").insert(previous);
+        if (restoreError) {
+          return { ok: false, error: "The role change stopped halfway. Check this account before trying again." };
+        }
+      }
+      return { ok: false, error: "Could not assign the new roles." };
+    }
   }
 
-  await writeAudit({
+  const audited = await writeAudit({
     actorId: auth.staff.userId,
     action: "user.roles_set",
     entityType: "profile",
@@ -297,8 +311,7 @@ export async function setUserRolesAction(input: {
     before: { role_ids: (before ?? []).map((r) => r.role_id) },
     after: { roles: [...wantsKeys] },
   });
-
   revalidatePath(`/admin/users/${input.userId}`);
   revalidatePath("/admin/users");
-  return { ok: true, message: "Roles updated." };
+  return { ok: true, message: "Roles updated.", ...partialAuditResult(audited) };
 }

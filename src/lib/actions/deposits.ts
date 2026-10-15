@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import { type DepositPaymentMethodId } from "@/lib/payments/methods";
 import { createNotification } from "@/lib/actions/notifications";
+import { partialAuditResult } from "@/lib/admin/audit-result";
 import { adminDb, writeAudit } from "@/lib/actions/admin/core";
 import { getAgentScope, playerInScope } from "@/lib/agents/scope";
 import type { RequestStatus } from "@/types/database";
@@ -86,7 +87,7 @@ export async function updateDepositStatus(
 
   if (selectError) {
     console.error("Select deposit request error:", selectError);
-    return { error: `Query error: ${selectError.message}` };
+    return { error: "The deposit could not be loaded." };
   }
   if (!existing) return { error: "Deposit request not found" };
 
@@ -109,7 +110,7 @@ export async function updateDepositStatus(
       })
       .eq("id", depositId);
 
-    if (error) return { error: error.message };
+    if (error) return { error: "The deposit status could not be saved." };
 
     if (status === "rejected") {
       await createNotification(
@@ -121,7 +122,7 @@ export async function updateDepositStatus(
     }
   }
 
-  await writeAudit({
+  const audited = await writeAudit({
     actorId: user.id,
     action: "deposit.update",
     entityType: "deposit_request",
@@ -133,5 +134,5 @@ export async function updateDepositStatus(
   revalidatePath("/dashboard/deposits");
   revalidatePath("/dashboard");
   revalidatePath("/admin/transactions");
-  return { success: true };
+  return { success: true, ...partialAuditResult(audited) };
 }

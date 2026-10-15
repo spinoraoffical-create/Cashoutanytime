@@ -52,11 +52,9 @@ export default async function AdminPaymentsPage() {
   return (
     <div className="mx-auto max-w-3xl">
       <AdminPageHeader
-        title="Payment Methods"
-        description="Stored payment labels for the settings list. Player checkout uses Paydora. Delete asks for confirmation before a method is removed."
-      />
-
-      <div className="mb-6">
+        title="Payment methods"
+        description="Labels already stored for the player deposit list. Checkout still uses Paydora. Delete still asks you to confirm. This page does not show a provider password."
+        action={
         <EntityEditDialog
           title="Add payment method"
           triggerLabel="Add payment method"
@@ -77,7 +75,8 @@ export default async function AdminPaymentsPage() {
             });
           }}
         />
-      </div>
+        }
+      />
 
       <div className="space-y-3">
         {methods.length === 0 && (

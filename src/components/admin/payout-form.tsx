@@ -32,11 +32,19 @@ export function PayoutForm({
       toast.error(`Max payout for ${playerName} is $${maxAmount.toFixed(2)}.`);
       return;
     }
+    if (
+      !window.confirm(
+        `Mark $${amount.toFixed(2)} paid for ${playerName}? This debits the cash-out wallet. It does not send a bank payment by itself.`
+      )
+    ) {
+      return;
+    }
     data.set("user_id", userId);
     start(async () => {
       const res = await payoutCashout(data);
       if (res.ok) {
-        toast.success(res.message ?? "Payout recorded.");
+        if (res.auditWarning) toast.warning(res.auditWarning);
+        else toast.success(res.message ?? "Payout recorded.");
         formRef.current?.reset();
       } else {
         toast.error(res.error);
@@ -72,6 +80,7 @@ export function PayoutForm({
       <Button type="submit" size="sm" variant="destructive" disabled={pending}>
         {pending ? <Loader2 className="size-4 animate-spin" /> : "Mark paid"}
       </Button>
+      <p className="w-full text-xs text-[#9fb0d0]">Mark paid asks you to confirm, then debits the cash-out wallet.</p>
     </form>
   );
 }

@@ -1,5 +1,6 @@
 "use server";
 
+import { headers } from "next/headers";
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
@@ -104,7 +105,7 @@ export async function submitKYCDocument(formData: FormData): Promise<{ ok: boole
     return { ok: false, error: "Could not submit that ID. Try again or contact support." };
   }
 
-  await writeAudit({
+  const submitted = await writeAudit({
     actorId: user.id,
     action: "kyc.submit",
     entityType: "kyc_submission",
@@ -123,6 +124,10 @@ export async function submitKYCDocument(formData: FormData): Promise<{ ok: boole
 
   if (profileError && !/kyc_status|column/i.test(profileError.message)) {
     console.warn("[KYC] profile update:", profileError.message);
+    return { ok: false, error: "The ID was saved, but the profile status could not be updated." };
+  }
+  if (!submitted) {
+    return { ok: false, error: "The ID was saved, but it was not written to the audit log." };
   }
 
   revalidatePath("/dashboard/kyc");
@@ -133,6 +138,9 @@ export async function submitKYCDocument(formData: FormData): Promise<{ ok: boole
 
 /** Check whether KYC tables exist in Supabase */
 export async function getKYCSystemStatus(): Promise<{ ready: boolean; error?: string }> {
+  const gate = await authorize("kyc.manage");
+  if ("error" in gate) return { ready: false, error: "You cannot review identity checks." };
+
   const admin = createAdminClient();
   if (!admin) {
     return { ready: false, error: "KYC review is not configured on the server." };
@@ -143,11 +151,10 @@ export async function getKYCSystemStatus(): Promise<{ ready: boolean; error?: st
     if (/kyc_submissions|schema cache|does not exist/i.test(error.message)) {
       return {
         ready: false,
-        error:
-          "Run supabase/migrations/20260720000300_kyc_and_ai_system.sql in the Supabase SQL Editor.",
+        error: "Identity checks are not ready on the server.",
       };
     }
-    return { ready: false, error: error.message };
+    return { ready: false, error: "Identity checks could not be loaded." };
   }
   return { ready: true };
 }
@@ -178,11 +185,24 @@ export async function getAdminKYCSubmissions(): Promise<KYCSubmissionRecord[]> {
 
   const rows = (data ?? []).map((row) => mapRow(row as Record<string, unknown>));
   for (const row of rows) {
-    if (!row.document_url || row.document_url.startsWith("data:") || row.document_url.startsWith("http")) continue;
+    if (row.status !== "pending") {
+      row.document_url = "";
+      continue;
+    }
+    if (!row.document_url) continue;
+    if (row.document_url.startsWith("data:") || row.document_url.startsWith("http")) {
+      row.document_url = "";
+      continue;
+    }
     const signed = await admin.storage.from("kyc-documents").createSignedUrl(row.document_url, 120);
     if (signed.data?.signedUrl) row.document_url = signed.data.signedUrl;
   }
   return rows;
+}
+
+function identityRpcUnavailable(error: { message: string; code?: string }): boolean {
+  if (error.code === "PGRST202") return true;
+  return /could not find the function|schema cache/i.test(error.message) && /admin_decide_kyc/i.test(error.message);
 }
 
 /** Approve or Reject KYC (Admin) — submissionIdOrUserId can be row id or user_id */
@@ -197,12 +217,12 @@ export async function updateKYCStatus(
   if (!admin) return { ok: false, error: "Server configuration error." };
 
   let submission = (
-    await admin.from("kyc_submissions").select("*").eq("id", submissionIdOrUserId).maybeSingle()
+    await admin.from("kyc_submissions").select("id, user_id").eq("id", submissionIdOrUserId).maybeSingle()
   ).data;
 
   if (!submission) {
     submission = (
-      await admin.from("kyc_submissions").select("*").eq("user_id", submissionIdOrUserId).maybeSingle()
+      await admin.from("kyc_submissions").select("id, user_id").eq("user_id", submissionIdOrUserId).maybeSingle()
     ).data;
   }
 
@@ -210,27 +230,23 @@ export async function updateKYCStatus(
     return { ok: false, error: "KYC submission not found." };
   }
 
-  const dbStatus = newStatus === "approved" ? "verified" : "rejected";
+  const requestHeaders = await headers();
+  const { error } = await admin.rpc("admin_decide_kyc", {
+    p_submission_id: submission.id,
+    p_status: newStatus,
+    p_actor: gate.staff.userId,
+    p_ip: requestHeaders.get("x-forwarded-for")?.split(",")[0]?.trim() ?? requestHeaders.get("x-real-ip") ?? null,
+    p_user_agent: requestHeaders.get("user-agent") ?? null,
+  });
 
-  const { error: subError } = await admin
-    .from("kyc_submissions")
-    .update({ status: newStatus, updated_at: new Date().toISOString() })
-    .eq("id", submission.id);
-
-  if (subError) {
-    return { ok: false, error: subError.message };
-  }
-
-  const { error: profileError } = await admin
-    .from("profiles")
-    .update({
-      kyc_status: dbStatus,
-      updated_at: new Date().toISOString(),
-    })
-    .eq("id", submission.user_id);
-
-  if (profileError) {
-    return { ok: false, error: profileError.message };
+  if (error) {
+    if (identityRpcUnavailable(error)) {
+      return { ok: false, error: "Identity review is not ready on this server." };
+    }
+    if (/player profile not found/i.test(error.message)) {
+      return { ok: false, error: "The identity status could not be saved. The check was left as it was." };
+    }
+    return { ok: false, error: "The identity status could not be saved." };
   }
 
   revalidatePath("/dashboard/kyc");

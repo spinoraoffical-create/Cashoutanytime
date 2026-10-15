@@ -90,7 +90,8 @@ export function UserManagementPanel({
         toast.error(result.error);
         return;
       }
-      toast.success(result.message ?? "Updated");
+      if (result.auditWarning) toast.warning(result.auditWarning);
+      else toast.success(result.message ?? "Updated");
       setBanReason("");
       router.refresh();
     });
@@ -106,6 +107,13 @@ export function UserManagementPanel({
       toast.error("Redeem amount must be positive.");
       return;
     }
+    if (
+      !window.confirm(
+        `Apply this ${KIND_META[kind].label.toLowerCase()} change of ${n}? This updates the player and is written to the audit log.`
+      )
+    ) {
+      return;
+    }
     startTransition(async () => {
       const result =
         kind === "balance"
@@ -117,7 +125,8 @@ export function UserManagementPanel({
         toast.error(result.error);
         return;
       }
-      toast.success(result.message ?? "Done");
+      if (result.auditWarning) toast.warning(result.auditWarning);
+      else toast.success(result.message ?? "Done");
       setAdjustOpen(false);
       setAmount("");
       setNote("");
@@ -135,7 +144,8 @@ export function UserManagementPanel({
         toast.error(result.error);
         return;
       }
-      toast.success(result.message ?? "Roles updated");
+      if (result.auditWarning) toast.warning(result.auditWarning);
+      else toast.success(result.message ?? "Roles updated");
       router.refresh();
     });
   }

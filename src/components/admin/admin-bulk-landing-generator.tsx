@@ -40,6 +40,7 @@ export function AdminBulkLandingGenerator() {
   }, [refresh]);
 
   async function handleBulkGenerate() {
+    if (!window.confirm("Publish all 50 state pages now? This updates the public city pages.")) return;
     setGenerating(true);
     const res = await bulkGenerateGeoPagesAction();
     setGenerating(false);
@@ -75,10 +76,10 @@ export function AdminBulkLandingGenerator() {
   const totalCities = statesList.reduce((acc, s) => acc + s.cities.length, 0);
 
   return (
-    <GlassCard className="p-6 border-amber-500/40 bg-gradient-to-r from-amber-950/30 via-zinc-900 to-black space-y-5">
+    <GlassCard className="space-y-5 rounded-2xl border border-[#7c3aed]/25 bg-gradient-to-br from-[#141432] to-[#0d1428] p-6">
       <div className="flex flex-col sm:flex-row sm:items-center justify-between border-b border-border/50 pb-4 gap-4">
         <div className="flex items-center gap-3">
-          <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-amber-500/20 text-amber-400 font-bold border border-amber-500/30 shadow-lg">
+          <div className="flex h-12 w-12 items-center justify-center rounded-2xl border border-[#7c3aed]/30 bg-[#7c3aed]/20 font-bold text-[#c4b5fd]">
             <Globe className="h-6 w-6" />
           </div>
           <div>
@@ -95,7 +96,7 @@ export function AdminBulkLandingGenerator() {
         <Button
           onClick={() => void handleBulkGenerate()}
           disabled={generating}
-          className="bg-gradient-to-r from-amber-500 to-amber-400 text-black font-extrabold py-6 px-8 rounded-2xl gap-2 shrink-0"
+          className="shrink-0 gap-2 rounded-2xl bg-gradient-to-r from-[#6d28d9] to-[#2563eb] px-8 py-6 font-extrabold text-white shadow-none"
         >
           <Sparkles className="h-4 w-4" />
           {generating ? "Publishing..." : "Generate All 50 States"}

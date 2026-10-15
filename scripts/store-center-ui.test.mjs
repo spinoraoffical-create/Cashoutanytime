@@ -9,6 +9,7 @@ const network = readFileSync(new URL("../src/components/admin/network-players.ts
 const reports = readFileSync(new URL("../src/app/admin/agent-reports/page.tsx", import.meta.url), "utf8");
 const home = readFileSync(new URL("../src/components/admin/agent-home.tsx", import.meta.url), "utf8");
 const actions = readFileSync(new URL("../src/lib/actions/agents.ts", import.meta.url), "utf8");
+const scope = readFileSync(new URL("../src/lib/agents/scope.ts", import.meta.url), "utf8");
 
 assert.match(agents, /requireStaff/);
 assert.match(agents, /getAgentScope/);
@@ -38,6 +39,11 @@ assert.match(network, /window\.confirm/);
 assert.match(reports, /redirect\("\/admin"\)/);
 assert.match(reports, /\/admin\/player-transactions/);
 assert.match(home, /agent_commissions/);
+assert.equal((home.match(/\.in\("parent_agent_id", parents\)/g) ?? []).length, 4);
+assert.match(home, /if \(!parents\.length\) return \[\]/);
+assert.match(home, /scope\.level === "sub" \? \[scope\.userId\] : parents/);
+assert.match(scope, /parentIds: \[ctx\.userId, \.\.\.subs\]/);
+assert.match(scope, /parentIds: \[ctx\.userId\]/);
 assert.match(home, /commission_amount/);
 assert.equal(actions.includes("createAgentAction"), true);
 

@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
 
+import { partialAuditResult } from "@/lib/admin/audit-result";
 import { writeAudit, adminDb } from "@/lib/actions/admin/core";
 import { authPhonesFor } from "@/lib/admin/member-phone";
 import { latestIpsFor } from "@/lib/admin/signup-ips";
@@ -248,7 +249,7 @@ export async function createAgentAction(input: z.infer<typeof createSchema>) {
     return { ok: false as const, error: "The login was created, but the agent record was not. Apply the migration and try again." };
   }
 
-  await writeAudit({
+  const audited = await writeAudit({
     actorId: scope.userId,
     action: "agent.create",
     entityType: "agent_account",
@@ -256,7 +257,12 @@ export async function createAgentAction(input: z.infer<typeof createSchema>) {
     after: { tier: parsed.data.kind, parentId, email: parsed.data.email },
   });
   revalidatePath("/admin/sub-creators");
-  return { ok: true as const, message: `Agent created. Promo code ${promo} stays on this account.`, promoCode: promo };
+  return {
+    ok: true as const,
+    message: `Agent created. Promo code ${promo} stays on this account.`,
+    promoCode: promo,
+    ...partialAuditResult(audited),
+  };
 }
 
 export async function setAgentActiveAction(userId: string, active: boolean) {
@@ -267,7 +273,7 @@ export async function setAgentActiveAction(userId: string, active: boolean) {
 
   const { error } = await adminDb().from("agent_accounts").update({ active, updated_at: new Date().toISOString() }).eq("user_id", userId);
   if (error) return { ok: false as const, error: "Could not update status." };
-  await writeAudit({
+  const audited = await writeAudit({
     actorId: scope.userId,
     action: active ? "agent.activate" : "agent.deactivate",
     entityType: "agent_account",
@@ -275,15 +281,17 @@ export async function setAgentActiveAction(userId: string, active: boolean) {
     after: { active },
   });
   revalidatePath("/admin/sub-creators");
-  return { ok: true as const };
+  return { ok: true as const, ...partialAuditResult(audited) };
 }
 
 export async function setAgentsActiveAction(userIds: string[], active: boolean) {
+  let auditWarning: string | undefined;
   for (const userId of userIds) {
     const result = await setAgentActiveAction(userId, active);
     if (!result.ok) return result;
+    if (result.auditWarning) auditWarning = result.auditWarning;
   }
-  return { ok: true as const };
+  return { ok: true as const, ...(auditWarning ? { auditWarning } : {}) };
 }
 
 const editSchema = z.object({
@@ -321,7 +329,7 @@ export async function updateAgentAction(input: z.infer<typeof editSchema>) {
     })
     .eq("user_id", parsed.data.userId);
   if (error) return { ok: false as const, error: "Could not save." };
-  await writeAudit({
+  const audited = await writeAudit({
     actorId: gate.scope.userId,
     action: "agent.update",
     entityType: "agent_account",
@@ -329,7 +337,7 @@ export async function updateAgentAction(input: z.infer<typeof editSchema>) {
     after: parsed.data,
   });
   revalidatePath("/admin/sub-creators");
-  return { ok: true as const };
+  return { ok: true as const, ...partialAuditResult(audited) };
 }
 
 export async function resetAgentPasswordAction(userId: string, password: string) {
@@ -339,13 +347,13 @@ export async function resetAgentPasswordAction(userId: string, password: string)
   if (!(await agentInScope(gate.scope, userId))) return { ok: false as const, error: "That agent is outside your network." };
   const { error } = await adminDb().auth.admin.updateUserById(userId, { password });
   if (error) return { ok: false as const, error: error.message };
-  await writeAudit({
+  const audited = await writeAudit({
     actorId: gate.scope.userId,
     action: "agent.password_reset",
     entityType: "agent_account",
     entityId: userId,
   });
-  return { ok: true as const, message: "Password updated." };
+  return { ok: true as const, message: "Password updated.", ...partialAuditResult(audited) };
 }
 
 async function agentInScope(scope: AgentScope, userId: string) {
@@ -575,7 +583,7 @@ export async function movePlayerAction(playerId: string, nextParentId: string) {
 
   const { error } = await adminDb().from("profiles").update({ parent_agent_id: nextParentId }).eq("id", playerId);
   if (error) return { ok: false as const, error: "Could not move the player." };
-  await writeAudit({
+  const audited = await writeAudit({
     actorId: scope.userId,
     action: "player.move_parent",
     entityType: "profile",
@@ -584,5 +592,5 @@ export async function movePlayerAction(playerId: string, nextParentId: string) {
   });
   revalidatePath("/admin/players");
   revalidatePath(`/admin/users/${playerId}`);
-  return { ok: true as const };
+  return { ok: true as const, ...partialAuditResult(audited) };
 }

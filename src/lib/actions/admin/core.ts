@@ -7,7 +7,7 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import type { Json } from "@/lib/database.types";
 
 export type AdminActionResult =
-  | { ok: true; message?: string; id?: string }
+  | { ok: true; message?: string; id?: string; auditWarning?: string }
   | { ok: false; error: string };
 
 export type AuthorizedStaff = {
@@ -31,8 +31,8 @@ export async function authorize(
 }
 
 /**
- * Append an immutable audit-log entry. Uses the service-role client so the
- * write always succeeds (the audit table is append-only for everyone else).
+ * Append an audit-log entry. Returns false when the entry was not saved so
+ * the caller can avoid a success message that hides the missing record.
  */
 export async function writeAudit(params: {
   actorId: string;
@@ -41,12 +41,12 @@ export async function writeAudit(params: {
   entityId?: string | null;
   before?: Json | null;
   after?: Json | null;
-}): Promise<void> {
+}): Promise<boolean> {
   try {
     const h = await headers();
     const admin = createAdminClient();
-    if (!admin) return;
-    await admin.from("audit_logs").insert({
+    if (!admin) return false;
+    const { error } = await admin.from("audit_logs").insert({
       actor_id: params.actorId,
       action: params.action,
       entity_type: params.entityType,
@@ -59,8 +59,9 @@ export async function writeAudit(params: {
         null,
       user_agent: h.get("user-agent") ?? null,
     });
+    return !error;
   } catch {
-    // never let an audit write failure abort the underlying mutation
+    return false;
   }
 }
 

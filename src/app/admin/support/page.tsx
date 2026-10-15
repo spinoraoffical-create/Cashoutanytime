@@ -9,6 +9,7 @@ import {
   TicketStatusBadge,
 } from "@/components/dashboard/ticket-status-badge";
 import { AdminEmptyState } from "@/components/admin/ui/admin-empty-state";
+import { AdminErrorState } from "@/components/admin/ui/admin-error-state";
 import { AdminSectionCard } from "@/components/admin/ui/admin-section-card";
 import { profileDisplayName } from "@/lib/admin/spinora-profile";
 import { platformTicketAccess } from "@/lib/support/ticket-access";
@@ -72,7 +73,9 @@ export default async function AdminSupportPage({
         })}
       </div>
 
-      {tickets.length === 0 ? (
+      {tickets == null ? (
+        <AdminErrorState title="Unavailable" body="The ticket list could not be loaded." />
+      ) : tickets.length === 0 ? (
         <AdminEmptyState
           title={`No ${filter.label.toLowerCase()} tickets`}
           body="When players open tickets, they show up here."

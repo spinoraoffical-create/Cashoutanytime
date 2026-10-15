@@ -25,6 +25,8 @@ export function RequestActions({ requestId, currentStatus }: RequestActionsProps
       setShowComplete(true);
       return;
     }
+    if (status === "rejected" && !window.confirm("Reject this request? This does not send a payment.")) return;
+    if (status === "completed" && !window.confirm("Mark this request complete? This can change the player record.")) return;
 
     setLoading(true);
     const result = await updateRequestStatus(

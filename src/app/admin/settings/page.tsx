@@ -4,7 +4,7 @@ import { AdminPageHeader } from "@/components/admin/admin-page-header";
 import { SettingsEditor } from "@/components/admin/settings-editor";
 import { RewardsToggle } from "@/components/admin/rewards-toggle";
 import { TelegramPromoMessagesSection } from "@/components/admin/telegram-promo-messages";
-import { GlassCard } from "@/components/shared/glass-card";
+import { AdminSectionCard } from "@/components/admin/ui/admin-section-card";
 import { LinkTelegramButton } from "@/components/shared/link-telegram-button";
 import { adminDb } from "@/lib/actions/admin/core";
 import { requirePermission } from "@/lib/data/admin";
@@ -22,23 +22,20 @@ export default async function AdminSettingsPage() {
   );
 
   return (
-    <div className="mx-auto max-w-3xl space-y-6">
+    <div className="mx-auto max-w-4xl space-y-6">
       <AdminPageHeader
         title="Settings"
-        description="Platform-wide configuration."
+        description="Site options that are already stored. A switch or Save button keeps the action it already had. Secret values are not shown on this page."
       />
 
       <RewardsToggle initialEnabled={settings.rewards_enabled !== false} />
-      <GlassCard className="flex items-center justify-between gap-4 p-6">
-        <div>
-          <h3 className="font-bold">Admin Telegram bot</h3>
-          <p className="mt-1 max-w-md text-xs text-muted-foreground">
-            Link your Telegram account to run admin commands like /dashboard and
-            /users from chat.
-          </p>
-        </div>
-        <LinkTelegramButton purpose="admin" />
-      </GlassCard>
+      <AdminSectionCard
+        title="Admin Telegram bot"
+        description="Link your Telegram account to run the existing admin commands, such as /dashboard and /users, from chat."
+        action={<LinkTelegramButton purpose="admin" />}
+      >
+        <p className="text-sm text-[#9fb0d0]">The link button uses the existing Telegram connection. It does not show a bot token.</p>
+      </AdminSectionCard>
       <SettingsEditor initial={settings} />
       <TelegramPromoMessagesSection db={db} />
     </div>

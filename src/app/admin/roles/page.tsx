@@ -2,7 +2,8 @@ import type { Metadata } from "next";
 import { Check } from "lucide-react";
 
 import { AdminPageHeader } from "@/components/admin/admin-page-header";
-import { GlassCard } from "@/components/shared/glass-card";
+import { AdminErrorState } from "@/components/admin/ui/admin-error-state";
+import { AdminSectionCard } from "@/components/admin/ui/admin-section-card";
 import {
   Table,
   TableBody,
@@ -27,6 +28,7 @@ export default async function AdminRolesPage() {
     db.from("user_roles").select("role_id"),
   ]);
 
+  const loadError = rolesRes.error || permsRes.error || rolePermsRes.error || memberCountsRes.error;
   const roles = rolesRes.data ?? [];
   const permissions = permsRes.data ?? [];
   const rolePerms = new Set(
@@ -43,32 +45,36 @@ export default async function AdminRolesPage() {
   return (
     <div className="mx-auto max-w-6xl">
       <AdminPageHeader
-        title="Roles & Permissions"
-        description="The RBAC matrix. Super Admin implicitly holds every permission. Assign roles from a member's profile."
+        title="Staff roles"
+        description="Read only. Super Admin already has every permission. A role is assigned from a player's profile, and this page does not change who has a role."
       />
 
+      {loadError ? (
+        <AdminErrorState title="Staff roles could not be loaded" body="The permission list is unchanged. Try this page again in a moment." />
+      ) : (
+      <>
       <div className="mb-6 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
         {roles.map((role) => (
-          <GlassCard key={role.id} className="p-5">
-            <div className="flex items-center justify-between">
-              <h3 className="font-bold capitalize">{role.name}</h3>
-              <span className="tnum text-xs text-muted-foreground">
-                {(memberCounts.get(role.id) ?? 0).toLocaleString()} members
-              </span>
-            </div>
-            <p className="mt-1 text-xs text-muted-foreground">{role.description}</p>
-          </GlassCard>
+          <AdminSectionCard key={role.id} title={role.name} description={role.description ?? "No description is stored for this role."}>
+            <p className="text-sm tabular-nums text-[#9fb0d0]">
+              {(memberCounts.get(role.id) ?? 0).toLocaleString()}{" "}
+              {(memberCounts.get(role.id) ?? 0) === 1 ? "person" : "people"} with this role
+            </p>
+          </AdminSectionCard>
         ))}
       </div>
 
-      <GlassCard className="overflow-hidden">
+      <AdminSectionCard
+        title="Permission summary"
+        description="A check means that role already has the permission. This table does not grant or remove a permission."
+      >
         <div className="overflow-x-auto">
           <Table>
             <TableHeader>
-              <TableRow className="border-foreground/8 hover:bg-transparent">
-                <TableHead className="sticky left-0">Permission</TableHead>
+              <TableRow className="border-white/10 hover:bg-transparent">
+                <TableHead className="sticky left-0 bg-[#12162e] text-[#8ea0c3]">Permission</TableHead>
                 {roles.map((r) => (
-                  <TableHead key={r.id} className="text-center text-xs capitalize">
+                  <TableHead key={r.id} className="text-center text-xs capitalize text-[#8ea0c3]">
                     {r.name.replace(" Admin", "")}
                   </TableHead>
                 ))}
@@ -76,22 +82,17 @@ export default async function AdminRolesPage() {
             </TableHeader>
             <TableBody>
               {permissions.map((perm) => (
-                <TableRow key={perm.id} className="border-foreground/8">
-                  <TableCell>
-                    <p className="text-sm font-medium">{perm.name}</p>
-                    <p className="font-mono text-xs text-muted-foreground">
-                      {perm.key}
-                    </p>
+                <TableRow key={perm.id} className="border-white/5 hover:bg-white/[0.03]">
+                  <TableCell className="sticky left-0 bg-[#12162e]">
+                    <p className="text-sm font-medium text-white">{perm.name}</p>
+                    <p className="font-mono text-xs text-[#8ea0c3]">{perm.key}</p>
                   </TableCell>
                   {roles.map((role) => (
                     <TableCell key={role.id} className="text-center">
                       {hasPerm(role.id, perm.id, role.key) ? (
-                        <Check
-                          className="mx-auto size-4 text-ws-emerald"
-                          aria-label="granted"
-                        />
+                        <Check className="mx-auto size-4 text-emerald-300" aria-label="granted" />
                       ) : (
-                        <span className="text-ws-text-faint" aria-label="not granted">
+                        <span className="text-[#8ea0c3]" aria-label="not granted">
                           —
                         </span>
                       )}
@@ -102,7 +103,9 @@ export default async function AdminRolesPage() {
             </TableBody>
           </Table>
         </div>
-      </GlassCard>
+      </AdminSectionCard>
+      </>
+      )}
     </div>
   );
 }

@@ -124,7 +124,7 @@ function AdminChatPanel({
 
   return (
     <div className="flex flex-col flex-1 min-h-0 h-full overflow-hidden">
-      <div className="p-3 sm:p-4 border-b border-white/10 flex items-center gap-2 sm:gap-3 bg-[#121212] shrink-0">
+      <div className="flex shrink-0 items-center gap-2 border-b border-white/10 bg-[#0d1428] p-3 sm:gap-3 sm:p-4">
         {showMobileBack && (
           <Button
             variant="ghost"
@@ -175,7 +175,7 @@ function AdminChatPanel({
       <div
         ref={scrollRef}
         onScroll={onScrollMessages}
-        className={`${CHAT_SCROLL_CLASS} p-3 sm:p-4 pb-4 space-y-3 bg-[#0f0f0f]`}
+        className={`${CHAT_SCROLL_CLASS} space-y-3 bg-[#070b18] p-3 pb-4 sm:p-4`}
       >
         {messages.length === 0 ? (
           <p className="text-sm text-muted-foreground text-center py-8">
@@ -196,12 +196,12 @@ function AdminChatPanel({
                   className={cn(
                     "max-w-[85%] rounded-2xl px-4 py-2.5 text-sm break-words",
                     isAdminMsg
-                      ? "gradient-bg text-white rounded-br-md"
-                      : "bg-[#1e1e1e] text-foreground border border-white/5 rounded-bl-md"
+                      ? "rounded-br-md bg-gradient-to-r from-[#6d28d9] to-[#2563eb] text-white"
+                      : "rounded-bl-md border border-white/10 bg-[#141432] text-[#e8eefc]"
                   )}
                 >
                   {!isAdminMsg && (
-                    <p className="text-[10px] font-semibold text-orange-400 mb-1">
+                    <p className="mb-1 text-[10px] font-semibold text-[#c4b5fd]">
                       {isBot ? "Support" : customerTitle(selected?.user)}
                     </p>
                   )}
@@ -224,7 +224,7 @@ function AdminChatPanel({
         disabled={!selectedId}
         placeholder="Type a message..."
         showSendLabel
-        className="bg-[#121212] border-white/10 shrink-0"
+        className="shrink-0 border-white/10 bg-[#0d1428]"
       />
     </div>
   );
@@ -661,7 +661,7 @@ export function AdminChatInbox({
                 className={cn(
                   "w-full text-left p-3 rounded-xl transition-colors border",
                   isActive
-                    ? "bg-white/10 border-orange-500/30"
+                    ? "border-[#7c3aed]/40 bg-[#1b1644]"
                     : "border-transparent hover:bg-white/5"
                 )}
               >
@@ -716,7 +716,7 @@ export function AdminChatInbox({
         <div className="grid grid-cols-1 md:grid-cols-3 md:grid-rows-1 flex-1 min-h-0 h-full overflow-hidden">
           <div
             className={cn(
-              "border-r border-white/10 flex flex-col min-h-0 h-full overflow-hidden bg-[#141414]",
+              "flex h-full min-h-0 flex-col overflow-hidden border-r border-white/10 bg-[#090e1c]",
               mobileChatOpen ? "hidden md:flex" : "flex"
             )}
           >

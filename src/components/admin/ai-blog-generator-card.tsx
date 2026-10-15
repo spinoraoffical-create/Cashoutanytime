@@ -55,6 +55,13 @@ export function AIBlogGeneratorCard() {
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
+    if (
+      !window.confirm(
+        "Generate this article now? If publishing is turned on, it goes live and can be sent to Telegram."
+      )
+    ) {
+      return;
+    }
     setLoading(true);
     setLastGenerated(null);
 

@@ -6,7 +6,6 @@ import {
   type FieldValue,
 } from "@/components/admin/entity-edit-dialog";
 import { DynamicIcon } from "@/components/shared/dynamic-icon";
-import { GlassCard } from "@/components/shared/glass-card";
 import { Badge } from "@/components/ui/badge";
 import {
   Table,
@@ -49,7 +48,7 @@ export default async function AdminAchievementsPage() {
         description="Edit rewards and unlock thresholds. Conditions are evaluated automatically as members progress."
       />
 
-      <GlassCard className="overflow-hidden">
+      <div className="overflow-hidden rounded-2xl border border-[#7c3aed]/25 bg-[#0d1428]">
         <div className="overflow-x-auto">
           <Table>
             <TableHeader>
@@ -136,7 +135,7 @@ export default async function AdminAchievementsPage() {
             </TableBody>
           </Table>
         </div>
-      </GlassCard>
+      </div>
     </div>
   );
 }

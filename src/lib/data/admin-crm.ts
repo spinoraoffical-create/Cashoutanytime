@@ -36,6 +36,46 @@ function since7dIso() {
   return new Date(Date.now() - 7 * 86_400_000).toISOString();
 }
 
+async function sumCompletedDeposits(userIds?: string[]) {
+  const db = adminDb();
+  const chunks = userIds ? Array.from({ length: Math.ceil(userIds.length / 100) }, (_, index) => userIds.slice(index * 100, index * 100 + 100)) : [undefined];
+  if (userIds && userIds.length === 0) return 0;
+  let total = 0;
+  for (const chunk of chunks) {
+    for (let from = 0; from < 20000; from += 1000) {
+      let query = db.from("deposit_requests").select("amount").eq("status", "completed").order("id").range(from, from + 999);
+      if (chunk) query = query.in("user_id", chunk);
+      const { data, error } = await query;
+      if (error) throw new Error("Fulfilled deposits could not be totaled.");
+      const rows = data ?? [];
+      total += rows.reduce((sum, row) => sum + Number(row.amount ?? 0), 0);
+      if (rows.length < 1000) break;
+      if (from + 1000 >= 20000) {
+        throw new Error("Fulfilled deposits could not be totaled.");
+      }
+    }
+  }
+  return total;
+}
+
+async function profileIdsForParents(parentIds: string[]) {
+  const db = adminDb();
+  const ids: string[] = [];
+  for (let from = 0; from < 20000; from += 1000) {
+    const { data, error } = await db
+      .from("profiles")
+      .select("id")
+      .in("parent_agent_id", parentIds)
+      .order("id")
+      .range(from, from + 999);
+    if (error) throw new Error("Could not load this creator's players.");
+    const rows = (data ?? []) as { id: string }[];
+    ids.push(...rows.map((row) => row.id));
+    if (rows.length < 1000) return ids;
+  }
+  throw new Error("This network is too large to total on this screen.");
+}
+
 async function fetchOverviewStatsUncached(): Promise<CrmOverviewStats> {
   const db = adminDb();
   const since = since7dIso();
@@ -51,17 +91,16 @@ async function fetchOverviewStatsUncached(): Promise<CrmOverviewStats> {
     };
   }
 
-  const [totalResult, newResult, activeResult, fulfilledRows] = await Promise.all([
+  const [totalResult, newResult, activeResult] = await Promise.all([
     db.from("profiles").select("id", { count: "exact", head: true }),
     db.from("profiles").select("id", { count: "exact", head: true }).gte("created_at", since),
     db.from("profiles").select("id", { count: "exact", head: true }).gte("last_seen_at", since),
-    db.from("deposit_requests").select("amount").eq("status", "completed").limit(5000),
   ]);
+  if (totalResult.error || newResult.error || activeResult.error) {
+    throw new Error("Player follow-up totals could not be loaded.");
+  }
 
-  const totalFulfilled = (fulfilledRows.data ?? []).reduce(
-    (sum, row) => sum + Number(row.amount ?? 0),
-    0
-  );
+  const totalFulfilled = await sumCompletedDeposits();
 
   return {
     totalPlayers: totalResult.count ?? 0,
@@ -84,27 +123,16 @@ export async function getCrmOverviewForParents(parentIds: readonly string[]): Pr
   const db = adminDb();
   const since = since7dIso();
   const parents = [...parentIds];
-  const [totalResult, newResult, activeResult, owned] = await Promise.all([
+  const [totalResult, newResult, activeResult] = await Promise.all([
     db.from("profiles").select("id", { count: "exact", head: true }).in("parent_agent_id", parents),
     db.from("profiles").select("id", { count: "exact", head: true }).in("parent_agent_id", parents).gte("created_at", since),
     db.from("profiles").select("id", { count: "exact", head: true }).in("parent_agent_id", parents).gte("last_seen_at", since),
-    db.from("profiles").select("id").in("parent_agent_id", parents).limit(1000),
   ]);
-  if (totalResult.error || newResult.error || activeResult.error || owned.error) {
-    throw new Error(totalResult.error?.message || newResult.error?.message || activeResult.error?.message || owned.error?.message || "Could not load this creator's CRM.");
+  if (totalResult.error || newResult.error || activeResult.error) {
+    throw new Error("Could not load this creator's CRM.");
   }
-  const ids = ((owned.data ?? []) as { id: string }[]).map((row) => row.id);
-  let totalFulfilled = 0;
-  if (ids.length) {
-    const fulfilled = await db
-      .from("deposit_requests")
-      .select("amount")
-      .in("user_id", ids)
-      .eq("status", "completed")
-      .limit(5000);
-    if (fulfilled.error) throw new Error(fulfilled.error.message);
-    totalFulfilled = (fulfilled.data ?? []).reduce((sum, row) => sum + Number(row.amount ?? 0), 0);
-  }
+  const ids = await profileIdsForParents(parents);
+  const totalFulfilled = await sumCompletedDeposits(ids);
   return {
     totalPlayers: totalResult.count ?? 0,
     newThisWeek: newResult.count ?? 0,
@@ -135,13 +163,23 @@ async function depositStatsForUsers(
     return map;
   }
 
-  const { data: requestRows } = await db
-    .from("deposit_requests")
-    .select("user_id, amount")
-    .in("user_id", userIds)
-    .eq("status", "completed");
+  const requestRows: { user_id: string | null; amount: number | null }[] = [];
+  for (let from = 0; from < 5000; from += 1000) {
+    const { data, error } = await db
+      .from("deposit_requests")
+      .select("user_id, amount")
+      .in("user_id", userIds)
+      .eq("status", "completed")
+      .order("id")
+      .range(from, from + 999);
+    if (error) throw new Error("Fulfilled deposits could not be totaled.");
+    const rows = data ?? [];
+    requestRows.push(...rows);
+    if (rows.length < 1000) break;
+    if (from + 1000 >= 5000) throw new Error("Fulfilled deposits could not be totaled.");
+  }
 
-  for (const r of requestRows ?? []) {
+  for (const r of requestRows) {
     if (!r.user_id) continue;
     const existing = map.get(r.user_id) ?? { fulfilledCount: 0, totalDeposited: 0 };
     existing.fulfilledCount += 1;
@@ -182,9 +220,12 @@ export async function getCrmPlayersPage(
   else if (segment === "active") profileQuery = profileQuery.gte("last_seen_at", since);
   else if (segment === "banned") profileQuery = profileQuery.eq("is_suspended", true);
 
-  const { data: profilesRaw, count: segmentCount } = await profileQuery.range(from, to);
+  const { data: profilesRaw, error: profileError, count: segmentCount } = await profileQuery.range(from, to);
+  if (profileError || segmentCount == null) {
+    throw new Error("Player follow-up totals could not be loaded.");
+  }
   const profiles = (profilesRaw ?? []) as ProfileRow[];
-  const total = segmentCount ?? 0;
+  const total = segmentCount;
   const totalPages = Math.max(1, Math.ceil(total / CRM_PAGE_SIZE));
   const profileIds = profiles.map((p) => p.id!).filter(Boolean);
 

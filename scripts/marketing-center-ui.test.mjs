@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 
+import { confirmActionDecision } from "../src/lib/admin/confirm-gate.ts";
 import {
   automationJobHelp,
   blogStatusHelp,
@@ -45,7 +46,29 @@ assert.match(offers, /offerScopeForCurrentUser/);
 assert.match(offers, /countOfferAudience/);
 assert.match(offers, /redirect\("\/admin"\)/);
 assert.match(offerForm, /sendOfferAction/);
-assert.equal(offerForm.includes("window.confirm"), false);
+assert.match(offerForm, /disabled=\{busy\}/);
+
+const offerSubmit = offerForm.slice(offerForm.indexOf("async function onSubmit"), offerForm.indexOf("return ("));
+assert.ok(offerSubmit.indexOf('confirmActionDecision({ pending: busy') < offerSubmit.indexOf("window.confirm"));
+assert.ok(offerSubmit.indexOf("window.confirm") < offerSubmit.indexOf("sendOfferAction"));
+assert.match(offerSubmit, /decision !== "run"\) return/);
+assert.equal((offerSubmit.match(/sendOfferAction\(/g) ?? []).length, 1);
+
+let offerRuns = 0;
+function attemptOffer(pending, confirmed) {
+  const decision = confirmActionDecision({ pending, confirmed });
+  if (decision !== "run") return decision;
+  offerRuns += 1;
+  return decision;
+}
+assert.equal(attemptOffer(false, false), "cancelled");
+assert.equal(offerRuns, 0);
+assert.equal(attemptOffer(true, true), "pending");
+assert.equal(offerRuns, 0);
+assert.equal(attemptOffer(false, true), "run");
+assert.equal(offerRuns, 1);
+assert.equal(attemptOffer(true, true), "pending");
+assert.equal(offerRuns, 1);
 
 assert.match(telegram, /requirePermission\("cms\.manage"\)/);
 assert.match(telegram, /isTelegramConfigured/);

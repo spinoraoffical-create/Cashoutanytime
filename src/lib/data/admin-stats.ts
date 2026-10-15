@@ -6,11 +6,11 @@ import { adminDb } from "@/lib/actions/admin/core";
 import { countOpenTickets } from "@/lib/support/ticket-store";
 
 export type DashboardStats = {
-  totalUsers: number;
-  newUsersInWindow: number;
-  coinsIssuedInWindow: number;
-  pendingRequests: number;
-  openTickets: number;
+  totalUsers: number | null;
+  newUsersInWindow: number | null;
+  coinsIssuedInWindow: number | null;
+  pendingRequests: number | null;
+  openTickets: number | null;
 };
 
 /** Pulse-of-the-platform numbers for a rolling window, shared by the admin overview page and the admin bot's /dashboard, /today, /weekly, /monthly. */
@@ -36,11 +36,12 @@ export const getDashboardStats = unstable_cache(
       countOpenTickets(),
     ]);
 
+    const coinRows = coins.data ?? [];
     return {
-      totalUsers: totalUsers.count ?? 0,
-      newUsersInWindow: newUsers.count ?? 0,
-      coinsIssuedInWindow: (coins.data ?? []).reduce((sum, e) => sum + e.amount, 0),
-      pendingRequests: pendingRequests.count ?? 0,
+      totalUsers: totalUsers.error || totalUsers.count == null ? null : totalUsers.count,
+      newUsersInWindow: newUsers.error || newUsers.count == null ? null : newUsers.count,
+      coinsIssuedInWindow: coins.error || coinRows.length >= 5000 ? null : coinRows.reduce((sum, e) => sum + e.amount, 0),
+      pendingRequests: pendingRequests.error || pendingRequests.count == null ? null : pendingRequests.count,
       openTickets: openTicketCount,
     };
   },

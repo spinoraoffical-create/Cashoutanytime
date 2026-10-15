@@ -83,6 +83,23 @@ assert.ok(review.indexOf('authorize("kyc.manage")') < review.indexOf('.from("kyc
 assert.match(review, /startsWith\("data:"\)/);
 assert.match(review, /startsWith\("http"\)/);
 
+const decision = actions.slice(
+  actions.indexOf("export async function updateKYCStatus"),
+  actions.indexOf("export async function getPlayerKYCStatus")
+);
+assert.ok(decision.indexOf('authorize("kyc.manage")') < decision.indexOf('.rpc("admin_decide_kyc"'));
+assert.equal((decision.match(/\.rpc\("admin_decide_kyc"/g) ?? []).length, 1);
+assert.match(decision, /p_status: newStatus/);
+assert.match(decision, /Identity review is not ready on this server/);
+assert.equal(decision.includes("writeAudit"), false);
+assert.equal(decision.includes(".update("), false);
+assert.equal((decision.match(/return \{ ok: true \}/g) ?? []).length, 1);
+
+const auditWriter = readFileSync(new URL("../src/lib/actions/admin/core.ts", import.meta.url), "utf8");
+const writer = auditWriter.slice(auditWriter.indexOf("export async function writeAudit"));
+assert.match(writer, /return !error/);
+assert.match(writer, /if \(!admin\) return false/);
+
 const playerStatus = actions.slice(actions.indexOf("export async function getPlayerKYCStatus"));
 assert.match(playerStatus, /\.select\("kyc_status"\)/);
 assert.equal(playerStatus.includes("document_url"), false);

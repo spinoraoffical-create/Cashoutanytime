@@ -31,7 +31,7 @@ export function CmsTabNav({ active }: { active: string }) {
         role="tablist"
         aria-label="CMS section"
         className={cn(
-          "glass inline-flex max-w-full flex-wrap gap-1 rounded-full p-1 transition-opacity",
+          "inline-flex max-w-full flex-wrap gap-1 rounded-full border border-white/10 bg-[#0c1224] p-1 transition-opacity",
           pending && "opacity-70"
         )}
       >
@@ -46,8 +46,8 @@ export function CmsTabNav({ active }: { active: string }) {
             className={cn(
               "min-h-9 rounded-full px-3 py-1.5 text-sm font-medium transition-colors sm:px-4",
               t.key === active
-                ? "bg-emerald-500 text-foreground"
-                : "text-muted-foreground hover:text-foreground"
+                ? "bg-gradient-to-r from-[#6d28d9] to-[#2563eb] text-white"
+                : "text-[#9fb0d0] hover:text-white"
             )}
           >
             {t.label}

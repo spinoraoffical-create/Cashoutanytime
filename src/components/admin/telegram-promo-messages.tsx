@@ -5,8 +5,9 @@ import {
   EntityEditDialog,
   type FieldValue,
 } from "@/components/admin/entity-edit-dialog";
-import { GlassCard } from "@/components/shared/glass-card";
-import { Badge } from "@/components/ui/badge";
+import { AdminEmptyState } from "@/components/admin/ui/admin-empty-state";
+import { AdminSectionCard } from "@/components/admin/ui/admin-section-card";
+import { AdminStatusBadge } from "@/components/admin/ui/admin-status-badge";
 import { adminDb } from "@/lib/actions/admin/core";
 import {
   deleteTelegramPromoMessageAction,
@@ -30,14 +31,10 @@ export async function TelegramPromoMessagesSection({ db }: { db: DB }) {
   ];
 
   return (
-    <GlassCard className="mb-6 p-6">
-      <div className="flex items-start justify-between gap-4">
-        <div>
-          <h2 className="font-bold">Telegram promo messages</h2>
-          <p className="mt-1 text-xs text-muted-foreground">
-            Pool the hourly cron rotates through — the longest-unsent active message posts first.
-          </p>
-        </div>
+    <AdminSectionCard
+      title="Telegram promo messages"
+      description="The existing schedule rotates through this pool. The longest-unsent active message posts first. Add and edit use the existing form. Delete still asks you to confirm."
+      action={
         <EntityEditDialog
           title="New promo message"
           triggerLabel="New message"
@@ -52,29 +49,20 @@ export async function TelegramPromoMessagesSection({ db }: { db: DB }) {
             });
           }}
         />
-      </div>
-      <div className="mt-4 divide-y divide-foreground/8 rounded-lg border border-border">
+      }
+    >
+      <div className="divide-y divide-white/10 rounded-xl border border-white/10">
         {messages.length === 0 ? (
-          <p className="p-6 text-center text-sm text-muted-foreground">
-            No promo messages yet — add at least one.
-          </p>
+          <AdminEmptyState title="No promo messages yet" body="Add at least one message before the existing schedule can post." />
         ) : (
           messages.map((m) => (
-            <div key={m.id} className="flex items-start justify-between gap-4 p-4">
+            <div key={m.id} className="flex flex-col gap-3 p-4 sm:flex-row sm:items-start sm:justify-between">
               <div className="min-w-0">
-                <div className="flex items-center gap-2">
-                  <p className="line-clamp-1 font-medium">{m.text}</p>
-                  <Badge
-                    className={
-                      m.is_active
-                        ? "bg-ws-emerald/15 text-ws-emerald"
-                        : "bg-foreground/8 text-muted-foreground"
-                    }
-                  >
-                    {m.is_active ? "Active" : "Off"}
-                  </Badge>
+                <div className="flex flex-wrap items-center gap-2">
+                  <p className="line-clamp-2 font-medium text-white">{m.text}</p>
+                  <AdminStatusBadge status={m.is_active ? "active" : "off"} />
                 </div>
-                <p className="mt-1 text-xs text-ws-text-faint">
+                <p className="mt-1 text-xs text-[#8ea0c3]">
                   {m.last_sent_at ? `Last sent ${format(new Date(m.last_sent_at), "MMM d, p")}` : "Never sent"}
                 </p>
               </div>
@@ -104,6 +92,6 @@ export async function TelegramPromoMessagesSection({ db }: { db: DB }) {
           ))
         )}
       </div>
-    </GlassCard>
+    </AdminSectionCard>
   );
 }

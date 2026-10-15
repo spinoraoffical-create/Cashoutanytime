@@ -154,6 +154,7 @@ export function ReviewCard({ review, isAdmin, isOwn }: ReviewCardProps) {
               size="sm"
               onClick={handleSaveComment}
               disabled={savingComment}
+              className="bg-gradient-to-r from-[#6d28d9] to-[#2563eb] text-white shadow-none hover:opacity-90"
             >
               {savingComment ? "Saving..." : "Save team reply"}
             </Button>
@@ -165,7 +166,7 @@ export function ReviewCard({ review, isAdmin, isOwn }: ReviewCardProps) {
               size="sm"
               variant={review.admin_liked ? "default" : "outline"}
               onClick={handleLike}
-              className="gap-1.5"
+              className={review.admin_liked ? "gap-1.5 bg-gradient-to-r from-[#6d28d9] to-[#2563eb] text-white shadow-none" : "gap-1.5 border-white/15 text-[#e8eefc]"}
             >
               <Heart className={cn("h-4 w-4", review.admin_liked && "fill-current")} />
               {review.admin_liked ? "Liked" : "Like review"}
@@ -175,7 +176,7 @@ export function ReviewCard({ review, isAdmin, isOwn }: ReviewCardProps) {
               size="sm"
               variant="outline"
               onClick={handleDelete}
-              className="gap-1.5 text-red-400 hover:text-red-300 hover:border-red-500/40"
+              className="gap-1.5 border-rose-400/40 text-rose-200 hover:border-rose-400/60 hover:text-rose-100"
             >
               <Trash2 className="h-4 w-4" />
               Delete

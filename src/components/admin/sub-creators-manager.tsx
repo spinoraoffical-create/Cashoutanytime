@@ -49,7 +49,7 @@ export function SubCreatorsManager({
   const active = rows.filter((row) => row.active).length;
   const wallet = rows.reduce((sum, row) => sum + row.wallet, 0);
 
-  async function run(task: () => Promise<{ ok: boolean; error?: string; message?: string }>) {
+  async function run(task: () => Promise<{ ok: boolean; error?: string; message?: string; auditWarning?: string }>) {
     setBusy(true);
     const result = await task();
     setBusy(false);
@@ -57,7 +57,8 @@ export function SubCreatorsManager({
       toast.error(result.error ?? "Could not save.");
       return;
     }
-    toast.success(result.message ?? "Saved.");
+    if (result.auditWarning) toast.warning(result.auditWarning);
+    else toast.success(result.message ?? "Saved.");
     setOpen(null);
     setEdit(null);
     setReset(null);

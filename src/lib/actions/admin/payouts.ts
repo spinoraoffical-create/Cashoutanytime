@@ -5,6 +5,7 @@ import { revalidatePath } from "next/cache";
 import { adminListScope } from "@/lib/admin/list-scope";
 import { playerInScope, readAgentScope } from "@/lib/agents/scope";
 import { getStaffContext } from "@/lib/data/admin";
+import { partialAuditResult, payoutOperatorMessage } from "@/lib/admin/audit-result";
 import { adminDb, authorize, writeAudit, type AdminActionResult } from "./core";
 import { adminLink, tgEsc, tgNotify } from "@/lib/telegram";
 
@@ -49,9 +50,9 @@ export async function payoutCashout(formData: FormData): Promise<AdminActionResu
     p_note: note || null,
   });
 
-  if (error) return { ok: false, error: error.message };
+  if (error) return { ok: false, error: payoutOperatorMessage(error.message) };
 
-  await writeAudit({
+  const audited = await writeAudit({
     actorId: auth.staff.userId,
     action: "cashout.payout",
     entityType: "profile",
@@ -70,5 +71,9 @@ export async function payoutCashout(formData: FormData): Promise<AdminActionResu
 
   await tgNotify("finance", `💸 <b>Cashout paid</b>\n$${amount.toFixed(2)} to ${tgEsc(userId)}${note ? `\n${tgEsc(note)}` : ""}\n${adminLink("/admin/payouts", "👉 View Payouts")}`);
   revalidatePath("/admin/payouts");
-  return { ok: true, message: `Paid out $${amount.toFixed(2)}. Remaining cash-out: $${Number(newBalance).toFixed(2)}.` };
+  return {
+    ok: true,
+    message: `Paid out $${amount.toFixed(2)}. Remaining cash-out: $${Number(newBalance).toFixed(2)}.`,
+    ...partialAuditResult(audited),
+  };
 }

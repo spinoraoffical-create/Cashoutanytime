@@ -155,13 +155,15 @@ export default async function AdminOverviewPage() {
   const failedWebhooks = ctx.isSuperAdmin ? await statusCount("webhook_events", "failed") : null;
 
   const feed: FeedItem[] = [];
+  let activityFailed = false;
   if (players) {
-    const { data } = await db
+    const { data, error } = await db
       .from("profiles")
       .select("id, full_name, email, created_at")
       .order("created_at", { ascending: false })
       .limit(5);
-    for (const row of data ?? []) {
+    if (error) activityFailed = true;
+    for (const row of error ? [] : data ?? []) {
       if (!row.created_at) continue;
       feed.push({
         id: `user-${row.id}`,
@@ -174,7 +176,8 @@ export default async function AdminOverviewPage() {
   }
   if (support) {
     const data = await listRecentTickets(5);
-    for (const row of data) {
+    if (data == null) activityFailed = true;
+    for (const row of data ?? []) {
       feed.push({
         id: `ticket-${row.id}`,
         href: `/admin/support/${row.id}`,
@@ -185,12 +188,13 @@ export default async function AdminOverviewPage() {
     }
   }
   if (money) {
-    const { data } = await db
+    const { data, error } = await db
       .from("deposit_requests")
       .select("id, amount, status, created_at")
       .order("created_at", { ascending: false })
       .limit(5);
-    for (const row of data ?? []) {
+    if (error) activityFailed = true;
+    for (const row of error ? [] : data ?? []) {
       feed.push({
         id: `deposit-${row.id}`,
         href: "/admin/deposits",
@@ -367,10 +371,17 @@ export default async function AdminOverviewPage() {
         ) : null}
 
         <AdminSectionCard title="Recent activity" description="Newest players, tickets, and deposits your role can see.">
-          {feed.length === 0 ? (
+          {activityFailed && feed.length === 0 ? (
+            <AdminErrorState title="Unavailable" body="Recent activity could not be loaded." />
+          ) : feed.length === 0 ? (
             <AdminEmptyState title="No recent activity" body="Nothing new is waiting in the feeds you can open." />
           ) : (
             <ul className="divide-y divide-white/10">
+              {activityFailed ? (
+                <li className="py-3 text-xs text-[#9fb0d0]">
+                  One feed could not be loaded. The rows below are only the feeds that loaded.
+                </li>
+              ) : null}
               {feed.slice(0, 8).map((item) => (
                 <li key={item.id} className="flex items-center justify-between gap-3 py-3">
                   <Link href={item.href} className="min-w-0 flex-1">
@@ -436,9 +447,9 @@ export default async function AdminOverviewPage() {
       {players ? (
         <AdminSectionCard title="Store activity" description="Counts of stores and linked players. This is not revenue.">
           <div className="grid gap-3 sm:grid-cols-3">
-            <AdminStatCard label="Active stores" value={showCount(storesOnFile)} />
-            <AdminStatCard label="Active sub-creators" value={showCount(subsOnFile)} />
-            <AdminStatCard label="Players linked to a store" value={showCount(linkedPlayers)} />
+            <AdminStatCard label="Active stores" value={showCount(storesOnFile)} hint="Store accounts marked active." />
+            <AdminStatCard label="Active sub-creators" value={showCount(subsOnFile)} hint="Sub-creator accounts marked active." />
+            <AdminStatCard label="Players linked to a store" value={showCount(linkedPlayers)} hint="Players with a parent store or sub-creator, including inactive parents." />
           </div>
         </AdminSectionCard>
       ) : null}

@@ -25,7 +25,7 @@ export default async function OffersPage() {
       >
         <p className="text-sm text-white">Email {counts.email}. SMS {counts.sms}.</p>
         <p className="mt-2 text-sm leading-5 text-[#9fb0d0]">
-          Send uses the existing offer action. It emails and texts those counted players. This screen does not ask for a second confirmation.
+          Send uses the existing offer action. It asks you to confirm, then emails and texts those counted players.
         </p>
       </AdminSectionCard>
       <AdminSectionCard title="Message" description="Viewing this form does not send. Send is the button that delivers the offer.">

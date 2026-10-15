@@ -13,8 +13,7 @@ import {
   EntityEditDialog,
   type FieldValue,
 } from "@/components/admin/entity-edit-dialog";
-import { GlassCard } from "@/components/shared/glass-card";
-import { Badge } from "@/components/ui/badge";
+import { AdminStatusBadge } from "@/components/admin/ui/admin-status-badge";
 import { adminDb } from "@/lib/actions/admin/core";
 import {
   deleteCmsEntityAction,
@@ -51,8 +50,8 @@ export default async function AdminCmsPage({
   return (
     <div className="mx-auto max-w-7xl">
       <AdminPageHeader
-        title="Content Management"
-        description="Manage public-facing content: FAQ, banners, announcements, testimonials and blog."
+        title="Pages and FAQ"
+        description="FAQ, banners, announcements, testimonials, and blog posts already stored. Nothing is published until you save it. Delete still asks you to confirm."
       />
 
       <CmsTabNav active={tab} />
@@ -88,7 +87,7 @@ async function FaqSection({ db }: { db: DB }) {
             { name: "answer", label: "Answer", type: "textarea", defaultValue: "" },
             { name: "category", label: "Category", type: "text", defaultValue: "general" },
             { name: "sort_order", label: "Sort order", type: "number", defaultValue: 100, min: 0 },
-            { name: "is_published", label: "Published", type: "switch", defaultValue: true },
+            { name: "is_published", label: "Published", type: "switch", defaultValue: false },
           ]}
           action={async (v: Record<string, FieldValue>) => {
             "use server";
@@ -102,9 +101,9 @@ async function FaqSection({ db }: { db: DB }) {
           }}
         />
       </div>
-      <GlassCard className="divide-y divide-foreground/8">
+      <div className="divide-y divide-white/10 overflow-hidden rounded-2xl border border-[#7c3aed]/25 bg-[#0d1428]">
         {faqs.length === 0 ? (
-          <p className="p-6 text-center text-sm text-muted-foreground">No FAQs yet.</p>
+          <p className="p-6 text-center text-sm text-[#9fb0d0]">No FAQs yet.</p>
         ) : (
           faqs.map((f) => (
             <div key={f.id} className="flex flex-col gap-3 p-4 sm:flex-row sm:items-start sm:justify-between sm:gap-4">
@@ -112,13 +111,13 @@ async function FaqSection({ db }: { db: DB }) {
                 <div className="flex items-center gap-2">
                   <p className="font-medium">{f.question}</p>
                   {!f.is_published && (
-                    <Badge className="bg-foreground/8 text-muted-foreground">Draft</Badge>
+                    <AdminStatusBadge status="draft" />
                   )}
                 </div>
-                <p className="mt-0.5 line-clamp-2 text-xs text-muted-foreground">
+                <p className="mt-0.5 line-clamp-2 text-xs text-[#9fb0d0]">
                   {f.answer}
                 </p>
-                <p className="mt-1 text-xs text-ws-text-faint">{f.category}</p>
+                <p className="mt-1 text-xs text-[#8ea0c3]">{f.category}</p>
               </div>
               <div className="flex shrink-0 flex-wrap gap-1">
                 <EntityEditDialog
@@ -152,7 +151,7 @@ async function FaqSection({ db }: { db: DB }) {
             </div>
           ))
         )}
-      </GlassCard>
+      </div>
     </div>
   );
 }
@@ -209,27 +208,19 @@ async function BannersSection({ db }: { db: DB }) {
           }}
         />
       </div>
-      <GlassCard className="divide-y divide-foreground/8">
+      <div className="divide-y divide-white/10 overflow-hidden rounded-2xl border border-[#7c3aed]/25 bg-[#0d1428]">
         {banners.length === 0 ? (
-          <p className="p-6 text-center text-sm text-muted-foreground">No banners yet.</p>
+          <p className="p-6 text-center text-sm text-[#9fb0d0]">No banners yet.</p>
         ) : (
           banners.map((b) => (
             <div key={b.id} className="flex items-start justify-between gap-4 p-4">
               <div className="min-w-0">
                 <div className="flex items-center gap-2">
                   <p className="font-medium">{b.title}</p>
-                  <Badge
-                    className={
-                      b.is_active
-                        ? "bg-ws-emerald/15 text-ws-emerald"
-                        : "bg-foreground/8 text-muted-foreground"
-                    }
-                  >
-                    {b.is_active ? "Active" : "Off"}
-                  </Badge>
+                  <AdminStatusBadge status={b.is_active ? "active" : "off"} />
                 </div>
-                <p className="mt-0.5 text-xs text-muted-foreground">{b.subtitle}</p>
-                <p className="mt-1 text-xs text-ws-text-faint">{b.placement}</p>
+                <p className="mt-0.5 text-xs text-[#9fb0d0]">{b.subtitle}</p>
+                <p className="mt-1 text-xs text-[#8ea0c3]">{b.placement}</p>
               </div>
               <div className="flex shrink-0 flex-wrap gap-1">
                 <EntityEditDialog
@@ -271,7 +262,7 @@ async function BannersSection({ db }: { db: DB }) {
             </div>
           ))
         )}
-      </GlassCard>
+      </div>
     </div>
   );
 }
@@ -314,9 +305,9 @@ async function AnnouncementsSection({ db }: { db: DB }) {
           }}
         />
       </div>
-      <GlassCard className="divide-y divide-foreground/8">
+      <div className="divide-y divide-white/10 overflow-hidden rounded-2xl border border-[#7c3aed]/25 bg-[#0d1428]">
         {announcements.length === 0 ? (
-          <p className="p-6 text-center text-sm text-muted-foreground">
+          <p className="p-6 text-center text-sm text-[#9fb0d0]">
             No announcements yet.
           </p>
         ) : (
@@ -325,12 +316,10 @@ async function AnnouncementsSection({ db }: { db: DB }) {
               <div className="min-w-0">
                 <div className="flex items-center gap-2">
                   <p className="font-medium">{a.title}</p>
-                  <Badge className="uppercase">{a.level}</Badge>
-                  {a.is_active && (
-                    <Badge className="bg-ws-emerald/15 text-ws-emerald">Live</Badge>
-                  )}
+                  <span className="inline-flex rounded-full bg-white/10 px-2.5 py-1 text-xs font-semibold uppercase text-[#d5def2]">{a.level}</span>
+                  {a.is_active ? <AdminStatusBadge status="live" /> : null}
                 </div>
-                <p className="mt-0.5 line-clamp-2 text-xs text-muted-foreground">
+                <p className="mt-0.5 line-clamp-2 text-xs text-[#9fb0d0]">
                   {a.body}
                 </p>
               </div>
@@ -364,7 +353,7 @@ async function AnnouncementsSection({ db }: { db: DB }) {
             </div>
           ))
         )}
-      </GlassCard>
+      </div>
     </div>
   );
 }
@@ -390,7 +379,7 @@ async function TestimonialsSection({ db }: { db: DB }) {
             { name: "rating", label: "Rating (1-5)", type: "number", defaultValue: 5, min: 1 },
             { name: "sort_order", label: "Sort order", type: "number", defaultValue: 100, min: 0 },
             { name: "is_featured", label: "Featured", type: "switch", defaultValue: false },
-            { name: "is_published", label: "Published", type: "switch", defaultValue: true },
+            { name: "is_published", label: "Published", type: "switch", defaultValue: false },
           ]}
           action={async (v: Record<string, FieldValue>) => {
             "use server";
@@ -406,9 +395,9 @@ async function TestimonialsSection({ db }: { db: DB }) {
           }}
         />
       </div>
-      <GlassCard className="divide-y divide-foreground/8">
+      <div className="divide-y divide-white/10 overflow-hidden rounded-2xl border border-[#7c3aed]/25 bg-[#0d1428]">
         {testimonials.length === 0 ? (
-          <p className="p-6 text-center text-sm text-muted-foreground">
+          <p className="p-6 text-center text-sm text-[#9fb0d0]">
             No testimonials yet.
           </p>
         ) : (
@@ -419,13 +408,13 @@ async function TestimonialsSection({ db }: { db: DB }) {
                   <p className="font-medium">{t.author_name}</p>
                   <span className="tnum text-xs text-ws-green-deep dark:text-ws-green">{t.rating}★</span>
                   {t.is_featured && (
-                    <Badge className="bg-ws-green/15 text-ws-green-deep dark:text-ws-green">Featured</Badge>
+                    <AdminStatusBadge status="featured" />
                   )}
                   {!t.is_published && (
-                    <Badge className="bg-foreground/8 text-muted-foreground">Draft</Badge>
+                    <AdminStatusBadge status="draft" />
                   )}
                 </div>
-                <p className="mt-0.5 line-clamp-2 text-xs text-muted-foreground">
+                <p className="mt-0.5 line-clamp-2 text-xs text-[#9fb0d0]">
                   “{t.quote}”
                 </p>
               </div>
@@ -465,7 +454,7 @@ async function TestimonialsSection({ db }: { db: DB }) {
             </div>
           ))
         )}
-      </GlassCard>
+      </div>
     </div>
   );
 }
@@ -473,16 +462,8 @@ async function TestimonialsSection({ db }: { db: DB }) {
 /* ── Blog ─────────────────────────────────────────────────────────────────── */
 
 function blogStatusBadge(status: string) {
-  switch (status) {
-    case "published":
-      return <Badge className="bg-ws-emerald/15 text-ws-emerald">Published</Badge>;
-    case "scheduled":
-      return <Badge className="bg-sky-500/15 text-sky-500">Scheduled</Badge>;
-    case "archived":
-      return <Badge className="bg-foreground/8 text-muted-foreground">Archived</Badge>;
-    default:
-      return <Badge className="bg-foreground/8 text-muted-foreground">Draft</Badge>;
-  }
+  const label = status === "published" || status === "scheduled" || status === "archived" ? status : "draft";
+  return <AdminStatusBadge status={label} />;
 }
 
 async function BlogSection({ db, page }: { db: DB; page: number }) {
@@ -503,9 +484,9 @@ async function BlogSection({ db, page }: { db: DB; page: number }) {
       <div className="flex justify-end">
         <BlogPostCreateDialog />
       </div>
-      <GlassCard className="divide-y divide-foreground/8">
+      <div className="divide-y divide-white/10 overflow-hidden rounded-2xl border border-[#7c3aed]/25 bg-[#0d1428]">
         {posts.length === 0 ? (
-          <p className="p-6 text-center text-sm text-muted-foreground">No posts yet.</p>
+          <p className="p-6 text-center text-sm text-[#9fb0d0]">No posts yet.</p>
         ) : (
           posts.map((p) => (
             <div
@@ -517,8 +498,8 @@ async function BlogSection({ db, page }: { db: DB; page: number }) {
                   <p className="font-medium">{p.title}</p>
                   {blogStatusBadge(p.status)}
                 </div>
-                <p className="mt-0.5 line-clamp-1 text-xs text-muted-foreground">{p.excerpt}</p>
-                <p className="mt-1 text-xs text-ws-text-faint">/{p.slug}</p>
+                <p className="mt-0.5 line-clamp-1 text-xs text-[#9fb0d0]">{p.excerpt}</p>
+                <p className="mt-1 text-xs text-[#8ea0c3]">/{p.slug}</p>
               </div>
               <div className="flex shrink-0 flex-wrap gap-1">
                 <BlogPostEditDialog postId={p.id} />
@@ -527,9 +508,9 @@ async function BlogSection({ db, page }: { db: DB; page: number }) {
             </div>
           ))
         )}
-      </GlassCard>
+      </div>
       {totalPages > 1 && (
-        <div className="flex flex-wrap items-center justify-between gap-2 text-sm text-muted-foreground">
+        <div className="flex flex-wrap items-center justify-between gap-2 text-sm text-[#9fb0d0]">
           <p>
             Page {page} of {totalPages}
           </p>

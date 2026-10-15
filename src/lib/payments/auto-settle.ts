@@ -2,6 +2,8 @@ import "server-only";
 
 import { createAdminClient } from "@/lib/supabase/admin";
 import { writeAudit } from "@/lib/actions/admin/core";
+import { missedAuditMessage } from "@/lib/admin/audit-result";
+import { logIncident } from "@/lib/observability/incident";
 import { fulfillTrackedRequest } from "@/lib/actions/game-loads";
 import { assignPlayerToAgentByCode } from "@/lib/agents/assign";
 import { bonusForPercent, depositKind } from "@/lib/payments/bonus-math";
@@ -324,7 +326,7 @@ export async function settleDepositSideEffects(
 
   await loadGameOnce(admin, input);
   await notifyOnce(admin, input, agentId);
-  await writeAudit({
+  const audited = await writeAudit({
     actorId: input.userId,
     action: "deposit.auto_settle",
     entityType: "deposit_request",
@@ -338,6 +340,7 @@ export async function settleDepositSideEffects(
       game: input.quote.gameSlug,
     },
   });
+  if (!audited) logIncident("audit", missedAuditMessage("deposit.auto_settle"));
   await markWebhook(admin, key, "processed");
 }
 

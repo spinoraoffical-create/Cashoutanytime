@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { ExternalLink, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { adminUpdateGameLoadStatus, getAdminPanelUrlForGame } from "@/lib/actions/game-loads";
+import { confirmActionDecision } from "@/lib/admin/confirm-gate";
 import { toast } from "sonner";
 import type { GameLoadRequest } from "@/lib/game-automation/types";
 
@@ -30,6 +31,13 @@ export function GameLoadActions({ load }: GameLoadActionsProps) {
   }
 
   async function mark(status: "completed" | "failed" | "cancelled") {
+    if (confirmActionDecision({ pending: busy, confirmed: false }) === "pending") return;
+    const label = status === "completed" ? "complete" : status === "failed" ? "fail" : "cancel";
+    const decision = confirmActionDecision({
+      pending: false,
+      confirmed: window.confirm(`Mark this game load as ${label}? This can change the player wallet.`),
+    });
+    if (decision !== "run") return;
     setBusy(true);
     const result = await adminUpdateGameLoadStatus(load.id, status);
     if (result.error) toast.error(result.error);
@@ -57,7 +65,7 @@ export function GameLoadActions({ load }: GameLoadActionsProps) {
         </Button>
       </div>
       <p className="text-xs leading-5 text-[#9fb0d0]">
-        Complete and Failed change this request and can change the player wallet. This screen does not ask for a second confirmation.
+        Complete and Failed ask you to confirm. They can change the player wallet.
       </p>
       {load.game_username && (
         <p className="text-xs text-[#6b6d8f]">User: {load.game_username}</p>

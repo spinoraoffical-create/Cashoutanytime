@@ -5,7 +5,6 @@ import {
   EntityEditDialog,
   type FieldValue,
 } from "@/components/admin/entity-edit-dialog";
-import { GlassCard } from "@/components/shared/glass-card";
 import { Badge } from "@/components/ui/badge";
 import {
   Table,
@@ -48,7 +47,7 @@ export default async function AdminRewardsPage() {
         description="Tune the coins, XP and availability of every reward stream. Changes apply to future claims immediately."
       />
 
-      <GlassCard className="overflow-hidden">
+      <div className="overflow-hidden rounded-2xl border border-[#7c3aed]/25 bg-[#0d1428]">
         <div className="overflow-x-auto">
           <Table>
             <TableHeader>
@@ -116,7 +115,7 @@ export default async function AdminRewardsPage() {
             </TableBody>
           </Table>
         </div>
-      </GlassCard>
+      </div>
     </div>
   );
 }

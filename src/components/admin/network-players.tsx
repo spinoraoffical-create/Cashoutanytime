@@ -58,6 +58,7 @@ export function NetworkPlayers({
             if (!window.confirm(`Move ${selected.length} player(s)?`)) return;
             setBusy(true);
             void (async () => {
+              let auditWarning: string | undefined;
               for (const id of selected) {
                 const result = await movePlayerAction(id, parentId);
                 if (!result.ok) {
@@ -65,8 +66,10 @@ export function NetworkPlayers({
                   setBusy(false);
                   return;
                 }
+                if (result.auditWarning) auditWarning = result.auditWarning;
               }
-              toast.success("Players moved.");
+              if (auditWarning) toast.warning(auditWarning);
+              else toast.success("Players moved.");
               setBusy(false);
               setSelected([]);
               router.refresh();

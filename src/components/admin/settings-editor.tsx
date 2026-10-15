@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import { Loader2 } from "lucide-react";
 import { toast } from "sonner";
 
-import { GlassCard } from "@/components/shared/glass-card";
+import { AdminSectionCard } from "@/components/admin/ui/admin-section-card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -47,6 +47,8 @@ export function SettingsEditor({ initial }: { initial: Settings }) {
     telegram: social.telegram ?? "",
   });
 
+  const saveClass = "bg-gradient-to-r from-[#6d28d9] to-[#2563eb] text-white shadow-none hover:opacity-90";
+
   function save(key: string, value: Json) {
     startTransition(async () => {
       const result = await updateSettingAction({ key, value });
@@ -62,20 +64,18 @@ export function SettingsEditor({ initial }: { initial: Settings }) {
   return (
     <div className="space-y-6">
       {/* maintenance */}
-      <GlassCard className="p-6">
-        <div className="flex items-start justify-between gap-4">
-          <div>
-            <h2 className="font-bold">Maintenance mode</h2>
-            <p className="mt-1 text-xs text-muted-foreground">
-              Show a site-wide maintenance banner to all visitors.
-            </p>
-          </div>
+      <AdminSectionCard
+        title="Maintenance mode"
+        description="Show a site-wide maintenance banner to all visitors. This is not saved until you press Save."
+        action={
           <Switch
             checked={maintEnabled}
             onCheckedChange={setMaintEnabled}
             aria-label="Maintenance mode"
+            className="data-[state=checked]:bg-[#6d28d9]"
           />
-        </div>
+        }
+      >
         <div className="mt-4 space-y-2">
           <Label htmlFor="maint-msg">Banner message</Label>
           <Input
@@ -87,7 +87,7 @@ export function SettingsEditor({ initial }: { initial: Settings }) {
         </div>
         <Button
           size="sm"
-          className="mt-4"
+          className={`mt-4 ${saveClass}`}
           disabled={pending}
           onClick={() =>
             save("maintenance_mode", { enabled: maintEnabled, message: maintMsg })
@@ -96,56 +96,59 @@ export function SettingsEditor({ initial }: { initial: Settings }) {
           {pending && <Loader2 className="size-4 animate-spin" aria-hidden />}
           Save
         </Button>
-      </GlassCard>
+      </AdminSectionCard>
 
-      {/* registration */}
-      <GlassCard className="p-6">
-        <div className="flex items-start justify-between gap-4">
-          <div>
-            <h2 className="font-bold">Registration</h2>
-            <p className="mt-1 text-xs text-muted-foreground">
-              Allow new members to sign up.
-            </p>
-          </div>
+      <AdminSectionCard
+        title="Registration"
+        description="Allow new members to sign up. This is not saved until you press Save."
+        action={
           <Switch
             checked={regOpen}
             onCheckedChange={setRegOpen}
             aria-label="Registration open"
+            className="data-[state=checked]:bg-[#6d28d9]"
           />
-        </div>
+        }
+      >
         <Button
           size="sm"
-          className="mt-4"
+          className={`mt-4 ${saveClass}`}
           disabled={pending}
           onClick={() => save("registration_open", { enabled: regOpen })}
         >
           {pending && <Loader2 className="size-4 animate-spin" aria-hidden />}
           Save
         </Button>
-      </GlassCard>
+      </AdminSectionCard>
 
-      {/* telegram promo broadcast */}
-      <GlassCard className="p-6">
-        <div className="flex items-start justify-between gap-4">
-          <div>
-            <h2 className="font-bold">Telegram promo broadcast</h2>
-            <p className="mt-1 text-xs text-muted-foreground">
-              Toggle saves automatically. The pool below must have active messages —
-              the cron rotates through them, posting the longest-unsent one each run.
-            </p>
-          </div>
+      <AdminSectionCard
+        title="Telegram promo broadcast"
+        description="The switch asks you to confirm, then saves immediately. The pool below must have active messages. The existing schedule posts the longest-unsent one each run. Send test now still asks you to confirm."
+        action={
           <Switch
             checked={promoEnabled}
             onCheckedChange={(checked) => {
+              if (
+                !window.confirm(
+                  checked
+                    ? "Turn the Telegram promo broadcast on? This saves immediately."
+                    : "Turn the Telegram promo broadcast off? This saves immediately."
+                )
+              ) {
+                return;
+              }
               setPromoEnabled(checked);
               save("telegram_promo", { enabled: checked });
             }}
             aria-label="Telegram promo broadcast enabled"
+            className="data-[state=checked]:bg-[#6d28d9]"
           />
-        </div>
+        }
+      >
         <div className="mt-4 flex flex-wrap items-center gap-2">
           <Button
             size="sm"
+            className={saveClass}
             disabled={pending}
             onClick={() => save("telegram_promo", { enabled: promoEnabled })}
           >
@@ -161,14 +164,12 @@ export function SettingsEditor({ initial }: { initial: Settings }) {
             variant="outline"
           />
         </div>
-      </GlassCard>
+      </AdminSectionCard>
 
-      {/* welcome bonus */}
-      <GlassCard className="p-6">
-        <h2 className="font-bold">Welcome bonus</h2>
-        <p className="mt-1 mb-4 text-xs text-muted-foreground">
-          Granted once when a member completes their profile.
-        </p>
+      <AdminSectionCard
+        title="Welcome bonus"
+        description="Granted once when a member completes their profile. These fields are not saved until you press Save."
+      >
         <div className="grid gap-4 sm:grid-cols-3">
           <div className="space-y-2">
             <Label htmlFor="wb-coins">Coins</Label>
@@ -201,7 +202,7 @@ export function SettingsEditor({ initial }: { initial: Settings }) {
         </div>
         <Button
           size="sm"
-          className="mt-4"
+          className={`mt-4 ${saveClass}`}
           disabled={pending}
           onClick={() =>
             save("welcome_bonus", {
@@ -214,14 +215,12 @@ export function SettingsEditor({ initial }: { initial: Settings }) {
           {pending && <Loader2 className="size-4 animate-spin" aria-hidden />}
           Save
         </Button>
-      </GlassCard>
+      </AdminSectionCard>
 
-      {/* social links */}
-      <GlassCard className="p-6">
-        <h2 className="font-bold">Social links</h2>
-        <p className="mt-1 mb-4 text-xs text-muted-foreground">
-          Shown in the public site footer.
-        </p>
+      <AdminSectionCard
+        title="Social links"
+        description="Shown in the public site footer. These fields are not saved until you press Save."
+      >
         <div className="grid gap-4 sm:grid-cols-2">
           {(["discord", "x", "instagram", "telegram"] as const).map((key) => (
             <div key={key} className="space-y-2">
@@ -241,14 +240,14 @@ export function SettingsEditor({ initial }: { initial: Settings }) {
         </div>
         <Button
           size="sm"
-          className="mt-4"
+          className={`mt-4 ${saveClass}`}
           disabled={pending}
           onClick={() => save("social_links", links)}
         >
           {pending && <Loader2 className="size-4 animate-spin" aria-hidden />}
           Save
         </Button>
-      </GlassCard>
+      </AdminSectionCard>
     </div>
   );
 }

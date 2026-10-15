@@ -20,10 +20,12 @@ export function DepositActions({ depositId, currentStatus }: DepositActionsProps
   const router = useRouter();
 
   async function handleStatus(status: RequestStatus) {
+    if (status === "rejected" && !window.confirm("Reject this deposit record? This does not send a payment.")) return;
     setLoading(true);
     const result = await updateDepositStatus(depositId, status, adminNotes || undefined);
     setLoading(false);
     if (result.error) toast.error(result.error);
+    else if ("auditWarning" in result && result.auditWarning) toast.warning(result.auditWarning);
     else toast.success(`Deposit ${status}`);
     router.refresh();
   }

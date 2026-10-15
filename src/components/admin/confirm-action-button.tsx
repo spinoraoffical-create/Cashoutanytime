@@ -54,7 +54,8 @@ export function ConfirmActionButton({
         toast.error(result.error);
         return;
       }
-      toast.success(result.message ?? "Done");
+      if (result.auditWarning) toast.warning(result.auditWarning);
+      else toast.success(result.message ?? "Done");
       setOpen(false);
       if (redirectTo) {
         router.push(redirectTo);

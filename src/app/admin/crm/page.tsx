@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { redirect } from "next/navigation";
 import { CrmPlayersPanel } from "@/components/admin/crm-players-panel";
 import { AdminPageHeader } from "@/components/admin/admin-page-header";
+import { AdminErrorState } from "@/components/admin/ui/admin-error-state";
 import { AdminStatCard } from "@/components/admin/ui/admin-stat-card";
 import { adminListScope } from "@/lib/admin/list-scope";
 import { readAgentScope } from "@/lib/agents/scope";
@@ -43,15 +44,19 @@ export default async function AdminCrmPage({
   const segment = (SEGMENTS.find((s) => s.key === params.segment)?.key ?? "all") as CrmSegment;
   const page = Math.max(1, Number(params.page) || 1);
 
-  const [stats, playersPage] = decision.mode === "network"
-    ? await Promise.all([
-        getCrmOverviewForParents(decision.parentIds),
-        getCrmPlayersPage(segment, page, decision.parentIds),
-      ])
-    : await Promise.all([
-        getCrmOverviewStats(),
-        getCrmPlayersPage(segment, page),
-      ]);
+  const parentIds = decision.mode === "network" ? decision.parentIds : undefined;
+  let stats: Awaited<ReturnType<typeof getCrmOverviewStats>> | null = null;
+  let playersPage: Awaited<ReturnType<typeof getCrmPlayersPage>> | null = null;
+  try {
+    stats = parentIds ? await getCrmOverviewForParents(parentIds) : await getCrmOverviewStats();
+  } catch {
+    stats = null;
+  }
+  try {
+    playersPage = await getCrmPlayersPage(segment, page, parentIds);
+  } catch {
+    playersPage = null;
+  }
 
   return (
     <div className="mx-auto max-w-7xl">
@@ -60,22 +65,32 @@ export default async function AdminCrmPage({
         description="Filter players by recent activity. The totals are counts and the stored fulfilled deposit amount. This page does not move money."
       />
 
-      <div className="mb-6 grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-        <AdminStatCard label="Total players" value={stats.totalPlayers.toLocaleString()} hint="Players in this view." />
-        <AdminStatCard label="New this week" value={stats.newThisWeek.toLocaleString()} hint="Accounts created in the last 7 days." />
-        <AdminStatCard label="Active last 7 days" value={stats.activeLast7d.toLocaleString()} hint="Players seen in the last 7 days." />
-        <AdminStatCard
-          label="Fulfilled deposits"
-          value={`$${stats.totalFulfilled.toLocaleString(undefined, { maximumFractionDigits: 0 })}`}
-          hint="Stored fulfilled deposit total. This is not profit."
-        />
-      </div>
+      {stats == null ? (
+        <div className="mb-6">
+          <AdminErrorState title="Unavailable" body="The follow-up totals could not be loaded." />
+        </div>
+      ) : (
+        <div className="mb-6 grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+          <AdminStatCard label="Total players" value={stats.totalPlayers.toLocaleString()} hint="Players in this view." />
+          <AdminStatCard label="New this week" value={stats.newThisWeek.toLocaleString()} hint="Accounts created in the last 7 days." />
+          <AdminStatCard label="Active last 7 days" value={stats.activeLast7d.toLocaleString()} hint="Players seen in the last 7 days." />
+          <AdminStatCard
+            label="Fulfilled deposits"
+            value={`$${stats.totalFulfilled.toLocaleString(undefined, { maximumFractionDigits: 0 })}`}
+            hint="Stored fulfilled deposit total. This is not profit."
+          />
+        </div>
+      )}
 
-      <CrmPlayersPanel
-        initialSegment={segment}
-        initialPage={page}
-        initialData={playersPage}
-      />
+      {playersPage == null ? (
+        <AdminErrorState title="Unavailable" body="The player list could not be loaded." />
+      ) : (
+        <CrmPlayersPanel
+          initialSegment={segment}
+          initialPage={page}
+          initialData={playersPage}
+        />
+      )}
     </div>
   );
 }

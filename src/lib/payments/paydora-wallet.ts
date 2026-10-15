@@ -1,4 +1,6 @@
 import { writeAudit } from "@/lib/actions/admin/core";
+import { missedAuditMessage } from "@/lib/admin/audit-result";
+import { logIncident } from "@/lib/observability/incident";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { PaymentIdentityError, quotePaidDeposit, settleDepositSideEffects } from "@/lib/payments/auto-settle";
 
@@ -135,13 +137,22 @@ export async function creditPaydoraDeposit(input: {
   const provider = input.provider || "paydora";
 
   if (input.payoutVoid) {
-    return creditMarkedAmount(admin, {
+    const credited = await creditMarkedAmount(admin, {
       ...input,
       amount,
       marker,
       creditAmount: amount,
       description: `Payout refund $${amount.toFixed(2)} (${marker})`,
     });
+    const audited = await writeAudit({
+      actorId: input.userId,
+      action: "deposit.payout_void",
+      entityType: "deposit_request",
+      entityId: marker,
+      after: { payoutVoid: true },
+    });
+    if (!audited) logIncident("audit", missedAuditMessage("deposit.payout_void"));
+    return credited;
   }
 
   if (await alreadyApplied(admin, input.userId, marker)) {
@@ -231,7 +242,7 @@ export async function creditPaydoraDeposit(input: {
     quote,
     walletCredited: true,
   });
-  await writeAudit({
+  const audited = await writeAudit({
     actorId: input.userId,
     action: "deposit.credit",
     entityType: "deposit_request",
@@ -244,6 +255,7 @@ export async function creditPaydoraDeposit(input: {
       game: quote.gameSlug,
     },
   });
+  if (!audited) logIncident("audit", missedAuditMessage("deposit.credit"));
   return { ...credited, finalCredit: quote.finalCredit, paid: amount };
 }
 
@@ -328,13 +340,14 @@ export async function reversePaydoraDeposit(input: {
   if (!rpcError) {
     const row = (rpcData ?? {}) as { reversed?: boolean; duplicate?: boolean; new_balance?: number };
     if (row.reversed) {
-      await writeAudit({
+      const audited = await writeAudit({
         actorId: saved.user_id,
         action: "deposit.refund",
         entityType: "deposit_request",
         entityId: input.depositId,
         after: { finalCredit: amount },
       });
+      if (!audited) logIncident("audit", missedAuditMessage("deposit.refund"));
     }
     return {
       reversed: Boolean(row.reversed),

@@ -4,7 +4,6 @@ import Link from "next/link";
 import { AdminPageHeader } from "@/components/admin/admin-page-header";
 import { RecomputeButton } from "@/components/admin/recompute-button";
 import { LeaderboardTable } from "@/components/shared/leaderboard-table";
-import { GlassCard } from "@/components/shared/glass-card";
 import { requirePermission } from "@/lib/data/admin";
 import {
   getLeaderboard,
@@ -64,9 +63,9 @@ export default async function AdminLeaderboardsPage({
       </div>
 
       {board.rows.length === 0 ? (
-        <GlassCard className="p-8 text-center text-sm text-muted-foreground">
+        <div className="rounded-2xl border border-dashed border-white/15 p-8 text-center text-sm text-[#9fb0d0]">
           No entries for this period yet. Members earn rank by gaining XP.
-        </GlassCard>
+        </div>
       ) : (
         <LeaderboardTable rows={board.rows} />
       )}
