@@ -33,8 +33,9 @@ export async function POST(request: Request) {
 
   return NextResponse.json({
     success: true,
-    response: aiResult.response,
-    confidenceScore: aiResult.confidenceScore,
-    escalatedToHuman: aiResult.shouldEscalateToHuman,
+    response: "",
+    confidenceScore: 0,
+    escalatedToHuman: true,
+    humanOnly: aiResult.shouldEscalateToHuman,
   });
 }

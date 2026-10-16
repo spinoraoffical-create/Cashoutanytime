@@ -84,6 +84,7 @@ export function MessageRealtimeProvider({ children }: { children: ReactNode }) {
   const popupTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const refreshDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const openingChatRef = useRef(false);
+  const seenMessageIdsRef = useRef<Set<string>>(new Set());
   const openingActivityRef = useRef(false);
 
   pathnameRef.current = pathname;
@@ -191,6 +192,8 @@ export function MessageRealtimeProvider({ children }: { children: ReactNode }) {
       const userId = userIdRef.current;
       const adminView = isAdminRef.current;
       if (!userId) return;
+      if (seenMessageIdsRef.current.has(msg.id)) return;
+      seenMessageIdsRef.current.add(msg.id);
       if (msg.sender_id === userId && (msg.from_staff || !adminView || isAdminOutgoingMessage(msg))) return;
 
       const path = pathnameRef.current;

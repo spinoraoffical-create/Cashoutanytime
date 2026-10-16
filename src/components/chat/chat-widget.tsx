@@ -17,6 +17,7 @@ import { ChatMessageContent } from "@/components/chat/chat-message-content";
 import { formatRelativeTime } from "@/lib/utils";
 import { CHAT_SCROLL_CLASS } from "@/lib/chat/chat-layout";
 import { useChatAutoScroll } from "@/lib/chat/use-chat-auto-scroll";
+import { appendMessage } from "@/lib/chat/merge-messages";
 import { playIncomingMessageSound } from "@/lib/chat/message-notification-sound";
 import { toast } from "sonner";
 import type { Message } from "@/types/database";
@@ -113,7 +114,7 @@ export function ChatWidget() {
         },
         (payload) => {
           const msg = payload.new as Message;
-          setMessages((prev) => [...prev, msg]);
+          setMessages((prev) => appendMessage(prev, msg));
           if (userId && msg.sender_id !== userId) {
             playIncomingMessageSound(msg.sender_id, userId);
             setOpen(true);

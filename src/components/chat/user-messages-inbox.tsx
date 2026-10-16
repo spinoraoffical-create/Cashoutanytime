@@ -30,7 +30,7 @@ import { useChatAutoScroll } from "@/lib/chat/use-chat-auto-scroll";
 import { CHAT_INCOMING_EVENT, type ChatIncomingDetail } from "@/lib/chat/events";
 import { playIncomingMessageSound } from "@/lib/chat/message-notification-sound";
 import { useDashboardProfile } from "@/lib/dashboard/dashboard-profile-context";
-import { appendMessage } from "@/lib/chat/merge-messages";
+import { appendMessage, mergeMessagesById } from "@/lib/chat/merge-messages";
 import { subscribeToConversationInserts, subscribeToMessageInserts } from "@/lib/chat/subscribe-messages";
 import { toast } from "sonner";
 import { ArrowLeft, Headphones, MessageCircle } from "lucide-react";
@@ -125,18 +125,15 @@ function UserChatPanel({
             <ArrowLeft className="h-4 w-4" />
           </Link>
         ) : null}
-        <span className="relative grid h-11 w-11 shrink-0 place-items-center rounded-full bg-emerald-500 text-white">
+        <span className="grid h-11 w-11 shrink-0 place-items-center rounded-full bg-emerald-500 text-white">
           <Headphones className="h-5 w-5" />
-          <span className="absolute bottom-0 right-0 h-2.5 w-2.5 rounded-full bg-amber-400 ring-2 ring-[#070b1f]" />
         </span>
         <div className="min-w-0 flex-1">
           <h2 className="truncate font-bold text-white">
             {humanRequested || supportLayout ? "Human support" : selectedConversation.title}
           </h2>
-          <p className={cn("truncate text-xs", humanRequested ? "text-amber-300" : "text-[#b9b3c6]")}>
-            {humanRequested
-              ? "Human support requested · updates stay here"
-              : "A person from support replies in this chat"}
+          <p className="truncate text-xs text-[#b9b3c6]">
+            Support team will reply as soon as possible.
           </p>
         </div>
         <Link href="/help" className="shrink-0 text-xs font-bold text-white">
@@ -409,21 +406,33 @@ export function UserMessagesInbox({
   useEffect(() => {
     if (!supabase || !selectedId) return;
 
+    let cancelled = false;
+    const conversationId = selectedId;
+
     const poll = () => {
       if (document.visibilityState !== "visible") return;
       void supabase
         .from("messages")
         .select("*")
-        .eq("conversation_id", selectedId)
+        .eq("conversation_id", conversationId)
         .order("created_at", { ascending: true })
         .then(({ data }) => {
-          if (data) setMessages(data);
+          if (cancelled || !data) return;
+          setMessages((prev) =>
+            mergeMessagesById(
+              prev.filter((message) => message.conversation_id === conversationId),
+              data
+            )
+          );
         });
     };
 
     poll();
     const interval = setInterval(poll, 800);
-    return () => clearInterval(interval);
+    return () => {
+      cancelled = true;
+      clearInterval(interval);
+    };
   }, [supabase, selectedId]);
 
   useEffect(() => {

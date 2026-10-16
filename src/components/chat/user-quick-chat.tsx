@@ -198,8 +198,8 @@ function QuickChatPanel({
           <p className="text-sm font-semibold text-white truncate">
             {humanRequested ? "Human support" : "Sweepstakes Hub Support"}
           </p>
-          <p className="text-[10px] text-emerald-300">
-            {humanRequested ? "Human support requested · updates stay here" : "A person from support replies in this chat"}
+          <p className="text-[10px] text-[#b9b3c6]">
+            Support team will reply as soon as possible.
           </p>
         </div>
         {!humanRequested && (

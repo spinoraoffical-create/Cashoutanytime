@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useRef } from "react";
 import { usePathname } from "next/navigation";
-import { X, Send, Bot, User, Paperclip, Image as ImageIcon, Video, RefreshCw } from "lucide-react";
+import { X, Send, Headphones, User, Paperclip, Image as ImageIcon, Video, RefreshCw } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
 import { createClient } from "@/lib/supabase/client";
@@ -16,14 +16,7 @@ interface ChatMessage {
   time: string;
 }
 
-const INITIAL_MESSAGES: ChatMessage[] = [
-  {
-    id: "1",
-    sender: "bot",
-    text: "Hi — this is Sweepstakes Hub support. Ask about Game Rooms, wallet loads, or cash outs. Sign in for private help with balances and payments.",
-    time: "Just now",
-  },
-];
+const INITIAL_MESSAGES: ChatMessage[] = [];
 
 const CHAT_HISTORY_KEY = "hub_support_chat_history";
 
@@ -136,50 +129,13 @@ export function LiveCasinoChatWidget() {
       time: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
     };
 
-    setMessages((prev) => [...prev, userMsg]);
+    setMessages((prev) => (prev.some((item) => item.id === userMsg.id) ? prev : [...prev, userMsg]));
     setInput("");
     setMediaFile(null);
-    setTyping(true);
+    setTyping(false);
 
-    try {
-      const res = await fetch("/api/chat/live-bot", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          message: userText,
-          hasMedia: !!currentMedia,
-          mediaName: currentMedia?.file.name,
-          conversationHistory: messages.map((m) => `${m.sender}: ${m.text}`),
-          userId: userId || "guest_visitor",
-        }),
-      });
-
-      const data = await res.json();
-      setTyping(false);
-
-      const botMsg: ChatMessage = {
-        id: (Date.now() + 1).toString(),
-        sender: "bot",
-        text: data.reply || "I'm here to help! Ask me anything about games or cashouts.",
-        time: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
-      };
-
-      setMessages((prev) => [...prev, botMsg]);
-
-      if (data.alertedTelegram) {
-        toast.success("🚨 Alerted Human Support Team & Saved to Admin Inbox!");
-      }
-    } catch {
-      setTyping(false);
-      setMessages((prev) => [
-        ...prev,
-        {
-          id: (Date.now() + 1).toString(),
-          sender: "bot",
-          text: "⚡ I'm here! You can load game credits on your Dashboard or ask me how to play.",
-          time: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
-        },
-      ]);
+    if (!userId || userId.startsWith("guest_")) {
+      toast.message("Sign in to send this to support.");
     }
   }
 
@@ -196,7 +152,7 @@ export function LiveCasinoChatWidget() {
           className="relative flex h-14 w-14 items-center justify-center rounded-full bg-gradient-to-r from-amber-500 to-amber-400 text-black shadow-2xl hover:scale-110 transition-transform shadow-amber-500/40 border-2 border-amber-300"
           aria-label="Open Sweepstakes Hub support"
         >
-          <Bot className="h-7 w-7" />
+          <Headphones className="h-7 w-7" />
         </button>
       )}
 
@@ -208,15 +164,14 @@ export function LiveCasinoChatWidget() {
             <div className="flex items-center gap-3">
               <div className="relative">
                 <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-amber-500/20 text-amber-400 font-bold border border-amber-500/30">
-                  <Bot className="h-5 w-5" />
+                  <Headphones className="h-5 w-5" />
                 </div>
-                <span className="absolute bottom-0 right-0 h-3 w-3 rounded-full bg-emerald-500 border-2 border-zinc-950" />
               </div>
               <div>
                 <div className="flex items-center gap-1.5">
                   <h3 className="text-sm font-bold text-foreground">Sweepstakes Hub Support</h3>
                 </div>
-                <p className="text-[10px] text-muted-foreground">Questions about play, wallet, and cash outs</p>
+                <p className="text-[10px] text-muted-foreground">Support team will reply as soon as possible.</p>
               </div>
             </div>
 
@@ -247,7 +202,7 @@ export function LiveCasinoChatWidget() {
               >
                 {m.sender === "bot" && (
                   <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-amber-500/20 text-amber-400 mt-0.5">
-                    <Bot className="h-4 w-4" />
+                    <Headphones className="h-4 w-4" />
                   </div>
                 )}
 
@@ -296,8 +251,8 @@ export function LiveCasinoChatWidget() {
 
             {typing && (
               <div className="flex gap-2 items-center text-muted-foreground text-xs font-mono">
-                <Bot className="h-4 w-4 text-amber-400 animate-spin" />
-                <span>Support is typing...</span>
+                <Headphones className="h-4 w-4 text-amber-400" />
+                <span>Support team will reply as soon as possible.</span>
               </div>
             )}
             <div ref={messagesEndRef} />
