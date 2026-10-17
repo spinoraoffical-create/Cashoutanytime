@@ -413,33 +413,59 @@ export type MarketingGame = Pick<
   "id" | "slug" | "name" | "description" | "image_url" | "badge_text" | "is_featured" | "popularity" | "play_url" | "download_url"
 >;
 
-export const getGames = unstable_cache(
+async function queryActiveGames(): Promise<MarketingGame[] | null> {
+  try {
+    const supabase = createAdminClient() ?? createStaticClient();
+    const { data, error } = await supabase
+      .from("games")
+      .select(
+        "id, slug, name, description, image_url, badge_text, is_featured, popularity, play_url, download_url"
+      )
+      .eq("is_active", true)
+      .order("popularity", { ascending: false });
+    if (error || !data) return null;
+    const rows = data as MarketingGame[];
+    const seen = new Set<string>();
+    return rows.filter((g) => {
+      const key = g.slug.trim().toLowerCase();
+      if (!key || seen.has(key)) return false;
+      seen.add(key);
+      return true;
+    });
+  } catch {
+    return null;
+  }
+}
+
+const readCachedActiveGames = unstable_cache(
   async (): Promise<MarketingGame[]> => {
-    try {
-      const supabase = createAdminClient() ?? createStaticClient();
-      const { data, error } = await supabase
-        .from("games")
-        .select(
-          "id, slug, name, description, image_url, badge_text, is_featured, popularity, play_url, download_url"
-        )
-        .eq("is_active", true)
-        .order("popularity", { ascending: false });
-      if (error || !data) return [];
-      const rows = data as MarketingGame[];
-      const seen = new Set<string>();
-      return rows.filter((g) => {
-        const key = g.slug.trim().toLowerCase();
-        if (!key || seen.has(key)) return false;
-        seen.add(key);
-        return true;
-      });
-    } catch {
-      return [];
-    }
+    const games = await queryActiveGames();
+    if (!games) throw new Error("Active game catalog could not be read.");
+    return games;
   },
   ["marketing-games-active"],
   { revalidate: 300, tags: ["marketing-games"] }
 );
+
+/** Cached active games. A failed read returns an empty list and is not stored as a successful empty catalog. */
+export async function getGames(): Promise<MarketingGame[]> {
+  try {
+    return await readCachedActiveGames();
+  } catch {
+    return [];
+  }
+}
+
+/** Distinguishes a real empty catalog from a failed read. */
+export async function loadActiveGames(): Promise<
+  { status: "ready"; games: MarketingGame[] } | { status: "unavailable" }
+> {
+  try {
+    return { status: "ready", games: await readCachedActiveGames() };
+  } catch {
+    return { status: "unavailable" };
+  }
+}
 
 // ── Geo (state/city) pages — admin-managed, static fallback = GEO_STATES ────
 

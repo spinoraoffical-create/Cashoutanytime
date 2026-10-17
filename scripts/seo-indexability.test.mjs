@@ -35,7 +35,7 @@ assert.doesNotMatch(gamesPage, /redirect\("\/play"\)/);
 const playPage = source("src/app/play/page.tsx");
 assert.match(playPage, /path:\s*"\/play"/);
 assert.match(playPage, /<h1/);
-assert.match(playPage, /\/games\/\$\{game\.slug\}/);
+assert.match(playPage, /gameDetailPath\(game\.slug\)/);
 assert.doesNotMatch(playPage, /canonical:\s*"\/games"/);
 
 const layout = source("src/app/layout.tsx");

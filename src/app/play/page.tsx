@@ -2,8 +2,8 @@ import Link from "next/link";
 import { Suspense } from "react";
 import { PlayCatalog } from "@/components/player/play-catalog";
 import { VipPageLayout } from "@/components/layout/vip-page-layout";
-import { getGames } from "@/lib/data/marketing";
-import { buildLobbyCatalog } from "@/lib/games-marketing";
+import { loadActiveGames } from "@/lib/data/marketing";
+import { gameDetailPath, publicPlayCatalog } from "@/lib/games-marketing";
 import { withPageSocial } from "@/lib/seo/metadata";
 
 export const metadata = withPageSocial({
@@ -13,8 +13,8 @@ export const metadata = withPageSocial({
 });
 
 export default async function PlayPage() {
-  const dbGames = await getGames();
-  const games = buildLobbyCatalog(dbGames).filter((game) => !game.upcoming);
+  const loaded = await loadActiveGames();
+  const games = loaded.status === "ready" ? publicPlayCatalog(loaded.games) : [];
 
   return (
     <VipPageLayout>
@@ -25,12 +25,14 @@ export default async function PlayPage() {
           <p className="mt-2 max-w-xl text-sm text-[#b9b3c6]">
             These are the Game Rooms currently available on Sweepstakes Hub. Open a room for its public page.
           </p>
-          {games.length > 0 ? (
+          {loaded.status === "unavailable" ? (
+            <p className="mt-4 text-sm text-[#b9b3c6]">The game list could not be loaded. Refresh the page.</p>
+          ) : games.length > 0 ? (
             <ul className="mt-4 flex flex-wrap gap-2">
               {games.map((game) => (
-                <li key={game.slug}>
+                <li key={game.id}>
                   <Link
-                    href={`/games/${game.slug}`}
+                    href={gameDetailPath(game.slug)}
                     className="inline-flex rounded-full bg-white/8 px-3 py-1.5 text-sm font-semibold text-white hover:bg-white/12"
                   >
                     {game.name}

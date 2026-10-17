@@ -8,6 +8,7 @@ import { ChevronRight, Gamepad2, LayoutGrid, Search, SlidersHorizontal, Star } f
 import { motion } from "framer-motion";
 import { cn } from "@/lib/utils";
 import type { Game } from "@/lib/games";
+import { filterPlayCatalog } from "@/lib/games-marketing";
 import { usePlayerMotion } from "@/lib/player-motion";
 import { MotionPage } from "@/components/player/motion-page";
 
@@ -52,22 +53,10 @@ export function PlayCatalog({ games }: { games: Game[] }) {
     [rooms]
   );
 
-  const list = useMemo(() => {
-    let rows = rooms;
-    if (chip === "popular") rows = rows.filter((g) => g.popular);
-    if (chip === "favorites" || chip === "yours") rows = rows.filter((g) => favs.includes(g.slug));
-    if (category !== "all") rows = rows.filter((g) => g.category === category);
-    if (q.trim()) {
-      const s = q.toLowerCase();
-      rows = rows.filter(
-        (g) =>
-          g.name.toLowerCase().includes(s) ||
-          g.provider.toLowerCase().includes(s) ||
-          g.category.toLowerCase().includes(s)
-      );
-    }
-    return rows;
-  }, [rooms, segment, chip, category, q, favs]);
+  const list = useMemo(
+    () => filterPlayCatalog(rooms, { query: q, category, chip, favorites: favs }),
+    [rooms, chip, category, q, favs]
+  );
 
   return (
     <MotionPage className="space-y-4">
