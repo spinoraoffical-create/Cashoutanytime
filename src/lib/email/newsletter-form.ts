@@ -3,7 +3,7 @@ import { isNewsletterSegment, type NewsletterSegmentId } from "@/lib/email/newsl
 import type { NewsletterVibe } from "@/lib/email/newsletter-templates";
 import { presetToSimpleForm } from "@/lib/email/newsletter-presets";
 
-const DEFAULT_CTA_HREF = "https://spinoracasinos.com/promotions";
+const DEFAULT_CTA_HREF = "https://www.sweeptakehub.com/promotions";
 
 export type SimpleNewsletterInput = {
   template_id: string;

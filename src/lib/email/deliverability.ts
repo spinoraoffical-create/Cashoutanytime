@@ -25,7 +25,7 @@ export function htmlToPlainText(html: string): string {
 }
 
 export const PROMO_REPLY_TO =
-  process.env.RESEND_REPLY_TO ?? "support@spinoracasinos.com";
+  process.env.RESEND_REPLY_TO ?? "support@sweeptakehub.com";
 
 const SETTINGS_URL = `${SITE_URL}/dashboard/notifications`;
 

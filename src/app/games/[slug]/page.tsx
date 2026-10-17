@@ -8,6 +8,7 @@ import { canonicalGameSlug, getGameBySlug, type Game } from "@/lib/games";
 import { getGames, getRelatedPosts } from "@/lib/data/marketing";
 import { marketingGamesToCards } from "@/lib/games-marketing";
 import { isWalletLoadEnabledForGame } from "@/lib/game-automation/config";
+import { isGameProviderReady } from "@/lib/game-automation/provider-ready";
 import { gameIsActive, getMyGameAccount } from "@/lib/actions/game-loads";
 
 export const dynamic = "force-dynamic";
@@ -65,6 +66,7 @@ export default async function GamePage({ params, searchParams }: GamePageProps) 
         game={game}
         autoCreate={create === "1"}
         walletLoadEnabled={walletLoadEnabled}
+        providerReady={isGameProviderReady(game.slug)}
         initialGameAccount={initialGameAccount}
         guides={guides}
       />

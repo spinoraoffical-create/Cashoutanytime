@@ -45,7 +45,8 @@ export async function createCashMachineAccount(
   client?: CashMachineApiClient
 ) {
   const api = client || getCashMachineApiClient();
-  const password = params.password || "123456";
+  const password = params.password?.trim();
+  if (!password) throw new Error("A game password is required.");
   const nickname = (params.nickname && params.nickname !== "-")
     ? params.nickname
     : params.username;

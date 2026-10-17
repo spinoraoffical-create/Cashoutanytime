@@ -32,7 +32,7 @@ export default function ContactPage() {
           <div className="grid sm:grid-cols-3 gap-6 mb-12">
             {[
               { icon: MessageCircle, title: "Live Chat", desc: "Signed in? Open messages from your dashboard.", action: "Open Messages", href: "/dashboard/messages" },
-              { icon: Mail, title: "Email", desc: "support@spinoracasinos.com", action: "Send Email", href: "mailto:support@spinoracasinos.com" },
+              { icon: Mail, title: "Email", desc: "support@sweeptakehub.com", action: "Send Email", href: "mailto:support@sweeptakehub.com" },
               { icon: Clock, title: "Response Time", desc: "Average response under 5 minutes.", action: "Help Center", href: "/support" },
             ].map(({ icon: Icon, title, desc, action, href }) => (
               <Card key={title} className="hover:glow-purple transition-all">

@@ -45,7 +45,8 @@ import {
   PROVIDER_OUTCOME_UNVERIFIED,
   staleLoadRpcDecision,
 } from "@/lib/game-automation/load-outcome";
-import { classifyProviderOutcome } from "@/lib/game-automation/load-outcome";
+import { classifyProviderOutcome, confirmedCheckBalance } from "@/lib/game-automation/load-outcome";
+import { isGameProviderReady } from "@/lib/game-automation/provider-ready";
 import { logIncident } from "@/lib/observability/incident";
 
 async function savedGameLogin(userId: string, gameSlug: string) {
@@ -215,9 +216,17 @@ async function fulfillOrFail(
         error: "The game did not confirm this request. It stays open until a person checks it.",
       };
     }
+    if (result.success && loadType === "check_balance" && confirmedCheckBalance(result.redeemedAmount) === null) {
+      await holdUnknownGameLoad(requestId, "Provider did not return a balance.");
+      return {
+        success: false as const,
+        error: "The game did not confirm a balance. It stays open until a person checks it.",
+      };
+    }
     const redeemed =
-      result.redeemedAmount ??
-      (result.success && (loadType === "redeem" || loadType === "check_balance") ? input.amount : null);
+      loadType === "check_balance"
+        ? confirmedCheckBalance(result.redeemedAmount)
+        : result.redeemedAmount ?? (result.success && loadType === "redeem" ? input.amount : null);
     const creating = loadType === "create_account" || loadType === "new_account";
     if (result.success && creating && !result.username?.trim()) {
       const message = result.error || "Provider did not return a username.";
@@ -302,34 +311,7 @@ const API_CONFIGURED_GAMES = ["cash-machine", "cash-frenzy", "gameroom", "game-v
 const GAME_API_UNAVAILABLE = "This game is not connected yet.";
 
 function isGameApiReady(slug: string): boolean {
-  switch (slug) {
-    case "juwa":
-      return isJuwaApiConfigured();
-    case "vegas-sweeps":
-      return isVegasApiConfigured();
-    case "cash-machine":
-      return isCashMachineApiConfigured();
-    case "cash-frenzy":
-      return isCashFrenzyApiConfigured();
-    case "gameroom":
-      return isGameroomApiConfigured();
-    case "mr-all-in-one":
-      return isMrAllInOneApiConfigured();
-    case "game-vault":
-      return isGameVaultApiConfigured();
-    case "mafia":
-      return isMafiaApiConfigured();
-    case "orion-stars":
-      return isOrionStarsApiConfigured();
-    case "milky-way":
-      return isMilkyWayApiConfigured();
-    case "fire-kirin":
-      return isFireKirinApiConfigured();
-    case "vblink":
-      return isVblinkApiConfigured();
-    default:
-      return false;
-  }
+  return isGameProviderReady(slug);
 }
 
 async function autoFulfillGameRequest(

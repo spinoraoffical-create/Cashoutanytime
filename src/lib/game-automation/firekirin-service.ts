@@ -1,6 +1,8 @@
 import { createAdminClient } from "@/lib/supabase/admin";
 import { classifyProviderOutcome } from "./load-outcome";
 import { generateGamePassword } from "./account-username";
+import { claimProviderAccount, finishProviderAccount } from "./account-claim";
+import { openTerminalPlayerAccount, probeFromError, TERMINAL_ACCOUNT_CREATION_ARMED, type ProviderProbe } from "./terminal-account";
 import {
   enqueueFireKirin,
   FireKirinApiClient,
@@ -115,6 +117,9 @@ async function provisionFireKirinAccountNow(
     }
   }
 
+  if (!TERMINAL_ACCOUNT_CREATION_ARMED) {
+    return { error: "Fire Kirin account creation is not armed. No player account was created." };
+  }
   const client = new FireKirinApiClient();
   const username = await fireKirinNameForUser(userId);
   const password = `Pass${Math.floor(1000 + Math.random() * 9000)}`;
@@ -219,22 +224,41 @@ async function autoFulfillFireKirinNow(
   let redeemedAmount: number | undefined;
 
   if (loadType === "create_account") {
-    const passToUse = password?.trim() || generateGamePassword();
+    const client = new FireKirinApiClient();
+    let savedPassword = "";
     try {
-      if (!/^[A-Za-z0-9]{7,13}$/.test(cleanAccount)) {
-        throw new Error("Fire Kirin username must be 7 to 13 letters or numbers.");
+      const outcome = await openTerminalPlayerAccount({
+        provider: "fire-kirin",
+        account: cleanAccount,
+        armed: TERMINAL_ACCOUNT_CREATION_ARMED,
+        capability: async () => client.listGames(),
+        lookup: async () => readFireKirinLookup(client, cleanAccount),
+        register: async () => {
+          const passToUse = password?.trim() || generateGamePassword();
+          try {
+            const created = await client.createAccount(cleanAccount, passToUse);
+            savedPassword = created.pass;
+            return { code: "200", message: "" };
+          } catch (error) {
+            return probeFromError(error);
+          }
+        },
+        verify: async () => readFireKirinLookup(client, cleanAccount),
+        claim: () => claimProviderAccount("fire-kirin", cleanAccount),
+        finish: (outcome) => finishProviderAccount("fire-kirin", cleanAccount, outcome),
+      });
+      if (outcome.status !== "confirmed" || !savedPassword) {
+        throw new Error(outcome.reason);
       }
-      const { createFireKirinPlayerOnStore } = await import("./firekirin-store");
-      await createFireKirinPlayerOnStore(cleanAccount, passToUse);
-      await saveFireKirinLogin(requestId, cleanAccount, passToUse, false);
+      await saveFireKirinLogin(requestId, cleanAccount, savedPassword, false);
       return {
         success: true,
-        message: `Fire Kirin account created: ${cleanAccount}`,
+        message: `Fire Kirin account created and confirmed by lookup: ${cleanAccount}`,
         accountName: cleanAccount,
-        credentials: { username: cleanAccount, password: passToUse },
+        credentials: { username: cleanAccount, password: savedPassword },
       };
     } catch (err: unknown) {
-      const message = err instanceof Error ? err.message : "Fire Kirin store could not create the player.";
+      const message = err instanceof Error ? err.message : "Fire Kirin account was not created.";
       console.error("[Fire Kirin automation failure]", message);
       await failRequest(requestId, message, false);
       return { success: false, message, accountName: cleanAccount };
@@ -257,6 +281,13 @@ async function autoFulfillFireKirinNow(
     if (loadType === "check_balance") {
       const info = await client.queryInfo(cleanAccount, session);
       const userBalance = parseFireKirinUserBalance(info);
+      if (userBalance === null) {
+        return {
+          success: false,
+          message: "Provider outcome unknown. Balance was not returned.",
+          accountName: cleanAccount,
+        };
+      }
       return {
         success: true,
         message: `Fire Kirin balance checked for ${cleanAccount}`,
@@ -273,13 +304,25 @@ async function autoFulfillFireKirinNow(
         throw new Error("Fire Kirin recharge amount must be a whole dollar.");
       }
       const account = await ensureFireKirinAccount(client, session, cleanAccount, password);
-      const res = await client.rechargePlayer(account.account, amount, session, transactionId);
+      const res = await client.rechargePlayer(account.account, amount, session, transactionId, requestId);
+      let infoAfter;
+      try {
+        infoAfter = await client.queryInfo(account.account, session);
+      } catch (error) {
+        const detail = error instanceof Error ? error.message : "verification failed";
+        throw new Error(`Provider outcome unknown. ${detail}`);
+      }
+      const newBalance = parseFireKirinUserBalance(infoAfter);
+      if (newBalance === null) throw new Error("Provider outcome unknown. Balance was not returned.");
+      if (!(await client.confirmOperation(res.operationKey))) {
+        throw new Error("Provider outcome unknown. Balance was read and the transfer was not confirmed.");
+      }
       return {
         success: true,
         message: `Fire Kirin recharged $${res.amount.toFixed(2)} to ${account.account}`,
         accountName: account.account,
         credentials: account.pass ? { username: account.account, password: account.pass } : undefined,
-        newBalance: res.amount,
+        newBalance,
         rawResponse: res,
       };
     }
@@ -301,6 +344,9 @@ async function autoFulfillFireKirinNow(
       await client.kickPlayerOut(cleanAccount, session);
       const info = await client.queryInfo(cleanAccount, session);
       const balance = parseFireKirinUserBalance(info);
+      if (balance === null) {
+        throw new Error("Provider outcome unknown. Balance was not returned.");
+      }
       if (!(balance > 0)) {
         throw new Error("Fire Kirin balance is 0.");
       }
@@ -315,7 +361,20 @@ async function autoFulfillFireKirinNow(
         take = Math.trunc(amount);
       }
 
-      const res = await client.withdrawPlayer(cleanAccount, take, session, transactionId);
+      const res = await client.withdrawPlayer(cleanAccount, take, session, transactionId, requestId);
+      let infoAfterRedeem;
+      try {
+        infoAfterRedeem = await client.queryInfo(cleanAccount, session);
+      } catch (error) {
+        const detail = error instanceof Error ? error.message : "verification failed";
+        throw new Error(`Provider outcome unknown. ${detail}`);
+      }
+      if (parseFireKirinUserBalance(infoAfterRedeem) === null) {
+        throw new Error("Provider outcome unknown. Balance was not returned.");
+      }
+      if (!(await client.confirmOperation(res.operationKey))) {
+        throw new Error("Provider outcome unknown. Balance was read and the transfer was not confirmed.");
+      }
       redeemedAmount = res.amount;
       await closeFireKirinRequest({
         requestId,
@@ -352,6 +411,15 @@ async function autoFulfillFireKirinNow(
       message,
       accountName: cleanAccount,
     };
+  }
+}
+
+async function readFireKirinLookup(client: FireKirinApiClient, account: string): Promise<ProviderProbe> {
+  try {
+    const info = await client.queryInfo(account);
+    return { code: String(info.code), message: info.msg || "", balance: parseFireKirinUserBalance(info) };
+  } catch (error) {
+    return probeFromError(error);
   }
 }
 

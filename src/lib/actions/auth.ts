@@ -88,6 +88,22 @@ async function otpRateLimitKey(identifier: string) {
   return `${ip}:${identifier.trim().toLowerCase().slice(0, 48)}`;
 }
 
+/** Stops a browser from sending signup or recovery email in a tight loop. */
+export async function guardAuthEmailSend(
+  email: string,
+  kind: "signup" | "recovery"
+): Promise<{ ok: true } | { ok: false; error: string }> {
+  const normalized = normalizeEmail(email);
+  if (!isEmailIdentifier(normalized)) {
+    return { ok: false, error: "Enter a valid email address." };
+  }
+  const allowed = await rateLimit("authOtp", `${kind}:${await otpRateLimitKey(normalized)}`);
+  if (!allowed) {
+    return { ok: false, error: "Too many emails. Please wait a few minutes." };
+  }
+  return { ok: true };
+}
+
 export async function sendLoginOtp(
   identifier: string
 ): Promise<{ ok: boolean; emailHint?: string; error?: string }> {
@@ -484,7 +500,7 @@ export async function registerWithEmail(input: {
     return {
       ok: false,
       error:
-        "This email is already registered. Check your inbox for an earlier confirmation link, or go to Sign In.",
+        "This email is already registered. Check your inbox for an earlier code, or go to Sign In.",
     };
   }
 

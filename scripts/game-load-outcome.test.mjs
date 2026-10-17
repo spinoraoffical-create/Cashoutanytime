@@ -10,6 +10,7 @@ import {
   PROVIDER_OUTCOME_UNVERIFIED,
   secondLoadBlocked,
   STALE_LOAD_CHECK_FAILED,
+  confirmedCheckBalance,
   staleLoadRpcDecision,
 } from "../src/lib/game-automation/load-outcome.ts";
 
@@ -184,5 +185,29 @@ assert.match(adminAction, /finishGameLoad\(\{/);
 const panel = readFileSync(new URL("../src/components/admin/admin-wallet-loads-sidebar-panel.tsx", import.meta.url), "utf8");
 assert.match(panel, /Account creation/);
 assert.match(panel, /Game account creation/);
+
+assert.equal(confirmedCheckBalance(0), 0);
+assert.equal(confirmedCheckBalance(12.5), 12.5);
+assert.equal(confirmedCheckBalance(undefined), null);
+assert.equal(confirmedCheckBalance(null), null);
+assert.equal(confirmedCheckBalance(Number.NaN), null);
+assert.match(adminAction, /confirmedCheckBalance\(result\.redeemedAmount\)/);
+assert.equal(adminAction.includes('loadType === "check_balance" ? input.amount'), false);
+
+const services = [
+  "../src/lib/game-automation/cashfrenzy-service.ts",
+  "../src/lib/game-automation/cashmachine-service.ts",
+  "../src/lib/game-automation/gameroom-service.ts",
+  "../src/lib/game-automation/mrallinone-service.ts",
+].map((file) => readFileSync(new URL(file, import.meta.url), "utf8"));
+for (const source of services) {
+  assert.equal(source.includes('"123456"'), false);
+  assert.match(source, /A game password is required/);
+}
+const ready = readFileSync(new URL("../src/lib/game-automation/provider-ready.ts", import.meta.url), "utf8");
+assert.match(ready, /panda-master|default:\s*\n\s*return false/);
+assert.equal(ready.includes('case "panda-master"'), false);
+const landing = readFileSync(new URL("../src/components/games/game-landing-client.tsx", import.meta.url), "utf8");
+assert.match(landing, /Not connected yet/);
 
 console.log("game load outcome checks passed");

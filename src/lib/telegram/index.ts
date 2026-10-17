@@ -10,7 +10,7 @@ const CHANNELS = {
 
 type Channel = keyof typeof CHANNELS;
 
-const SITE = process.env.NEXT_PUBLIC_SITE_URL ?? "https://spinoracasinos.com";
+const SITE = process.env.NEXT_PUBLIC_SITE_URL ?? "https://www.sweeptakehub.com";
 
 /** Escape user-supplied strings for Telegram HTML parse_mode. */
 export function tgEsc(s: string): string {

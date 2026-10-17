@@ -1,6 +1,6 @@
 import { GAMES } from "@/lib/games";
 
-const OWN_HOSTS = new Set(["sweeptakehub.com", "spinoracasinos.com"]);
+const OWN_HOSTS = new Set(["sweeptakehub.com", "www.sweeptakehub.com", "spinoracasinos.com"]);
 
 export type InternalLink = { href: string; label: string };
 

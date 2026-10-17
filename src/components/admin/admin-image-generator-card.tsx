@@ -29,7 +29,7 @@ export function AdminImageGeneratorCard() {
   const [preset, setPreset] = useState<SitePosterPreset>(SITE_POSTER_PRESETS[0]);
   const [offerText, setOfferText] = useState(SITE_POSTER_PRESETS[0].offerAmount);
   const [dateText, setDateText] = useState("");
-  const [domainText, setDomainText] = useState("spinoracasinos.com");
+  const [domainText, setDomainText] = useState("sweeptakehub.com");
 
   useEffect(() => {
     const today = new Date().toLocaleDateString("en-US", {
@@ -194,7 +194,7 @@ export function AdminImageGeneratorCard() {
     ctx.font = "black 22px Arial, sans-serif";
     ctx.fillText("🌐 VISIT OUR WEBSITE NOW", width / 2, 968);
 
-    // White Pill Domain Name: spinoracasinos.com
+    // White pill shows the site domain.
     ctx.fillStyle = "#ffffff";
     ctx.beginPath();
     ctx.roundRect(180, 1010, width - 360, 44, [22]);

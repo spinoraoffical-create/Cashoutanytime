@@ -29,11 +29,11 @@ const SECTIONS = [
   },
   {
     heading: "Your choices",
-    body: "You may update profile details from your dashboard and request account deletion by contacting support@spinoracasinos.com.",
+    body: "You may update profile details from your dashboard and request account deletion by contacting support@sweeptakehub.com.",
   },
   {
     heading: "Contact",
-    body: "Privacy questions: support@spinoracasinos.com.",
+    body: "Privacy questions: support@sweeptakehub.com.",
   },
 ];
 

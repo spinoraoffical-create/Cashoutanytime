@@ -1,4 +1,9 @@
 import crypto from "crypto";
+import { getTransferStore } from "./supabase-transfer-store";
+import { terminalGameCount } from "./terminal-account";
+import { providerReplyClass, providerReplyFlags, terminalAgentBalance, terminalAgentKey, terminalUserBalance } from "./terminal-response";
+import { executeGuardedTransfer } from "./transfer-guard";
+import type { DurableTransferStore } from "./transfer-ledger";
 import type { ClientRequest } from "node:http";
 import https from "https";
 import { HttpsProxyAgent } from "https-proxy-agent";
@@ -32,10 +37,8 @@ export interface FireKirinQueryResponse extends FireKirinBaseResponse {
   webLoginUrl?: string;
 }
 
-export function parseFireKirinUserBalance(info: FireKirinQueryResponse): number {
-  const raw = info.userBalance ?? info.userbalance;
-  const value = Number(raw);
-  return Number.isFinite(value) ? value : 0;
+export function parseFireKirinUserBalance(info: FireKirinQueryResponse): number | null {
+  return terminalUserBalance(info);
 }
 
 export function isWholeDollar(amount: number): boolean {
@@ -52,6 +55,7 @@ export interface FireKirinConfig {
   agentPassword?: string;
   /** Fallback only. Direct calls to port 8033 do not use it. `null` disables the fallback. */
   proxyUrl?: string | null;
+  transferStore?: DurableTransferStore;
 }
 
 export interface FireKirinSession {
@@ -137,14 +141,9 @@ export function enqueueFireKirin<T>(task: () => Promise<T>): Promise<T> {
   return run;
 }
 
-/** Each successful Fire Kirin call burns its timestamp. The next call waits for a new second. */
-async function nextFireKirinStamp(): Promise<string> {
-  let now = Math.floor(Date.now() / 1000);
-  if (now <= lastFireKirinStamp) {
-    const waitMs = (lastFireKirinStamp + 1) * 1000 - Date.now() + 50;
-    await new Promise((resolve) => setTimeout(resolve, Math.max(waitMs, 50)));
-    now = Math.floor(Date.now() / 1000);
-  }
+/** Official Fire Kirin time is System.currentTimeMillis. Each successful call consumes its timestamp. */
+function nextFireKirinStamp(): string {
+  let now = Date.now();
   if (now <= lastFireKirinStamp) now = lastFireKirinStamp + 1;
   lastFireKirinStamp = now;
   return String(now);
@@ -162,10 +161,11 @@ export class FireKirinApiClient {
   private fallbackProxy?: string;
   private useProxy = false;
   private session: FireKirinSession | null = null;
-  public lastAgentBalance: number = 0;
+  private transferStore: DurableTransferStore;
+  public lastAgentBalance: number | null = null;
 
   constructor(config: FireKirinConfig = {}) {
-    this.apiUrl = OFFICIAL_API_URL;
+    this.apiUrl = (config.apiUrl || OFFICIAL_API_URL).trim();
 
     this.agentName = (config.agentName || process.env.FIREKIRIN_AGENT_USERNAME || "").trim();
 
@@ -177,13 +177,14 @@ export class FireKirinApiClient {
     } else {
       this.fallbackProxy = (config.proxyUrl || process.env.FIREKIRIN_PROXY_URL || "").trim() || undefined;
     }
+    this.transferStore = config.transferStore || getTransferStore();
   }
 
   get name(): string {
     return this.agentName;
   }
 
-  private stamp(): Promise<string> {
+  private stamp(): string {
     return nextFireKirinStamp();
   }
 
@@ -220,7 +221,7 @@ export class FireKirinApiClient {
     return this.request(loginUrl);
   }
 
-  public async getAgentBalance(): Promise<number> {
+  public async getAgentBalance(): Promise<number | null> {
     await this.getValidSession();
     return this.lastAgentBalance;
   }
@@ -229,9 +230,9 @@ export class FireKirinApiClient {
   public async getValidSession(): Promise<FireKirinSession> {
     if (this.session) return this.session;
 
-    const time = await this.stamp();
+    const time = this.stamp();
     const json = await this.loginAt(time);
-    const agentKey = json.agentkey || json.agentKey;
+    const agentKey = terminalAgentKey(json);
     if (String(json.code) !== "200" || !agentKey) {
       throw new Error(`Fire Kirin agentLogin failed: ${json.msg || `code ${json.code}`}`);
     }
@@ -239,14 +240,13 @@ export class FireKirinApiClient {
   }
 
   private rememberSession(json: FireKirinLoginResponse, agentKey: string, time: string): FireKirinSession {
-    const balance = json.balance ?? json.Balance;
-    this.lastAgentBalance = parseFloat(String(balance || "0"));
+    this.lastAgentBalance = terminalAgentBalance(json);
     this.session = { agentKey, time };
     return this.session;
   }
 
-  private async createSignFromSession(session: FireKirinSession): Promise<{ sign: string; time: string }> {
-    const time = await this.stamp();
+  private createSignFromSession(session: FireKirinSession): { sign: string; time: string } {
+    const time = this.stamp();
     const rawSignStr = (this.agentName + time + session.agentKey).toLowerCase();
     const sign = md5(rawSignStr);
     return { sign, time };
@@ -261,7 +261,7 @@ export class FireKirinApiClient {
       throw new Error("Fire Kirin registerUser refused: player account cannot be the agent login.");
     }
     const session = existingSession || (await this.getValidSession());
-    const { sign, time } = await this.createSignFromSession(session);
+    const { sign, time } = this.createSignFromSession(session);
     const passHash = md5(pass);
 
     const url = `${this.apiUrl}?action=registerUser&account=${encodeURIComponent(
@@ -284,7 +284,7 @@ export class FireKirinApiClient {
     existingSession?: FireKirinSession
   ): Promise<FireKirinQueryResponse> {
     const session = existingSession || (await this.getValidSession());
-    const { sign, time } = await this.createSignFromSession(session);
+    const { sign, time } = this.createSignFromSession(session);
 
     const url = `${this.apiUrl}?action=queryInfo&account=${encodeURIComponent(
       account
@@ -299,65 +299,154 @@ export class FireKirinApiClient {
     return json;
   }
 
+  /** Read-only signed call. It does not create a player or move coins. */
+  public async listGames(
+    existingSession?: FireKirinSession
+  ): Promise<{ code: string; message: string; gameCount: number | null }> {
+    const session = existingSession || (await this.getValidSession());
+    const { sign, time } = this.createSignFromSession(session);
+    const url = `${this.apiUrl}?action=getgamelist&agentName=${encodeURIComponent(
+      this.agentName
+    )}&time=${time}&sign=${sign}`;
+    const json = await this.request(url);
+    return {
+      code: String(json.code),
+      message: String(json.msg || ""),
+      gameCount: terminalGameCount(json.data),
+    };
+  }
+
+  /** Read-only. Sends the same query timestamp twice and returns codes only. */
+  public async compareStampReuse(account: string): Promise<{ firstCode: string; repeatCode: string; balance: number | null; firstClass: string; flags: ReturnType<typeof providerReplyFlags> }> {
+    const session = await this.getValidSession();
+    const { sign, time } = this.createSignFromSession(session);
+    const url = `${this.apiUrl}?action=queryInfo&account=${encodeURIComponent(
+      account
+    )}&agentName=${encodeURIComponent(this.agentName)}&time=${time}&sign=${sign}`;
+    const first = await this.request(url);
+    let repeatCode = "transport";
+    try {
+      const second = await this.request(url);
+      repeatCode = String(second.code);
+    } catch {
+      repeatCode = "transport";
+    }
+    return {
+      firstCode: String(first.code),
+      repeatCode,
+      balance: terminalUserBalance(first),
+      firstClass: providerReplyClass(String(first.code), String(first.msg || "")),
+      flags: providerReplyFlags(String(first.msg || "")),
+    };
+  }
+
+  public async confirmOperation(operationKey: string): Promise<boolean> {
+    return this.transferStore.confirm(operationKey);
+  }
+
   public async rechargePlayer(
     account: string,
     amount: number,
     existingSession?: FireKirinSession,
-    transactionId?: string
-  ): Promise<{ success: boolean; account: string; amount: number; transactionId: string }> {
-    if (!isWholeDollar(amount)) {
-      throw new Error("Fire Kirin recharge amount must be a whole dollar.");
-    }
+    transactionId?: string,
+    requestId?: string
+  ): Promise<{ success: boolean; account: string; amount: number; transactionId: string; operationKey: string }> {
+    if (!isWholeDollar(amount)) throw new Error("Fire Kirin recharge amount must be a whole dollar.");
     const dollars = Math.trunc(amount);
-    const session = existingSession || (await this.getValidSession());
-    const { sign, time } = await this.createSignFromSession(session);
-    const txId = (transactionId || "").slice(0, 20);
-    const tx = txId ? `&transactionId=${encodeURIComponent(txId)}` : "";
-
-    const url = `${this.apiUrl}?action=recharge&account=${encodeURIComponent(
-      account
-    )}&amount=${dollars}${tx}&agentName=${encodeURIComponent(this.agentName)}&time=${time}&sign=${sign}`;
-
-    const json = await this.request(url);
-    if (String(json.code) !== "200") {
-      const errMsg = json.msg || `Recharge failed with code ${json.code}`;
-      throw new Error(`Fire Kirin recharge error [code ${json.code}]: ${errMsg}`);
-    }
-
-    return { success: true, account, amount: dollars, transactionId: txId };
+    const txId = (transactionId || "").trim().slice(0, 20);
+    const reservationId = (requestId || "").trim();
+    if (!txId || !reservationId) throw new Error("A request id is required before Fire Kirin recharge.");
+    let session = existingSession;
+    return executeGuardedTransfer({
+      store: this.transferStore,
+      claim: {
+        operationKey: `fire-kirin:recharge:${reservationId}`,
+        provider: "fire-kirin",
+        action: "recharge",
+        amount: dollars,
+        requestId: reservationId,
+        playerAccount: account,
+        providerTransactionId: txId,
+        providerIdempotent: true,
+      },
+      prepare: async () => {
+        session = session || (await this.getValidSession());
+      },
+      send: async () => {
+        const { sign, time } = this.createSignFromSession(session as FireKirinSession);
+        const url = `${this.apiUrl}?action=recharge&account=${encodeURIComponent(
+          account
+        )}&amount=${dollars}&transactionId=${encodeURIComponent(txId)}&agentName=${encodeURIComponent(this.agentName)}&time=${time}&sign=${sign}`;
+        const json = await this.request(url);
+        return {
+          code: json.code,
+          msg: json.msg ? `Fire Kirin recharge error [code ${json.code}]: ${json.msg}` : undefined,
+          value: { success: true, account, amount: dollars, transactionId: txId },
+        };
+      },
+    });
   }
 
   public async withdrawPlayer(
     account: string,
     amount: number,
     existingSession?: FireKirinSession,
-    transactionId?: string
-  ): Promise<{ success: boolean; account: string; amount: number; transactionId: string }> {
-    if (!isWholeDollar(amount)) {
-      throw new Error("Fire Kirin redeem amount must be a whole dollar.");
-    }
+    transactionId?: string,
+    requestId?: string
+  ): Promise<{ success: boolean; account: string; amount: number; transactionId: string; operationKey: string }> {
+    if (!isWholeDollar(amount)) throw new Error("Fire Kirin redeem amount must be a whole dollar.");
     const dollars = Math.trunc(amount);
+    const txId = (transactionId || "").trim().slice(0, 20);
+    const reservationId = (requestId || "").trim();
+    if (!txId || !reservationId) throw new Error("A request id is required before Fire Kirin redeem.");
+    let session = existingSession;
+    return executeGuardedTransfer({
+      store: this.transferStore,
+      claim: {
+        operationKey: `fire-kirin:redeem:${reservationId}`,
+        provider: "fire-kirin",
+        action: "redeem",
+        amount: dollars,
+        requestId: reservationId,
+        playerAccount: account,
+        providerTransactionId: txId,
+        providerIdempotent: true,
+      },
+      prepare: async () => {
+        session = session || (await this.getValidSession());
+      },
+      send: async () => {
+        const { sign, time } = this.createSignFromSession(session as FireKirinSession);
+        const url = `${this.apiUrl}?action=redeem&account=${encodeURIComponent(
+          account
+        )}&amount=${dollars}&transactionId=${encodeURIComponent(txId)}&agentName=${encodeURIComponent(this.agentName)}&time=${time}&sign=${sign}`;
+        const json = await this.request(url);
+        return {
+          code: json.code,
+          msg: json.msg ? `Fire Kirin redeem error [code ${json.code}]: ${json.msg}` : undefined,
+          value: { success: true, account, amount: dollars, transactionId: txId },
+        };
+      },
+    });
+  }
+
+  public async changePassword(account: string, nextPassword: string, existingSession?: FireKirinSession): Promise<void> {
     const session = existingSession || (await this.getValidSession());
-    const { sign, time } = await this.createSignFromSession(session);
-    const txId = (transactionId || "").slice(0, 20);
-    const tx = txId ? `&transactionId=${encodeURIComponent(txId)}` : "";
-
-    const url = `${this.apiUrl}?action=redeem&account=${encodeURIComponent(
+    const { sign, time } = this.createSignFromSession(session);
+    const url = `${this.apiUrl}?action=changePasswd&account=${encodeURIComponent(
       account
-    )}&amount=${dollars}${tx}&agentName=${encodeURIComponent(this.agentName)}&time=${time}&sign=${sign}`;
-
+    )}&passwdNew=${encodeURIComponent(md5(nextPassword))}&agentName=${encodeURIComponent(
+      this.agentName
+    )}&time=${time}&sign=${sign}`;
     const json = await this.request(url);
     if (String(json.code) !== "200") {
-      const errMsg = json.msg || `Redeem failed with code ${json.code}`;
-      throw new Error(`Fire Kirin redeem error [code ${json.code}]: ${errMsg}`);
+      throw new Error(`Fire Kirin changePasswd error [code ${json.code}]: ${json.msg || "Password reset failed"}`);
     }
-
-    return { success: true, account, amount: dollars, transactionId: txId };
   }
 
   public async kickPlayerOut(account: string, existingSession?: FireKirinSession): Promise<void> {
     const session = existingSession || (await this.getValidSession());
-    const { sign, time } = await this.createSignFromSession(session);
+    const { sign, time } = this.createSignFromSession(session);
 
     const url = `${this.apiUrl}?action=kickPlayerOut&account=${encodeURIComponent(
       account

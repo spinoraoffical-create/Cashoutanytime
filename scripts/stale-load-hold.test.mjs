@@ -54,4 +54,21 @@ for (const row of cases) {
   assert.equal(twice.row.outcome, start.outcome);
 }
 
+const review = readFileSync(
+  new URL("../supabase/migrations/20261017000200_hold_stale_game_loads_for_review.sql", import.meta.url),
+  "utf8"
+);
+const reviewBody = review.slice(review.indexOf("AS $$"), review.indexOf("REVOKE ALL"));
+assert.match(review, /CREATE OR REPLACE FUNCTION public\.fail_stale_game_loads/);
+assert.match(reviewBody, /\[held for review\]/);
+assert.match(reviewBody, /FOR UPDATE SKIP LOCKED/);
+assert.equal(reviewBody.includes("refund_game_load_wallet"), false);
+assert.equal(reviewBody.includes("credit_wallet"), false);
+assert.equal(reviewBody.includes("debit_wallet"), false);
+assert.equal(reviewBody.includes("wallet_balance"), false);
+assert.equal(reviewBody.includes("INSERT"), false);
+assert.equal(reviewBody.includes("status = 'failed'"), false);
+assert.equal(reviewBody.includes("wallet_refunded = true"), false);
+assert.match(review, /GRANT EXECUTE ON FUNCTION public\.fail_stale_game_loads\(integer, uuid, text\) TO service_role/);
+
 console.log("stale load hold checks passed");

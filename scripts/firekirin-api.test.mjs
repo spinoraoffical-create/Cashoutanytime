@@ -22,7 +22,7 @@ assert.equal(api.includes("timeUnit"), false);
 assert.match(api, /Host: hostHeader/);
 assert.match(api, /String\(json\.code\) !== "200"/);
 assert.match(api, /\.toLowerCase\(\)/);
-assert.match(api, /this\.apiUrl = OFFICIAL_API_URL/);
+assert.match(api, /config\.apiUrl \|\| OFFICIAL_API_URL/);
 
 const service = readFileSync(new URL("../src/lib/game-automation/firekirin-service.ts", import.meta.url), "utf8");
 assert.match(service, /complete_game_load/);
@@ -38,7 +38,9 @@ const refund = readFileSync(
 assert.match(refund, /load_type NOT IN \('load', 'reload'\)/);
 assert.match(refund, /wallet_refunded/);
 assert.match(service, /status: "completed"/);
-assert.match(service, /createFireKirinPlayerOnStore/);
+assert.match(service, /openTerminalPlayerAccount/);
+assert.match(service, /TERMINAL_ACCOUNT_CREATION_ARMED/);
+assert.equal(service.includes("createFireKirinPlayerOnStore"), false);
 const store = readFileSync(new URL("../src/lib/game-automation/firekirin-store.ts", import.meta.url), "utf8");
 assert.match(store, /Store\.aspx/);
 assert.match(store, /CreateAccount\.aspx/);

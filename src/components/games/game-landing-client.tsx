@@ -16,6 +16,7 @@ interface GameLandingClientProps {
   game: Game;
   autoCreate?: boolean;
   walletLoadEnabled?: boolean;
+  providerReady?: boolean;
   initialGameAccount?: {
     game_username: string;
     game_password: string | null;
@@ -27,6 +28,7 @@ export function GameLandingClient({
   game,
   autoCreate,
   walletLoadEnabled,
+  providerReady = true,
   initialGameAccount,
   guides = [],
 }: GameLandingClientProps) {
@@ -133,11 +135,11 @@ export function GameLandingClient({
     if (accountStatus === "loading") return;
     autoCreateAttempted.current = true;
 
-    if (!walletLoadEnabled || accountStatus === "has") return;
+    if (!walletLoadEnabled || !providerReady || accountStatus === "has") return;
 
     void handleCreateAccount();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [autoCreate, walletLoadEnabled, accountStatus]);
+  }, [autoCreate, walletLoadEnabled, providerReady, accountStatus]);
 
   const rules = GAME_BONUS_RULES;
   const hasAccount = accountStatus === "has" || Boolean(resolvedAccount?.game_username);
@@ -173,7 +175,16 @@ export function GameLandingClient({
         </section>
       ) : null}
 
-      {!game.upcoming && walletLoadEnabled && hasAccount && resolvedAccount ? (
+      {!game.upcoming && walletLoadEnabled && !providerReady ? (
+        <section className="rounded-2xl border border-white/10 bg-[#24152e] p-4">
+          <h2 className="text-lg font-black">Not connected yet</h2>
+          <p className="mt-1 text-sm text-[#b9b3c6]">
+            {game.name} does not have a game connection on this site yet. Account creation, balance, load, and redeem stay off until it does.
+          </p>
+        </section>
+      ) : null}
+
+      {!game.upcoming && walletLoadEnabled && providerReady && hasAccount && resolvedAccount ? (
         <GameWalletLoadSection
           mode="owned"
           game={game}
@@ -182,7 +193,7 @@ export function GameLandingClient({
         />
       ) : null}
 
-      {!game.upcoming && walletLoadEnabled && !hasAccount ? (
+      {!game.upcoming && walletLoadEnabled && providerReady && !hasAccount ? (
         <section className="overflow-hidden rounded-2xl border border-white/10 bg-[#24152e]">
           <div className="p-4">
             <h2 className="text-lg font-black">Start with {game.name}</h2>

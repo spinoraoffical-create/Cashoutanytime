@@ -92,7 +92,7 @@ async function layuiBalance(api: {
   return { storeCoins: api.getStoreCoins(), ...players };
 }
 
-async function agentBalance(read: () => Promise<number>): Promise<ListedCoins> {
+async function agentBalance(read: () => Promise<number | null>): Promise<ListedCoins> {
   const storeCoins = await read();
   return {
     storeCoins: Number.isFinite(storeCoins) ? storeCoins : null,

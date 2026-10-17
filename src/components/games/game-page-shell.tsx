@@ -8,6 +8,7 @@ interface GamePageShellProps {
   game: Game;
   autoCreate?: boolean;
   walletLoadEnabled?: boolean;
+  providerReady?: boolean;
   initialGameAccount?: {
     game_username: string;
     game_password: string | null;
@@ -19,6 +20,7 @@ export function GamePageShell({
   game,
   autoCreate,
   walletLoadEnabled,
+  providerReady = true,
   initialGameAccount,
   guides,
 }: GamePageShellProps) {
@@ -28,6 +30,7 @@ export function GamePageShell({
         game={game}
         autoCreate={autoCreate}
         walletLoadEnabled={walletLoadEnabled}
+        providerReady={providerReady}
         initialGameAccount={initialGameAccount}
         guides={guides}
       />

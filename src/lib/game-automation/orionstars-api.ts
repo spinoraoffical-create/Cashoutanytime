@@ -1,6 +1,10 @@
 import crypto from "crypto";
 import https from "https";
 import { HttpsProxyAgent } from "https-proxy-agent";
+import { getTransferStore } from "./supabase-transfer-store";
+import { terminalAgentBalance, terminalAgentKey, terminalUserBalance } from "./terminal-response";
+import { executeGuardedTransfer } from "./transfer-guard";
+import type { DurableTransferStore } from "./transfer-ledger";
 
 /**
  * Orion Stars Official Terminal API v1.2.6 Client
@@ -9,7 +13,9 @@ import { HttpsProxyAgent } from "https-proxy-agent";
 export interface OrionStarsLoginResponse {
   code: string | number;
   balance?: string | number;
+  Balance?: string | number;
   agentkey?: string;
+  agentKey?: string;
   msg?: string;
 }
 
@@ -29,17 +35,16 @@ export interface OrionStarsQueryResponse extends OrionStarsBaseResponse {
   webLoginUrl?: string;
 }
 
-export function parseOrionStarsUserBalance(info: OrionStarsQueryResponse): number {
-  const raw = info.userBalance ?? info.userbalance;
-  const value = Number(raw);
-  return Number.isFinite(value) ? value : 0;
+export function parseOrionStarsUserBalance(info: OrionStarsQueryResponse): number | null {
+  return terminalUserBalance(info);
 }
 
 export interface OrionStarsConfig {
   apiUrl?: string;
   agentName?: string;
   agentPassword?: string;
-  proxyUrl?: string;
+  proxyUrl?: string | null;
+  transferStore?: DurableTransferStore;
 }
 
 export interface OrionStarsSession {
@@ -100,13 +105,14 @@ export class OrionStarsApiClient {
   private agentName: string;
   private agentPasswdHash: string;
   private proxyUrl?: string;
-  public lastAgentBalance: number = 0;
+  private transferStore: DurableTransferStore;
+  public lastAgentBalance: number | null = null;
 
   constructor(config: OrionStarsConfig = {}) {
     this.apiUrl = (
       config.apiUrl ||
       process.env.ORIONSTARS_API_URL ||
-      "https://34.212.168.0:8033/ws/service.ashx"
+      "https://orionstars.vip:8033/ws/service.ashx"
     ).trim();
 
     this.agentName = (
@@ -122,12 +128,17 @@ export class OrionStarsApiClient {
 
     this.agentPasswdHash = md5(rawPass.trim());
 
-    this.proxyUrl = (
-      config.proxyUrl ||
-      process.env.ORIONSTARS_PROXY_URL ||
-      process.env.GAMEVAULT_PROXY_URL ||
-      ""
-    ).trim();
+    if (config.proxyUrl === null) {
+      this.proxyUrl = undefined;
+    } else {
+      this.proxyUrl = (
+        config.proxyUrl ||
+        process.env.ORIONSTARS_PROXY_URL ||
+        process.env.GAMEVAULT_PROXY_URL ||
+        ""
+      ).trim() || undefined;
+    }
+    this.transferStore = config.transferStore || getTransferStore();
   }
 
   private async request(url: string): Promise<any> {
@@ -148,19 +159,16 @@ export class OrionStarsApiClient {
       this.agentName
     )}&agentPasswd=${encodeURIComponent(this.agentPasswdHash)}&time=${time}`;
 
-    console.log(`[OrionStars API] agentLogin call | agentName: "${this.agentName}" | proxy: ${this.proxyUrl ? "ENABLED" : "DIRECT"}`);
-
     const json: OrionStarsLoginResponse = await this.request(loginUrl);
+    const agentKey = terminalAgentKey(json);
 
-    console.log(`[OrionStars API] agentLogin response | code: ${json.code} | balance: "${json.balance}" | agentKey: ${json.agentkey ? json.agentkey.slice(0, 6) + "..." : "NONE"}`);
-
-    if (String(json.code) !== "200" || !json.agentkey) {
+    if (String(json.code) !== "200" || !agentKey) {
       const msg = json.msg || `code ${json.code}`;
       throw new Error(`Orion Stars agentLogin failed: ${msg}`);
     }
 
-    this.lastAgentBalance = parseFloat(String(json.balance || "0"));
-    return { agentKey: json.agentkey, time };
+    this.lastAgentBalance = terminalAgentBalance(json);
+    return { agentKey, time };
   }
 
   private createSignFromSession(session: OrionStarsSession): { sign: string; time: string; agentKey: string } {
@@ -177,26 +185,19 @@ export class OrionStarsApiClient {
     existingSession?: OrionStarsSession
   ): Promise<{ account: string; pass: string; session: OrionStarsSession }> {
     const session = existingSession || (await this.getValidSession());
-    const { sign, time, agentKey } = this.createSignFromSession(session);
+    const { sign, time } = this.createSignFromSession(session);
     const passHash = md5(pass);
 
     const url = `${this.apiUrl}?action=registerUser&account=${encodeURIComponent(
       account
     )}&passwd=${encodeURIComponent(passHash)}&agentName=${encodeURIComponent(
       this.agentName
-    )}&agentkey=${encodeURIComponent(agentKey)}&time=${time}&sign=${sign}`;
-
-    console.log(`[OrionStars API] registerUser calling for account: "${account}"...`);
+    )}&time=${time}&sign=${sign}`;
 
     const json = await this.request(url);
 
-    console.log(`[OrionStars API] registerUser response | code: ${json.code} | msg: "${json.msg || ""}"`);
-
     if (String(json.code) !== "200") {
-      let errMsg = json.msg || `Registration failed with code ${json.code}`;
-      if (String(json.code) === "201" && !/session timeout/i.test(errMsg)) {
-        errMsg = `${errMsg} (Verify agent store balance on Orion Stars admin panel)`;
-      }
+      const errMsg = json.msg || `Registration failed with code ${json.code}`;
       throw new Error(`Orion Stars registerUser error [code ${json.code}]: ${errMsg}`);
     }
 
@@ -205,62 +206,113 @@ export class OrionStarsApiClient {
 
   public async queryInfo(account: string, existingSession?: OrionStarsSession): Promise<OrionStarsQueryResponse> {
     const session = existingSession || (await this.getValidSession());
-    const { sign, time, agentKey } = this.createSignFromSession(session);
+    const { sign, time } = this.createSignFromSession(session);
 
     const url = `${this.apiUrl}?action=queryInfo&account=${encodeURIComponent(
       account
-    )}&agentName=${encodeURIComponent(this.agentName)}&agentkey=${encodeURIComponent(
-      agentKey
-    )}&time=${time}&sign=${sign}`;
+    )}&agentName=${encodeURIComponent(this.agentName)}&time=${time}&sign=${sign}`;
 
     const json: OrionStarsQueryResponse = await this.request(url);
     if (String(json.code) !== "200") {
-      let errMsg = json.msg || `Query failed with code ${json.code}`;
-      if (String(json.code) === "201") {
-        errMsg = `${errMsg} (Session timeout)`;
-      }
+      const errMsg = json.msg || `Query failed with code ${json.code}`;
       throw new Error(`Orion Stars queryInfo error [code ${json.code}]: ${errMsg}`);
     }
 
     return json;
   }
 
-  public async rechargePlayer(account: string, amount: number, existingSession?: OrionStarsSession): Promise<{ success: boolean; account: string; amount: number }> {
+  /** Read-only. status 0 is available and status 1 is taken. It does not create a player. */
+  public async checkAccountName(
+    account: string,
+    existingSession?: OrionStarsSession
+  ): Promise<{ code: string; message: string; nameState: "available" | "taken" | "unknown" }> {
     const session = existingSession || (await this.getValidSession());
-    const { sign, time, agentKey } = this.createSignFromSession(session);
-
-    const url = `${this.apiUrl}?action=recharge&account=${encodeURIComponent(
+    const { sign, time } = this.createSignFromSession(session);
+    const url = `${this.apiUrl}?action=checkAccountName&account=${encodeURIComponent(
       account
-    )}&amount=${Math.floor(amount)}&agentName=${encodeURIComponent(
-      this.agentName
-    )}&agentkey=${encodeURIComponent(agentKey)}&time=${time}&sign=${sign}`;
-
+    )}&agentName=${encodeURIComponent(this.agentName)}&time=${time}&sign=${sign}`;
     const json = await this.request(url);
-    if (String(json.code) !== "200") {
-      const errMsg = json.msg || `Recharge failed with code ${json.code}`;
-      throw new Error(`Orion Stars recharge error [code ${json.code}]: ${errMsg}`);
-    }
-
-    return { success: true, account, amount };
+    const code = String(json.code);
+    const status = Number(json.status);
+    const nameState = code === "200" && status === 0 ? "available" : code === "200" && status === 1 ? "taken" : "unknown";
+    return { code, message: String(json.msg || ""), nameState };
   }
 
-  public async withdrawPlayer(account: string, amount: number, existingSession?: OrionStarsSession): Promise<{ success: boolean; account: string; amount: number }> {
+  public async rechargePlayer(
+    account: string,
+    amount: number,
+    existingSession?: OrionStarsSession,
+    requestId?: string
+  ): Promise<{ success: boolean; account: string; amount: number; operationKey: string }> {
+    return this.moneyCall("recharge", account, amount, existingSession, requestId);
+  }
+
+  public async withdrawPlayer(
+    account: string,
+    amount: number,
+    existingSession?: OrionStarsSession,
+    requestId?: string
+  ): Promise<{ success: boolean; account: string; amount: number; operationKey: string }> {
+    return this.moneyCall("redeem", account, amount, existingSession, requestId);
+  }
+
+  public async changePassword(account: string, nextPassword: string, existingSession?: OrionStarsSession): Promise<void> {
     const session = existingSession || (await this.getValidSession());
-    const { sign, time, agentKey } = this.createSignFromSession(session);
-
-    const url = `${this.apiUrl}?action=redeem&account=${encodeURIComponent(
+    const { sign, time } = this.createSignFromSession(session);
+    const url = `${this.apiUrl}?action=changePasswd&account=${encodeURIComponent(
       account
-    )}&amount=${Math.floor(amount)}&agentName=${encodeURIComponent(
+    )}&passwdNew=${encodeURIComponent(md5(nextPassword))}&agentName=${encodeURIComponent(
       this.agentName
-    )}&agentkey=${encodeURIComponent(agentKey)}&time=${time}&sign=${sign}`;
-
+    )}&time=${time}&sign=${sign}`;
     const json = await this.request(url);
     if (String(json.code) !== "200") {
-      const errMsg = json.msg || `Redeem failed with code ${json.code}`;
-      throw new Error(`Orion Stars redeem error [code ${json.code}]: ${errMsg}`);
+      throw new Error(`Orion Stars changePasswd error [code ${json.code}]: ${json.msg || "Password reset failed"}`);
     }
+  }
 
-    return { success: true, account, amount };
+  public async confirmOperation(operationKey: string): Promise<boolean> {
+    return this.transferStore.confirm(operationKey);
+  }
+
+  private async moneyCall(
+    action: "recharge" | "redeem",
+    account: string,
+    amount: number,
+    existingSession: OrionStarsSession | undefined,
+    requestId: string | undefined
+  ): Promise<{ success: boolean; account: string; amount: number; operationKey: string }> {
+    const reservationId = requestId?.trim() || "";
+    if (!reservationId) throw new Error("A request id is required before an Orion Stars transfer.");
+    let session = existingSession;
+    const dollars = Math.floor(amount);
+    return executeGuardedTransfer({
+      store: this.transferStore,
+      claim: {
+        operationKey: `orion-stars:${action}:${reservationId}`,
+        provider: "orion-stars",
+        action,
+        amount: dollars,
+        requestId: reservationId,
+        playerAccount: account,
+        providerTransactionId: null,
+        providerIdempotent: false,
+      },
+      prepare: async () => {
+        session = session || (await this.getValidSession());
+      },
+      send: async () => {
+        const { sign, time } = this.createSignFromSession(session as OrionStarsSession);
+        const url = `${this.apiUrl}?action=${action}&account=${encodeURIComponent(
+          account
+        )}&amount=${dollars}&agentName=${encodeURIComponent(this.agentName)}&time=${time}&sign=${sign}`;
+        const json = await this.request(url);
+        return {
+          code: json.code,
+          msg: json.msg ? `Orion Stars ${action} error [code ${json.code}]: ${json.msg}` : undefined,
+          value: { success: true, account, amount: dollars },
+        };
+      },
+    });
   }
 }
 

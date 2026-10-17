@@ -166,6 +166,7 @@ export const ADMIN_NAV: AdminNavSection[] = [
       { href: "/admin/ai-blog", label: "AI blog", permission: "cms.manage" },
       { href: "/admin/ai-bot", label: "Support chatbot", permission: "support.manage" },
       { href: "/admin/analyzer", label: "Analyzer", permission: null },
+      { href: "/admin/game-automation", label: "Game automation", permission: null, superOnly: true },
     ],
   },
   {

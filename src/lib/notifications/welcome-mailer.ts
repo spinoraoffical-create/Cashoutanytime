@@ -24,7 +24,7 @@ export async function sendFreePlayerEmail({ to, subject, html }: EmailOptions): 
         Authorization: `Bearer ${resendApiKey}`,
       },
       body: JSON.stringify({
-        from: process.env.RESEND_FROM_EMAIL ?? "Sweepstakes Hub <noreply@spinoracasinos.com>",
+        from: process.env.RESEND_FROM_EMAIL ?? "Sweepstakes Hub <noreply@sweeptakehub.com>",
         to: [to],
         subject,
         html,

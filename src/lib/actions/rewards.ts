@@ -2,6 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { assertFreeplayAllowed } from "@/lib/actions/security";
+import { createAdminClient } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
 
 export async function claimRewardAction(ruleKey: string) {
@@ -14,7 +15,13 @@ export async function claimRewardAction(ruleKey: string) {
   const freeplay = await assertFreeplayAllowed();
   if (!freeplay.ok) return { ok: false as const, error: freeplay.error };
 
-  const { data, error } = await supabase.rpc("claim_reward", { rule_key: ruleKey });
+  const admin = createAdminClient();
+  if (!admin) return { ok: false as const, error: "Rewards are unavailable right now." };
+
+  const { data, error } = await admin.rpc("claim_reward", {
+    rule_key: ruleKey,
+    p_user_id: user.id,
+  });
   if (error) {
     return { ok: false as const, error: error.message };
   }
@@ -37,9 +44,13 @@ export async function claimPromotionAction(slug: string, code?: string) {
   } = await supabase.auth.getUser();
   if (!user) return { ok: false as const, error: "Not signed in." };
 
-  const { data, error } = await supabase.rpc("claim_promotion", {
+  const admin = createAdminClient();
+  if (!admin) return { ok: false as const, error: "Promotions are unavailable right now." };
+
+  const { data, error } = await admin.rpc("claim_promotion", {
     promo_slug: slug,
     redeem_code: code ?? null,
+    p_user_id: user.id,
   });
   if (error) {
     return { ok: false as const, error: error.message };

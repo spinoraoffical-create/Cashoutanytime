@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { Mail } from "lucide-react";
@@ -15,9 +15,13 @@ import { buildAuthCallbackUrl, getEmailAuthOrigin } from "@/lib/auth/callback-ur
 import { normalizeEmail, formatAuthErrorMessage } from "@/lib/auth/identifier";
 import {
   finalizeRegistrationAfterSignUp,
+  guardAuthEmailSend,
   isPhoneAvailable,
   signInWithEmailPassword,
 } from "@/lib/actions/auth";
+import { PasswordField } from "@/components/auth/password-field";
+import { passwordIsAcceptable } from "@/lib/auth/password-rules";
+import { OTP_REJECTED_MESSAGE } from "@/lib/auth/recovery";
 import { checkSignupAllowed, linkSignupSecurity } from "@/lib/actions/security";
 import { getDeviceId } from "@/lib/security/device-fingerprint";
 
@@ -28,22 +32,33 @@ interface EmailAuthFormProps {
   agentCode?: string | null;
 }
 
+const RESEND_COOLDOWN_SECONDS = 60;
+
 function EmailCodeForm({ email, redirect }: { email: string; redirect: string }) {
   const router = useRouter();
   const [code, setCode] = useState("");
   const [loading, setLoading] = useState(false);
   const [sending, setSending] = useState(false);
+  const [cooldown, setCooldown] = useState(RESEND_COOLDOWN_SECONDS);
+  const [formError, setFormError] = useState("");
+
+  useEffect(() => {
+    if (cooldown <= 0) return;
+    const timer = window.setTimeout(() => setCooldown((current) => current - 1), 1000);
+    return () => window.clearTimeout(timer);
+  }, [cooldown]);
 
   async function verify(e: React.FormEvent) {
     e.preventDefault();
+    setFormError("");
     if (!isValidOtpCode(code)) {
-      toast.error("Enter the 6-digit code from your email.");
+      setFormError("Enter the 6-digit code from the email.");
       return;
     }
 
     const supabase = createClient();
     if (!supabase) {
-      toast.error("Sign-in is temporarily unavailable. Please try again later or contact support.");
+      setFormError("Sign-in is temporarily unavailable. Please try again later or contact support.");
       return;
     }
 
@@ -56,7 +71,7 @@ function EmailCodeForm({ email, redirect }: { email: string; redirect: string })
     setLoading(false);
 
     if (error) {
-      toast.error(formatAuthErrorMessage(error));
+      setFormError(OTP_REJECTED_MESSAGE);
       return;
     }
 
@@ -66,16 +81,29 @@ function EmailCodeForm({ email, redirect }: { email: string; redirect: string })
   }
 
   async function resend() {
+    if (cooldown > 0 || sending) return;
     const supabase = createClient();
     if (!supabase) return;
     setSending(true);
-    const { error } = await supabase.auth.resend({ type: "signup", email });
-    setSending(false);
-    if (error) {
-      toast.error(formatAuthErrorMessage(error));
+    setFormError("");
+    const guard = await guardAuthEmailSend(email, "signup");
+    if (!guard.ok) {
+      setSending(false);
+      setFormError(guard.error);
       return;
     }
-    toast.success("A new code was sent.");
+    const { error } = await supabase.auth.resend({
+      type: "signup",
+      email,
+      options: { emailRedirectTo: buildAuthCallbackUrl(window.location.origin, redirect) },
+    });
+    setSending(false);
+    if (error) {
+      setFormError(formatAuthErrorMessage(error));
+      return;
+    }
+    setCooldown(RESEND_COOLDOWN_SECONDS);
+    toast.success("We sent a new 6-digit code.");
   }
 
   return (
@@ -86,11 +114,11 @@ function EmailCodeForm({ email, redirect }: { email: string; redirect: string })
         </div>
         <p className="mt-3 text-lg font-semibold text-foreground">Enter your code</p>
         <p className="mt-2 text-sm text-muted-foreground">
-          We sent a 6-digit code to <strong className="text-foreground">{email}</strong>
+          We sent a 6-digit code to <strong className="text-foreground">{email}</strong>. Type it here to finish.
         </p>
       </div>
       <div className="space-y-2">
-        <Label htmlFor="signup-code">Code</Label>
+        <Label htmlFor="signup-code">6-digit code</Label>
         <Input
           id="signup-code"
           inputMode="numeric"
@@ -103,18 +131,21 @@ function EmailCodeForm({ email, redirect }: { email: string; redirect: string })
           required
         />
       </div>
+      {formError && <p className="text-sm text-red-600">{formError}</p>}
       <Button type="submit" className="w-full" disabled={loading || code.length !== 6}>
         {loading ? "Checking code..." : "Verify email"}
       </Button>
       <button
         type="button"
         onClick={() => void resend()}
-        disabled={sending}
+        disabled={sending || cooldown > 0}
         className="w-full text-sm font-semibold text-primary hover:underline disabled:opacity-60"
       >
-        {sending ? "Sending..." : "Send a new code"}
+        {sending ? "Sending..." : cooldown > 0 ? `Send a new code in ${cooldown}s` : "Send a new code"}
       </button>
-      <p className="text-center text-xs text-muted-foreground">Check spam if the code is not there in a minute.</p>
+      <p className="text-center text-xs text-muted-foreground">
+        Check spam if it is not there in a minute. If the email also has a link, you can open that link in this browser.
+      </p>
     </form>
   );
 }
@@ -165,7 +196,7 @@ export function EmailAuthForm({ mode, redirect = "/", referralCodeFromUrl, agent
       if (!result.loggedIn) {
         setPendingEmail(result.email);
         setAwaitingConfirmation(true);
-        toast.success("We sent a 6-digit code. Enter it to verify your email.");
+        toast.success("We sent a 6-digit code. Enter it to finish.");
         return;
       }
 
@@ -223,8 +254,8 @@ export function EmailAuthForm({ mode, redirect = "/", referralCodeFromUrl, agent
       return;
     }
 
-    if (password.length < 6) {
-      toast.error("Password must be at least 6 characters");
+    if (!passwordIsAcceptable(password)) {
+      toast.error("Use at least 8 characters, with a letter and a number.");
       setLoading(false);
       return;
     }
@@ -396,40 +427,32 @@ export function EmailAuthForm({ mode, redirect = "/", referralCodeFromUrl, agent
         </div>
       )}
       <div className="space-y-2">
-        <div className="flex justify-between">
-          <Label htmlFor="password">Password</Label>
-          {mode === "login" && (
-            <Link
-              href="/reset-password"
-              className="text-sm text-primary hover:underline font-medium"
-            >
+        {mode === "login" && (
+          <div className="flex justify-end">
+            <Link href="/reset-password" className="text-sm font-medium text-primary hover:underline">
               Forgot password?
             </Link>
-          )}
-        </div>
-        <Input
+          </div>
+        )}
+        <PasswordField
           id="password"
-          type="password"
+          label="Password"
           value={password}
-          onChange={(e) => setPassword(e.target.value)}
-          required
-          minLength={mode === "register" ? 6 : undefined}
-          placeholder={mode === "register" ? "At least 6 characters" : undefined}
+          onChange={setPassword}
+          autoComplete={mode === "login" ? "current-password" : "new-password"}
+          placeholder={mode === "register" ? "At least 8 characters" : undefined}
+          showRules={mode === "register"}
         />
       </div>
       {mode === "register" && (
-        <div className="space-y-2">
-          <Label htmlFor="confirmPassword">Confirm Password</Label>
-          <Input
-            id="confirmPassword"
-            type="password"
-            value={confirmPassword}
-            onChange={(e) => setConfirmPassword(e.target.value)}
-            required
-            minLength={6}
-            placeholder="Re-enter your password"
-          />
-        </div>
+        <PasswordField
+          id="confirmPassword"
+          label="Confirm password"
+          value={confirmPassword}
+          onChange={setConfirmPassword}
+          autoComplete="new-password"
+          placeholder="Re-enter your password"
+        />
       )}
       {mode === "register" && !agentCode && (
         <div className="space-y-2">

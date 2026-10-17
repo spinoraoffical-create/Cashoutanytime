@@ -18,7 +18,8 @@ export async function createCashFrenzyAccount(
   client?: CashFrenzyApiClient
 ) {
   const api = client || getCashFrenzyApiClient();
-  const password = params.password || "123456";
+  const password = params.password?.trim();
+  if (!password) throw new Error("A game password is required.");
   const nickname = (params.nickname && params.nickname !== "-") ? params.nickname : params.username;
   const res = await api.addPlayer(params.username, password, nickname, "0");
   return { success: true, account: res.data.account, password: res.data.password };

@@ -5,7 +5,7 @@ export const HOME_FAQS = [
   },
   {
     q: "How do I create an account?",
-    a: "Open Register, enter your details, and type the 6-digit code sent to your email. You can also choose Continue with Google and sign in with that Google account.",
+    a: "Open Register, enter your details, and type the 6-digit code from your email. You can also choose Continue with Google and sign in with that Google account.",
   },
   {
     q: "What games can I play?",

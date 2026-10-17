@@ -2,7 +2,7 @@
 
 export type ProviderOutcome = "confirmed_success" | "confirmed_failure" | "unknown";
 
-const UNKNOWN_PROVIDER = /timed out|timeout|ECONNRESET|ECONNREFUSED|ENOTFOUND|EAI_AGAIN|socket hang up|network|aborted|unreachable|empty response|invalid JSON|bad gateway|fetch failed|worker interrupted/i;
+const UNKNOWN_PROVIDER = /timed out|timeout|ECONNRESET|ECONNREFUSED|ENOTFOUND|EAI_AGAIN|socket hang up|network|aborted|unreachable|empty response|invalid JSON|bad gateway|fetch failed|worker interrupted|outcome unknown/i;
 
 export function classifyProviderOutcome(input: {
   success: boolean;
@@ -71,6 +71,15 @@ export const STALE_LOAD_CHECK_FAILED =
  * A failed fail_my_stale_game_load call is not a confirmed provider failure.
  * The app must not refund or close the row from that error.
  */
+/**
+ * A successful balance check must carry the provider's number.
+ * Zero is a real balance. A missing number is unknown and must not be saved as zero.
+ */
+export function confirmedCheckBalance(reported: number | null | undefined): number | null {
+  if (typeof reported !== "number" || !Number.isFinite(reported)) return null;
+  return reported;
+}
+
 export function staleLoadRpcDecision(input: {
   rpcFailed: boolean;
   healedCount?: number | null;

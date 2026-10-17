@@ -17,7 +17,7 @@ function LoginForm() {
     }
     if (searchParams.get("error") === "auth_callback_failed") {
       toast.error(
-        "Confirmation link expired or already used. Register again or sign in to get a new link."
+        "That code or link expired. Request a new code, or sign in if you already verified."
       );
     }
     if (searchParams.get("error") === "email_not_confirmed") {

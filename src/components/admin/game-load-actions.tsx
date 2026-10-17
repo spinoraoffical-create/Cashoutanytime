@@ -52,6 +52,9 @@ export function GameLoadActions({ load }: GameLoadActionsProps) {
       {load.game_password && (
         <p className="text-xs font-mono text-[#00E5FF] break-all">Pass: {load.game_password}</p>
       )}
+      {load.admin_notes && (
+        <p className="text-xs text-amber-200">{load.admin_notes}</p>
+      )}
       {load.error_message && (
         <p className="text-xs text-destructive">{load.error_message}</p>
       )}

@@ -76,7 +76,7 @@ export function formatAuthErrorMessage(error: unknown): string {
     lower.includes("invalid login credentials") ||
     lower.includes("invalid email or password")
   ) {
-    return "Email or password is incorrect. If you just created an account, open the confirmation email before signing in.";
+    return "Email or password is incorrect. If you just created an account, enter the 6-digit code from the email before signing in.";
   }
   if (codeLower.includes("redirect") || lower.includes("redirect")) {
     console.error("[auth] redirect rejected:", trimmed, code);

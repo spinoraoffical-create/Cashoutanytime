@@ -5,7 +5,7 @@ import {
   getSupabaseServiceRoleKey,
   getSupabaseUrl,
   isSupabaseConfigured,
-} from "@/lib/supabase/env";
+} from "./env";
 
 /** Server-only client for auth lookups (never expose to the browser) */
 export function createAdminClient(): SupabaseClient | null {

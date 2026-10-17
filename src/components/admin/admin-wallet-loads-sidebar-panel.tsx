@@ -64,6 +64,9 @@ function LoadEntry({ load, compact }: { load: AdminGameLoadRow; compact?: boolea
           <p className="mt-1 text-[11px] text-slate-500">
             {formatDate(load.created_at)} · {formatRelativeTime(load.created_at)}
           </p>
+          {!compact && load.admin_notes && (
+            <p className="mt-1 text-xs text-amber-200">{load.admin_notes}</p>
+          )}
           {!compact && load.error_message && (
             <p className="mt-1 text-xs text-red-400">{load.error_message}</p>
           )}

@@ -1,6 +1,9 @@
 import { createAdminClient } from "@/lib/supabase/admin";
+import { generateGamePassword } from "./account-username";
 import { MilkyWayApiClient, parseMilkyWayUserBalance } from "./milkyway-api";
 import { shouldRefundProviderError } from "./load-outcome";
+import { claimProviderAccount, finishProviderAccount } from "./account-claim";
+import { openTerminalPlayerAccount, probeFromError, TERMINAL_ACCOUNT_CREATION_ARMED, type ProviderProbe } from "./terminal-account";
 
 export interface AutoFulfillMilkyWayOptions {
   requestId?: string;
@@ -35,44 +38,50 @@ export async function autoFulfillMilkyWayRequest(
 
   try {
     if (loadType === "create_account") {
-      console.log(`[MW Strict Flow] Initiating provider account creation for account: "${cleanAccount}"`);
-      const passToUse = password?.trim() || `Pass_${Math.floor(1000 + Math.random() * 9000)}`;
-
-      // 1. Call registerUser on Milky Way API
-      console.log(`[MW Strict Flow] Calling client.createAccount(registerUser)...`);
-      const created = await client.createAccount(cleanAccount, passToUse);
-
-      // 2. Strict Verification: Call queryInfo to confirm account exists on Milky Way server using exact same session
-      console.log(`[MW Strict Flow] registerUser code 200 received! Verifying via queryInfo...`);
-      const verifiedInfo = await client.queryInfo(created.account, created.session);
-
-      if (String(verifiedInfo.code) !== "200") {
-        throw new Error(`Milky Way account verification failed via queryInfo [code ${verifiedInfo.code}]: ${verifiedInfo.msg || "Account not found on provider server"}`);
+      let savedPassword = "";
+      const outcome = await openTerminalPlayerAccount({
+        provider: "milky-way",
+        account: cleanAccount,
+        armed: TERMINAL_ACCOUNT_CREATION_ARMED,
+        capability: async () => client.listGames(),
+        lookup: async () => readMilkyWayLookup(client, cleanAccount),
+        register: async () => {
+          const passToUse = password?.trim() || generateGamePassword();
+          try {
+            const created = await client.createAccount(cleanAccount, passToUse);
+            savedPassword = created.pass;
+            return { code: "200", message: "" };
+          } catch (error) {
+            return probeFromError(error);
+          }
+        },
+        verify: async () => readMilkyWayLookup(client, cleanAccount),
+        claim: () => claimProviderAccount("milky-way", cleanAccount),
+        finish: (outcome) => finishProviderAccount("milky-way", cleanAccount, outcome),
+      });
+      if (outcome.status !== "confirmed" || !savedPassword) {
+        throw new Error(outcome.reason);
       }
 
-      console.log(`[MW Strict Flow] Provider account verified successfully! Userbalance: ${parseMilkyWayUserBalance(verifiedInfo)}`);
-
-      // 3. Save provider account information locally ONLY AFTER verified on Milky Way provider
       if (admin && requestId) {
         await admin
           .from("game_load_requests")
           .update({
-            game_username: created.account,
-            game_password: created.pass,
+            game_username: cleanAccount,
+            game_password: savedPassword,
             completed_at: new Date().toISOString(),
             updated_at: new Date().toISOString(),
           })
           .eq("id", requestId);
-        console.log(`[MW Strict Flow] Local DB updated to completed for requestId: ${requestId}`);
       }
 
       return {
         success: true,
-        message: `Milky Way account created and verified on provider: ${created.account}`,
-        accountName: created.account,
+        message: `Milky Way account created and confirmed by lookup: ${cleanAccount}`,
+        accountName: cleanAccount,
         credentials: {
-          username: created.account,
-          password: created.pass,
+          username: cleanAccount,
+          password: savedPassword,
         },
       };
     }
@@ -84,6 +93,9 @@ export async function autoFulfillMilkyWayRequest(
       }
 
       const userBalance = parseMilkyWayUserBalance(info);
+      if (userBalance === null) {
+        throw new Error("Provider outcome unknown. Balance was not returned.");
+      }
 
       if (admin && requestId) {
         await admin
@@ -112,13 +124,25 @@ export async function autoFulfillMilkyWayRequest(
         throw new Error("Invalid deposit amount for Milky Way load");
       }
 
-      const res = await client.rechargePlayer(cleanAccount, amount);
-      const infoAfter = await client.queryInfo(cleanAccount);
+      const res = await client.rechargePlayer(cleanAccount, amount, undefined, requestId);
+      let infoAfter;
+      try {
+        infoAfter = await client.queryInfo(cleanAccount);
+      } catch (error) {
+        const message = error instanceof Error ? error.message : "verification failed";
+        throw new Error(`Provider outcome unknown. ${message}`);
+      }
       if (String(infoAfter.code) !== "200") {
-        throw new Error(`Milky Way recharge verification failed [code ${infoAfter.code}]: ${infoAfter.msg || "Recharge verification failed"}`);
+        throw new Error(`Provider outcome unknown. Recharge verification failed [code ${infoAfter.code}].`);
       }
 
-      const newBal = parseMilkyWayUserBalance(infoAfter) || amount;
+      const newBal = parseMilkyWayUserBalance(infoAfter);
+      if (newBal === null) {
+        throw new Error("Provider outcome unknown. Balance was not returned.");
+      }
+      if (!(await client.confirmOperation(res.operationKey))) {
+        throw new Error("Provider outcome unknown. Balance was read and the transfer was not confirmed.");
+      }
 
       if (admin && requestId) {
         await admin
@@ -144,10 +168,23 @@ export async function autoFulfillMilkyWayRequest(
         throw new Error("Invalid redeem amount for Milky Way");
       }
 
-      const res = await client.withdrawPlayer(cleanAccount, amount);
-      const infoAfter = await client.queryInfo(cleanAccount);
+      const res = await client.withdrawPlayer(cleanAccount, amount, undefined, requestId);
+      let infoAfter;
+      try {
+        infoAfter = await client.queryInfo(cleanAccount);
+      } catch (error) {
+        const message = error instanceof Error ? error.message : "verification failed";
+        throw new Error(`Provider outcome unknown. ${message}`);
+      }
       if (String(infoAfter.code) !== "200") {
-        throw new Error(`Milky Way redeem verification failed [code ${infoAfter.code}]: ${infoAfter.msg || "Redeem verification failed"}`);
+        throw new Error(`Provider outcome unknown. Redeem verification failed [code ${infoAfter.code}].`);
+      }
+      const redeemedBalance = parseMilkyWayUserBalance(infoAfter);
+      if (redeemedBalance === null) {
+        throw new Error("Provider outcome unknown. Balance was not returned.");
+      }
+      if (!(await client.confirmOperation(res.operationKey))) {
+        throw new Error("Provider outcome unknown. Balance was read and the transfer was not confirmed.");
       }
 
       if (admin && requestId) {
@@ -164,7 +201,7 @@ export async function autoFulfillMilkyWayRequest(
         success: true,
         message: `Milky Way redeemed $${amount}.00 from ${cleanAccount}`,
         accountName: cleanAccount,
-        newBalance: parseMilkyWayUserBalance(infoAfter),
+        newBalance: redeemedBalance,
         rawResponse: res,
       };
     }
@@ -195,5 +232,14 @@ export async function autoFulfillMilkyWayRequest(
       message: err.message || "Milky Way provider operation failed",
       accountName: cleanAccount,
     };
+  }
+}
+
+async function readMilkyWayLookup(client: MilkyWayApiClient, account: string): Promise<ProviderProbe> {
+  try {
+    const info = await client.queryInfo(account);
+    return { code: String(info.code), message: info.msg || "", balance: parseMilkyWayUserBalance(info) };
+  } catch (error) {
+    return probeFromError(error);
   }
 }

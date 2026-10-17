@@ -17,7 +17,6 @@ import { isGameroomApiConfigured } from "@/lib/game-automation/gameroom-service"
 import { isMrAllInOneApiConfigured } from "@/lib/game-automation/mrallinone-api";
 import { isGameVaultApiConfigured } from "@/lib/game-automation/gamevault-service";
 import { isMafiaApiConfigured } from "@/lib/game-automation/mafia-api";
-import { isOrionStarsApiConfigured } from "@/lib/game-automation/orionstars-api";
 import { isMilkyWayApiConfigured } from "@/lib/game-automation/milkyway-api";
 import { isFireKirinApiConfigured } from "@/lib/game-automation/firekirin-api";
 import { isVblinkApiConfigured } from "@/lib/game-automation/vblink-service";
@@ -73,7 +72,7 @@ function apiReady(slug: string) {
     case "mafia":
       return isMafiaApiConfigured();
     case "orion-stars":
-      return isOrionStarsApiConfigured();
+      return false;
     case "milky-way":
       return isMilkyWayApiConfigured();
     case "fire-kirin":

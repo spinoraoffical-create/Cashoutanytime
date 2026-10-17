@@ -1,6 +1,9 @@
 import { createAdminClient } from "@/lib/supabase/admin";
+import { generateGamePassword } from "./account-username";
 import { OrionStarsApiClient, parseOrionStarsUserBalance } from "./orionstars-api";
 import { shouldRefundProviderError } from "./load-outcome";
+import { claimProviderAccount, finishProviderAccount } from "./account-claim";
+import { openTerminalPlayerAccount, probeFromError, TERMINAL_ACCOUNT_CREATION_ARMED, type ProviderProbe } from "./terminal-account";
 
 export interface AutoFulfillOrionStarsOptions {
   requestId?: string;
@@ -35,44 +38,59 @@ export async function autoFulfillOrionStarsRequest(
 
   try {
     if (loadType === "create_account") {
-      console.log(`[OS Strict Flow] Initiating provider account creation for account: "${cleanAccount}"`);
-      const passToUse = password?.trim() || `Pass_${Math.floor(1000 + Math.random() * 9000)}`;
-
-      // 1. Call registerUser on Orion Stars API
-      console.log(`[OS Strict Flow] Calling client.createAccount(registerUser)...`);
-      const created = await client.createAccount(cleanAccount, passToUse);
-
-      // 2. Strict Verification: Call queryInfo to confirm account exists on Orion Stars server using exact same session
-      console.log(`[OS Strict Flow] registerUser code 200 received! Verifying via queryInfo...`);
-      const verifiedInfo = await client.queryInfo(created.account, created.session);
-
-      if (String(verifiedInfo.code) !== "200") {
-        throw new Error(`Orion Stars account verification failed via queryInfo [code ${verifiedInfo.code}]: ${verifiedInfo.msg || "Account not found on provider server"}`);
+      let savedPassword = "";
+      let checked: Promise<ProviderProbe> | null = null;
+      const nameCheck = () => {
+        checked ??= client.checkAccountName(cleanAccount).then((result) => ({
+          code: result.code,
+          message: result.message,
+          nameState: result.nameState,
+        }));
+        return checked;
+      };
+      const outcome = await openTerminalPlayerAccount({
+        provider: "orion-stars",
+        account: cleanAccount,
+        armed: TERMINAL_ACCOUNT_CREATION_ARMED,
+        capability: nameCheck,
+        lookup: nameCheck,
+        register: async () => {
+          const passToUse = password?.trim() || generateGamePassword();
+          try {
+            const created = await client.createAccount(cleanAccount, passToUse);
+            savedPassword = created.pass;
+            return { code: "200", message: "" };
+          } catch (error) {
+            return probeFromError(error);
+          }
+        },
+        verify: async () => readOrionLookup(client, cleanAccount),
+        claim: () => claimProviderAccount("orion-stars", cleanAccount),
+        finish: (outcome) => finishProviderAccount("orion-stars", cleanAccount, outcome),
+      });
+      if (outcome.status !== "confirmed" || !savedPassword) {
+        throw new Error(outcome.reason);
       }
 
-      console.log(`[OS Strict Flow] Provider account verified successfully! Userbalance: ${parseOrionStarsUserBalance(verifiedInfo)}`);
-
-      // 3. Save provider account information locally ONLY AFTER verified on Orion Stars provider
       if (admin && requestId) {
         await admin
           .from("game_load_requests")
           .update({
-            game_username: created.account,
-            game_password: created.pass,
+            game_username: cleanAccount,
+            game_password: savedPassword,
             completed_at: new Date().toISOString(),
             updated_at: new Date().toISOString(),
           })
           .eq("id", requestId);
-        console.log(`[OS Strict Flow] Local DB updated to completed for requestId: ${requestId}`);
       }
 
       return {
         success: true,
-        message: `Orion Stars account created and verified on provider: ${created.account}`,
-        accountName: created.account,
+        message: `Orion Stars account created and confirmed by lookup: ${cleanAccount}`,
+        accountName: cleanAccount,
         credentials: {
-          username: created.account,
-          password: created.pass,
+          username: cleanAccount,
+          password: savedPassword,
         },
       };
     }
@@ -84,6 +102,9 @@ export async function autoFulfillOrionStarsRequest(
       }
 
       const userBalance = parseOrionStarsUserBalance(info);
+      if (userBalance === null) {
+        throw new Error("Provider outcome unknown. Balance was not returned.");
+      }
 
       if (admin && requestId) {
         await admin
@@ -112,13 +133,25 @@ export async function autoFulfillOrionStarsRequest(
         throw new Error("Invalid deposit amount for Orion Stars load");
       }
 
-      const res = await client.rechargePlayer(cleanAccount, amount);
-      const infoAfter = await client.queryInfo(cleanAccount);
+      const res = await client.rechargePlayer(cleanAccount, amount, undefined, requestId);
+      let infoAfter;
+      try {
+        infoAfter = await client.queryInfo(cleanAccount);
+      } catch (error) {
+        const message = error instanceof Error ? error.message : "verification failed";
+        throw new Error(`Provider outcome unknown. ${message}`);
+      }
       if (String(infoAfter.code) !== "200") {
-        throw new Error(`Orion Stars recharge verification failed [code ${infoAfter.code}]: ${infoAfter.msg || "Recharge verification failed"}`);
+        throw new Error(`Provider outcome unknown. Recharge verification failed [code ${infoAfter.code}].`);
       }
 
-      const newBal = parseOrionStarsUserBalance(infoAfter) || amount;
+      const newBal = parseOrionStarsUserBalance(infoAfter);
+      if (newBal === null) {
+        throw new Error("Provider outcome unknown. Balance was not returned.");
+      }
+      if (!(await client.confirmOperation(res.operationKey))) {
+        throw new Error("Provider outcome unknown. Balance was read and the transfer was not confirmed.");
+      }
 
       if (admin && requestId) {
         await admin
@@ -144,10 +177,23 @@ export async function autoFulfillOrionStarsRequest(
         throw new Error("Invalid redeem amount for Orion Stars");
       }
 
-      const res = await client.withdrawPlayer(cleanAccount, amount);
-      const infoAfter = await client.queryInfo(cleanAccount);
+      const res = await client.withdrawPlayer(cleanAccount, amount, undefined, requestId);
+      let infoAfter;
+      try {
+        infoAfter = await client.queryInfo(cleanAccount);
+      } catch (error) {
+        const message = error instanceof Error ? error.message : "verification failed";
+        throw new Error(`Provider outcome unknown. ${message}`);
+      }
       if (String(infoAfter.code) !== "200") {
-        throw new Error(`Orion Stars redeem verification failed [code ${infoAfter.code}]: ${infoAfter.msg || "Redeem verification failed"}`);
+        throw new Error(`Provider outcome unknown. Redeem verification failed [code ${infoAfter.code}].`);
+      }
+      const redeemedBalance = parseOrionStarsUserBalance(infoAfter);
+      if (redeemedBalance === null) {
+        throw new Error("Provider outcome unknown. Balance was not returned.");
+      }
+      if (!(await client.confirmOperation(res.operationKey))) {
+        throw new Error("Provider outcome unknown. Balance was read and the transfer was not confirmed.");
       }
 
       if (admin && requestId) {
@@ -164,7 +210,7 @@ export async function autoFulfillOrionStarsRequest(
         success: true,
         message: `Orion Stars redeemed $${amount}.00 from ${cleanAccount}`,
         accountName: cleanAccount,
-        newBalance: parseOrionStarsUserBalance(infoAfter),
+        newBalance: redeemedBalance,
         rawResponse: res,
       };
     }
@@ -195,5 +241,14 @@ export async function autoFulfillOrionStarsRequest(
       message: err.message || "Orion Stars provider operation failed",
       accountName: cleanAccount,
     };
+  }
+}
+
+async function readOrionLookup(client: OrionStarsApiClient, account: string): Promise<ProviderProbe> {
+  try {
+    const info = await client.queryInfo(account);
+    return { code: String(info.code), message: info.msg || "", balance: parseOrionStarsUserBalance(info) };
+  } catch (error) {
+    return probeFromError(error);
   }
 }

@@ -9,7 +9,7 @@ export function getEmailAuthOrigin(requestOrigin: string): string {
     // fall through to SITE_URL
   }
 
-  const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || "https://cashoutanytime.vercel.app";
+  const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || "https://www.sweeptakehub.com";
   return siteUrl.replace(/\/$/, "");
 }
 

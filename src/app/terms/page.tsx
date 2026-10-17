@@ -29,7 +29,7 @@ const SECTIONS = [
   },
   {
     heading: "Contact",
-    body: "Questions about these terms: support@spinoracasinos.com or open a message from your dashboard.",
+    body: "Questions about these terms: support@sweeptakehub.com or open a message from your dashboard.",
   },
 ];
 

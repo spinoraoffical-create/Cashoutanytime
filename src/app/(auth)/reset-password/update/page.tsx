@@ -5,9 +5,8 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
+import { PasswordField } from "@/components/auth/password-field";
+import { passwordIsAcceptable } from "@/lib/auth/password-rules";
 import { toast } from "sonner";
 import type { SupabaseClient } from "@supabase/supabase-js";
 
@@ -89,8 +88,8 @@ export default function UpdatePasswordPage() {
 
     const {
       data: { subscription },
-    } = supabase.auth.onAuthStateChange((event) => {
-      if (cancelled) return;
+    } = supabase.auth.onAuthStateChange((event, session) => {
+      if (cancelled || !session) return;
       if (event === "INITIAL_SESSION" || event === "PASSWORD_RECOVERY" || event === "SIGNED_IN") {
         sessionFound.current = true;
         setHasSession(true);
@@ -127,8 +126,8 @@ export default function UpdatePasswordPage() {
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
 
-    if (password.length < 6) {
-      toast.error("Password must be at least 6 characters");
+    if (!passwordIsAcceptable(password)) {
+      toast.error("Use at least 8 characters, with a letter and a number.");
       return;
     }
 
@@ -155,84 +154,62 @@ export default function UpdatePasswordPage() {
       return;
     }
 
-    toast.success("Password updated! You are now signed in.");
+    toast.success("Password updated. You are signed in.");
     router.push("/");
     router.refresh();
   }
 
   if (checkingSession) {
-    return (
-      <Card>
-        <CardContent className="py-12 text-center text-muted-foreground text-sm">
-          Verifying reset link…
-        </CardContent>
-      </Card>
-    );
+    return <p className="py-12 text-center text-sm text-zinc-500">Checking your reset…</p>;
   }
 
   if (!hasSession) {
     return (
-      <Card>
-        <CardHeader>
-          <CardTitle>Link expired</CardTitle>
-          <CardDescription>This password reset link is no longer valid</CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <p className="text-sm text-muted-foreground">
-            Request a new reset link and open it in the same browser within a few minutes.
-          </p>
-          <Button asChild className="w-full">
-            <Link href="/reset-password">Request new reset link</Link>
-          </Button>
-          <p className="text-sm text-muted-foreground text-center">
-            <Link href="/login" className="text-primary hover:underline">
-              Back to sign in
-            </Link>
-          </p>
-        </CardContent>
-      </Card>
+      <div className="space-y-4">
+        <h2 className="text-2xl font-extrabold text-zinc-950">Code expired</h2>
+        <p className="text-sm text-zinc-500">
+          That reset code or link is no longer valid. Request a new code and enter it in this browser.
+        </p>
+        <Button asChild className="w-full">
+          <Link href="/reset-password">Request a new code</Link>
+        </Button>
+        <p className="text-center text-sm text-zinc-500">
+          <Link href="/login" className="font-semibold text-rose-600 hover:underline">
+            Back to sign in
+          </Link>
+        </p>
+      </div>
     );
   }
 
   return (
-    <Card>
-      <CardHeader>
-        <CardTitle>Set new password</CardTitle>
-        <CardDescription>Choose a new password for your Sweepstakes Hub account</CardDescription>
-      </CardHeader>
-      <CardContent>
-        <form onSubmit={handleSubmit} className="space-y-4">
-          <div className="space-y-2">
-            <Label htmlFor="password">New password</Label>
-            <Input
-              id="password"
-              type="password"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              required
-              minLength={6}
-              placeholder="At least 6 characters"
-              autoComplete="new-password"
-            />
-          </div>
-          <div className="space-y-2">
-            <Label htmlFor="confirmPassword">Confirm new password</Label>
-            <Input
-              id="confirmPassword"
-              type="password"
-              value={confirmPassword}
-              onChange={(e) => setConfirmPassword(e.target.value)}
-              required
-              minLength={6}
-              placeholder="Re-enter your password"
-              autoComplete="new-password"
-            />
-          </div>
-          <Button type="submit" className="w-full" disabled={loading}>
-            {loading ? "Saving…" : "Update password"}
-          </Button>
-        </form>
-      </CardContent>
-    </Card>
+    <div className="space-y-6">
+      <div>
+        <h2 className="text-2xl font-extrabold text-zinc-950">Set a new password</h2>
+        <p className="mt-1 text-sm text-zinc-500">Choose a password you have not used here before.</p>
+      </div>
+      <form onSubmit={handleSubmit} className="space-y-4">
+        <PasswordField
+          id="password"
+          label="New password"
+          value={password}
+          onChange={setPassword}
+          autoComplete="new-password"
+          placeholder="At least 8 characters"
+          showRules
+        />
+        <PasswordField
+          id="confirmPassword"
+          label="Confirm new password"
+          value={confirmPassword}
+          onChange={setConfirmPassword}
+          autoComplete="new-password"
+          placeholder="Re-enter your password"
+        />
+        <Button type="submit" className="w-full" disabled={loading}>
+          {loading ? "Saving…" : "Update password"}
+        </Button>
+      </form>
+    </div>
   );
 }

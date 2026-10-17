@@ -1,7 +1,7 @@
 import { sendTelegramPhoto, sendTelegramMessage, escapeTelegramHtml } from "@/lib/telegram/client";
 import { GeneratedBlogPost } from "@/lib/ai/blog-generator";
 
-const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL || "https://spinoracasinos.com";
+const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL || "https://www.sweeptakehub.com";
 
 export interface TelegramBroadcastOptions {
   header?: string;
