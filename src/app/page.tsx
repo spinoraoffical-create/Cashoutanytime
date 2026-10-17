@@ -1,6 +1,7 @@
 import { redirect } from "next/navigation";
 
 import { HomeLandingShell } from "@/components/home/home-landing-shell";
+import { homeMetadata } from "@/lib/seo/metadata";
 import { HomeFaqSchema } from "@/lib/seo/json-ld";
 import { signedInUsesAdminHome } from "@/lib/auth/account-home";
 import { createClient } from "@/lib/supabase/server";
@@ -13,6 +14,8 @@ import { DAILY_SPIN_ENABLED } from "@/lib/constants";
 import { getAuthUser, getProfile } from "@/lib/supabase/session";
 
 export const dynamic = "force-dynamic";
+
+export const metadata = homeMetadata;
 
 export default async function HomePage() {
   const user = await getAuthUser();

@@ -37,7 +37,7 @@ const SIDEBAR_LINKS: { id: GameTab; label: string; icon: React.ElementType }[] =
 
 const ACCOUNT_LINKS = [
   { href: "/", label: "Home", icon: LayoutDashboard },
-  { href: "/games", label: "All Games", icon: Gamepad2 },
+  { href: "/play", label: "All Games", icon: Gamepad2 },
   { href: "/blog", label: "Blog & Guides", icon: Target },
   { href: "/dashboard/deposit", label: "Deposit", icon: Banknote },
   { href: "/dashboard/messages", label: "Messages", icon: MessageSquare },

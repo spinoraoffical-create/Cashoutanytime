@@ -1,14 +1,14 @@
-import type { Metadata } from "next";
 import Link from "next/link";
 
 import { VipPageLayout } from "@/components/layout/vip-page-layout";
 import { Breadcrumbs } from "@/components/seo/breadcrumbs";
+import { withPageSocial } from "@/lib/seo/metadata";
 
-export const metadata: Metadata = {
+export const metadata = withPageSocial({
   title: "Privacy Policy | Sweepstakes Hub",
   description: "How Sweepstakes Hub collects, uses, and protects your information.",
-  alternates: { canonical: "/privacy" },
-};
+  path: "/privacy",
+});
 
 const SECTIONS = [
   {

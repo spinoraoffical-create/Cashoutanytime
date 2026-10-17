@@ -1,4 +1,3 @@
-import type { Metadata } from "next";
 import Link from "next/link";
 
 import { VipPageLayout } from "@/components/layout/vip-page-layout";
@@ -12,12 +11,13 @@ import {
   LEADERBOARD_PERIODS,
 } from "@/lib/data/leaderboard";
 import { cn } from "@/lib/utils";
+import { withPageSocial } from "@/lib/seo/metadata";
 
-export const metadata: Metadata = {
+export const metadata = withPageSocial({
   title: "Leaderboard | Sweepstakes Hub",
   description: "Top Sweepstakes Hub players by XP — daily, weekly, monthly and all-time rankings.",
-  alternates: { canonical: "/leaderboard" },
-};
+  path: "/leaderboard",
+});
 
 export default async function PublicLeaderboardPage({
   searchParams,

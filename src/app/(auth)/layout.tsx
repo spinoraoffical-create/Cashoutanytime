@@ -1,6 +1,12 @@
+import type { Metadata } from "next";
 import Image from "next/image";
 import Link from "next/link";
 import { SITE_NAME } from "@/lib/constants";
+
+export const metadata: Metadata = {
+  title: "Account | Sweepstakes Hub",
+  robots: { index: false, follow: false },
+};
 
 export default function AuthLayout({ children }: { children: React.ReactNode }) {
   return (

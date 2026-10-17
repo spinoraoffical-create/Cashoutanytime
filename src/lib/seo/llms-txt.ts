@@ -3,8 +3,7 @@ import { HOME_FAQS } from "@/lib/seo/faq-data";
 
 const PAGES: { path: string; title: string; note: string }[] = [
   { path: "/", title: "Home", note: "Game Rooms lobby and sign-in." },
-  { path: "/play", title: "Play", note: "Signed-in game lobby." },
-  { path: "/games", title: "Games", note: "Public list of game rooms." },
+  { path: "/play", title: "Play", note: "Public list of active Game Rooms. Individual rooms use /games/{slug}." },
   { path: "/faq", title: "FAQ", note: "Short answers for players and search engines." },
   { path: "/help", title: "Help", note: "Wallet, cash out, verification, and account help." },
   { path: "/register", title: "Register", note: "Create an account with email or Google." },

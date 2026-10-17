@@ -26,7 +26,7 @@ const UserAccountMenu = dynamic(
 );
 
 const navLinks = [
-  { href: "/games", label: "Games" },
+  { href: "/play", label: "Games" },
   { href: "/blog", label: "Blog" },
   { href: "/promotions", label: "Promotions" },
   { href: "/leaderboard", label: "Leaderboard" },

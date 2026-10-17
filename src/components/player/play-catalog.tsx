@@ -71,14 +71,6 @@ export function PlayCatalog({ games }: { games: Game[] }) {
 
   return (
     <MotionPage className="space-y-4">
-      <div>
-        <p className="text-xs font-black uppercase tracking-[0.16em] text-[#ff6b89]">Game Room catalog</p>
-        <h1 className="mt-1 text-4xl font-black leading-10">Find your game</h1>
-        <p className="mt-2 max-w-xl text-sm text-[#b9b3c6]">
-          Open a Game Room, load credits, then redeem winnings back to your wallet.
-        </p>
-      </div>
-
       <div className="grid grid-cols-2 gap-2 rounded-2xl bg-white/[0.04] p-1">
         {(
           [

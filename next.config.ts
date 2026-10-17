@@ -27,6 +27,7 @@ const nextConfig: NextConfig = {
   },
   async redirects() {
     return [
+      { source: "/games", destination: "/play", permanent: true },
       { source: "/home", destination: "/", permanent: false },
       { source: "/wallet", destination: "/dashboard/wallet", permanent: false },
       { source: "/activity", destination: "/dashboard/activity", permanent: false },

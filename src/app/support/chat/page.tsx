@@ -1,3 +1,4 @@
+import type { Metadata } from "next";
 import { redirect } from "next/navigation";
 import { VipPageLayout } from "@/components/layout/vip-page-layout";
 import { AgentThread } from "@/components/agents/agent-thread";
@@ -7,6 +8,11 @@ import { loadMyParentAgent } from "@/lib/actions/player-tickets";
 import { getAuthUser } from "@/lib/supabase/session";
 
 export const dynamic = "force-dynamic";
+
+export const metadata: Metadata = {
+  title: "Live chat | Sweepstakes Hub",
+  robots: { index: false, follow: false },
+};
 
 export default async function SupportChatPage() {
   const user = await getAuthUser();

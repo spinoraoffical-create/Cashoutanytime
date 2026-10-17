@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button";
 export const metadata: Metadata = {
   title: "Access Restricted | Sweepstakes Hub",
   description: "Sweepstakes Hub sweepstakes games are not available in your state due to local regulations.",
+  robots: { index: false, follow: false },
 };
 
 export default function RestrictedPage() {

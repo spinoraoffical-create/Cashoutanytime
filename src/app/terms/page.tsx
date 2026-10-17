@@ -1,14 +1,14 @@
-import type { Metadata } from "next";
 import Link from "next/link";
 
 import { VipPageLayout } from "@/components/layout/vip-page-layout";
 import { Breadcrumbs } from "@/components/seo/breadcrumbs";
+import { withPageSocial } from "@/lib/seo/metadata";
 
-export const metadata: Metadata = {
+export const metadata = withPageSocial({
   title: "Terms of Service | Sweepstakes Hub",
   description: "Terms that govern your use of the Sweepstakes Hub platform.",
-  alternates: { canonical: "/terms" },
-};
+  path: "/terms",
+});
 
 const SECTIONS = [
   {

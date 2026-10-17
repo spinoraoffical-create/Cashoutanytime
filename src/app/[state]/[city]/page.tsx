@@ -3,6 +3,7 @@ import { notFound } from "next/navigation";
 
 import { GeoPageTemplate } from "@/components/marketing/geo-page-template";
 import { allGeoCityParams, getGeoCity } from "@/lib/data/marketing";
+import { withPageSocial } from "@/lib/seo/metadata";
 
 export const revalidate = 86400;
 export const dynamicParams = true;
@@ -21,11 +22,11 @@ export async function generateMetadata({
   if (!city) return {};
 
   const title = `Fish Table Games in ${city.name} | Sweepstakes Hub`;
-  return {
+  return withPageSocial({
     title,
     description: city.descriptionSnippet,
-    alternates: { canonical: `/${stateSlug}/${citySlug}` },
-  };
+    path: `/${stateSlug}/${citySlug}`,
+  });
 }
 
 export default async function CityPage({

@@ -1,4 +1,3 @@
-import type { Metadata } from "next";
 import Link from "next/link";
 import { BookOpen } from "lucide-react";
 import { VipPageLayout } from "@/components/layout/vip-page-layout";
@@ -6,15 +5,15 @@ import { Breadcrumbs } from "@/components/seo/breadcrumbs";
 import { BlogPostCard } from "@/components/marketing/blog-post-card";
 import { Card } from "@/components/ui/card";
 import { getPublishedBlogPosts } from "@/lib/data/marketing";
+import { withPageSocial } from "@/lib/seo/metadata";
 
 export const revalidate = 300;
 
-export const metadata: Metadata = {
+export const metadata = withPageSocial({
   title: "Game Guides, Bonuses & Tips | Sweepstakes Hub Blog",
-  description:
-    "How-to guides on fish table games, deposits, bonuses and winning strategies at Sweepstakes Hub.",
-  alternates: { canonical: "/blog" },
-};
+  description: "Guides about Sweepstakes Hub Game Rooms, accounts, and the public rules pages.",
+  path: "/blog",
+});
 
 export default async function BlogPage() {
   const posts = await getPublishedBlogPosts();

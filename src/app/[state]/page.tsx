@@ -3,6 +3,7 @@ import { notFound } from "next/navigation";
 
 import { GeoPageTemplate } from "@/components/marketing/geo-page-template";
 import { allGeoStateSlugs, getGeoState } from "@/lib/data/marketing";
+import { withPageSocial } from "@/lib/seo/metadata";
 
 export const revalidate = 86400;
 export const dynamicParams = true;
@@ -53,11 +54,11 @@ export async function generateMetadata({
   if (!state) return {};
 
   const title = `Play Sweepstakes Games Online in ${state.name} | Sweepstakes Hub`;
-  return {
+  return withPageSocial({
     title,
     description: state.metaDescription,
-    alternates: { canonical: `/${stateSlug}` },
-  };
+    path: `/${stateSlug}`,
+  });
 }
 
 export default async function StatePage({

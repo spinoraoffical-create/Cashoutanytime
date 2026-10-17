@@ -6,7 +6,7 @@ import { AnimatedLogo } from "@/components/ui/animated-logo";
 
 const footerLinks = {
   Platform: [
-    { href: "/games", label: "All Games" },
+    { href: "/play", label: "All Games" },
     { href: "/blog", label: "Blog & Guides" },
     { href: "/promotions", label: "Promotions" },
     { href: "/leaderboard", label: "Leaderboard" },

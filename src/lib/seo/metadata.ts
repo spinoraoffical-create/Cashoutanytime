@@ -11,6 +11,39 @@ interface PageSEO {
   documentTitle?: string;
 }
 
+/** Social tags for one public page. The URL matches that page, not the homepage. */
+export function withPageSocial({
+  title,
+  description,
+  path,
+}: {
+  title: string;
+  description: string;
+  path: string;
+}): Metadata {
+  const url = `${SITE_URL}${path}`;
+  return {
+    title,
+    description,
+    alternates: { canonical: path },
+    openGraph: {
+      type: "website",
+      locale: "en_US",
+      url,
+      title,
+      description,
+      siteName: SITE_NAME,
+      images: [{ url: "/logo.webp", width: 1200, height: 630, alt: SITE_NAME }],
+    },
+    twitter: {
+      card: "summary_large_image",
+      title,
+      description,
+      images: ["/logo.webp"],
+    },
+  };
+}
+
 export function createMetadata({
   title,
   description,

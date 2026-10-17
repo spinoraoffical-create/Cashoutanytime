@@ -1,4 +1,3 @@
-import type { Metadata } from "next";
 import Link from "next/link";
 import { Mail, MessageCircle, Clock } from "lucide-react";
 
@@ -6,12 +5,13 @@ import { VipPageLayout } from "@/components/layout/vip-page-layout";
 import { Breadcrumbs } from "@/components/seo/breadcrumbs";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import { withPageSocial } from "@/lib/seo/metadata";
 
-export const metadata: Metadata = {
+export const metadata = withPageSocial({
   title: "Contact | Sweepstakes Hub",
   description: "Reach Sweepstakes Hub support for deposits, game accounts, and VIP questions.",
-  alternates: { canonical: "/contact" },
-};
+  path: "/contact",
+});
 
 export default function ContactPage() {
   return (
