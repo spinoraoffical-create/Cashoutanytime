@@ -6,12 +6,14 @@ Date: 18 October 2026
 
 - Repository: https://github.com/spinoraoffical-create/Cashoutanytime
 - Branch pushed: `restore/public-game-catalog`
-- Default branch `main` fast-forwarded to the same commit. This was not a force-push.
-- Commit: `c88a0cc38c97ed64e5c08a9cc71ba8bcba6fc37c`
+- Default branch `main` fast-forwarded to the same commits. This was not a force-push.
+- Code commit: `c88a0cc38c97ed64e5c08a9cc71ba8bcba6fc37c`
 - Message: Stop paused games from being contacted and keep an unrecognized Paydora method from being stored as Cash App.
-- Push: `origin/restore/public-game-catalog` moved from `2f170db` to `c88a0cc`. `origin/main` moved from `b6afbc6` to `c88a0cc`.
+- Notes commit on top of that code: `54a7af892026912386c4fdb9a5b8ca968acabc21` — Record the October 18 release checks and the GitHub push.
+- Push of the code and notes: `origin/restore/public-game-catalog` and `origin/main` reached `54a7af8`. `main` moved from `b6afbc6` through `c88a0cc` to `54a7af8`.
+- This file’s production-alias confirmation is the commit that follows `54a7af8`.
 
-The commit contains the reviewed October 18 code: financial switches, the database guard migration, the KYC decision repair, the stale-load hold, Paydora method labeling, checkout method storage, webhook method handling, and provider pause enforcement. Environment files, `supabase/.temp`, backups, and KYC files were not committed. A scan of the reports and source found no API key and no access token.
+The code commit contains the reviewed October 18 fixes: financial switches, the database guard migration, the KYC decision repair, the stale-load hold, Paydora method labeling, checkout method storage, webhook method handling, and provider pause enforcement. The notes commit records the release checks. Environment files, `supabase/.temp`, backups, and KYC files were not committed. A scan of the reports and source found no API key and no access token.
 
 ## Tests before the push
 
@@ -22,16 +24,23 @@ The commit contains the reviewed October 18 code: financial switches, the databa
 
 ## Vercel
 
-The domain https://www.sweeptakehub.com is attached to ready deployment `dpl_9QLfizNCi3EA8pJZbd5TKU1AT62n`, created 12:56 Nepal time. https://sweeptakehub.com is on that same deployment.
+Production deployment `dpl_ApADCciQH7B4PvvJKy93f6q7idRD` is Ready. It was created at 13:05 Nepal time from this release, built in 1 minute 51 seconds, and is the deployment serving the domain.
 
-A newer production deployment, `dpl_ApADCciQH7B4PvvJKy93f6q7idRD`, was created at 13:05 from this release and is still Queued. It does not own the domain yet. It was not promoted over an older build by hand. Another production deployment from the same window is also Queued. When Vercel starts them, they are the same reviewed release.
+- Production URL: https://www.sweeptakehub.com
+- Apex https://sweeptakehub.com is aliased to the same deployment
+- Project alias: https://cashoutanytime-spinoraoffical-8942s-projects.vercel.app
+- Deployment URL: https://cashoutanytime-jfe8bvb9p-spinoraoffical-8942s-projects.vercel.app
+- Inspector: https://vercel.com/spinoraoffical-8942s-projects/cashoutanytime/ApADCciQH7B4PvvJKy93f6q7idRD
 
-Checked on the live domain just now:
+The earlier ready deployment `dpl_9QLfizNCi3EA8pJZbd5TKU1AT62n` is no longer the domain deployment. No older deployment was promoted by hand.
+
+Checked on the live domain after this alias:
 
 - `/login` 200
 - `/register` 200
 - `/play` 200
 - `/admin` without a session: 307 to login
+- Apex `/login`: 308 to the www host
 - Deposit methods: “Deposits are temporarily unavailable. Please try again later or contact support.”
 
 No customer row was modified. Wallet sum is still 0. The five database controls are still off. All eleven provider pause rows are still paused. The five `REAL_VALUE_*` switches are not set in Vercel Production.
