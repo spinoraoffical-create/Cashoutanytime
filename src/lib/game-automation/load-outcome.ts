@@ -71,6 +71,22 @@ export function displayedLoadError(
   });
 }
 
+/**
+ * A confirmed rejection may leave pending only after the refund row is saved.
+ * An unknown provider result stays open.
+ */
+export function closeRefundedRejection(input: {
+  outcome: ProviderOutcome;
+  loadType: string;
+  walletRefunded: boolean;
+  status: string | null;
+}): boolean {
+  if (input.outcome !== "confirmed_failure") return false;
+  if (input.loadType !== "load" && input.loadType !== "reload") return false;
+  if (!input.walletRefunded) return false;
+  return input.status === "pending" || input.status === "processing";
+}
+
 /** A second load is refused while the first row is still open. */
 export function secondLoadBlocked(status: string | null): boolean {
   return status === "pending" || status === "processing";

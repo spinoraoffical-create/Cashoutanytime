@@ -8,6 +8,7 @@ import {
   completionApplies,
   mayRefundLoad,
   PROVIDER_OUTCOME_UNVERIFIED,
+  closeRefundedRejection,
   secondLoadBlocked,
   STALE_LOAD_CHECK_FAILED,
   confirmedCheckBalance,
@@ -36,6 +37,24 @@ assert.equal(mayRefundLoad({
   loadType: "load",
   gameApiDebited: false,
   walletRefunded: false,
+}), false);
+assert.equal(closeRefundedRejection({
+  outcome: "confirmed_failure",
+  loadType: "load",
+  walletRefunded: true,
+  status: "pending",
+}), true);
+assert.equal(closeRefundedRejection({
+  outcome: "confirmed_failure",
+  loadType: "load",
+  walletRefunded: false,
+  status: "pending",
+}), false);
+assert.equal(closeRefundedRejection({
+  outcome: "unknown",
+  loadType: "load",
+  walletRefunded: false,
+  status: "pending",
 }), false);
 assert.equal(secondLoadBlocked("pending"), true);
 

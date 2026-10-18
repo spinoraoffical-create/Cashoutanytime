@@ -46,6 +46,7 @@ import { finishGameLoad } from "@/lib/game-automation/finish-game-load";
 import {
   adminFinancialStatusDecision,
   classifyProviderOutcome,
+  closeRefundedRejection,
   confirmedCheckBalance,
   loadRefundNotice,
   PROVIDER_OUTCOME_UNVERIFIED,
@@ -201,27 +202,36 @@ async function blockPlayerMoney(
   });
 }
 
-/** Rewrite the stored sentence after the refund function has run. Does not move money. */
-async function recordRefundNotice(requestId: string, providerMessage: string, loadType: string) {
+/** Refund a confirmed rejection, then mark it failed only after the ledger flag is true. */
+async function settleRejectedLoad(requestId: string, providerMessage: string, loadType: string) {
   const admin = createAdminClient();
+  const outcome = classifyProviderOutcome({ success: false, error: providerMessage });
+  const refundExpected = shouldRefundProviderError(providerMessage, loadType);
+  if (admin && refundExpected) {
+    await admin.rpc("refund_game_load_wallet", { p_request_id: requestId });
+  }
   let walletRefunded = false;
+  let status: string | null = null;
   if (admin) {
     const { data } = await admin
       .from("game_load_requests")
-      .select("wallet_refunded")
+      .select("wallet_refunded, status")
       .eq("id", requestId)
       .maybeSingle();
-    walletRefunded = Boolean((data as { wallet_refunded?: boolean } | null)?.wallet_refunded);
+    const row = data as { wallet_refunded?: boolean; status?: string } | null;
+    walletRefunded = Boolean(row?.wallet_refunded);
+    status = row?.status ?? null;
   }
-  const notice = loadRefundNotice({
-    providerMessage,
-    walletRefunded,
-    refundExpected: shouldRefundProviderError(providerMessage, loadType),
-  });
+  const notice = loadRefundNotice({ providerMessage, walletRefunded, refundExpected });
   if (admin) {
+    const close = closeRefundedRejection({ outcome, loadType, walletRefunded, status });
     await admin
       .from("game_load_requests")
-      .update({ error_message: notice, updated_at: new Date().toISOString() })
+      .update({
+        error_message: notice,
+        ...(close ? { status: "failed" } : {}),
+        updated_at: new Date().toISOString(),
+      })
       .eq("id", requestId);
   }
   return notice;
@@ -300,7 +310,7 @@ async function fulfillOrFail(
       redeemedAmount: redeemed,
     });
     if (!result.success && (loadType === "load" || loadType === "reload")) {
-      const notice = await recordRefundNotice(requestId, result.error || "Game load failed.", loadType);
+      const notice = await settleRejectedLoad(requestId, result.error || "Game load failed.", loadType);
       return { success: false as const, error: notice };
     }
     if (!finished.ok) {
@@ -324,6 +334,10 @@ async function fulfillOrFail(
       success: false,
       errorMessage: message.slice(0, 400),
     });
+    if (loadType === "load" || loadType === "reload") {
+      const notice = await settleRejectedLoad(requestId, message.slice(0, 400), loadType);
+      return { success: false as const, error: notice };
+    }
     return { success: false as const, error: message };
   }
 }
