@@ -25,8 +25,9 @@ export function currencyAccepted(currency: string | null | undefined) {
 
 /**
  * Pure callback decision. A held payment is never credited from a later retry.
- * Currency is rejected when the provider sends a non-USD value. A missing
- * currency field is not treated as proof of USD.
+ * Currency is rejected when the provider sends a non-USD value. Paydora's
+ * paid callback omits currency, so a missing currency credits when the
+ * paid amount matches the saved intent.
  */
 export function decidePaydoraWebhook(input: {
   depositsOn: boolean;
@@ -62,9 +63,6 @@ export function decidePaydoraWebhook(input: {
   }
   if (currencyAccepted(input.currency) === "rejected") {
     return { action: "ignore", reason: "currency rejected", amount: 0 };
-  }
-  if (currencyAccepted(input.currency) === "missing") {
-    return { action: "hold", reason: "held: currency missing", amount: 0 };
   }
   if (!input.hasIntent || !amountsMatch(input.savedAmount, collected)) {
     return { action: "hold", reason: "held: amount mismatch", amount: 0 };

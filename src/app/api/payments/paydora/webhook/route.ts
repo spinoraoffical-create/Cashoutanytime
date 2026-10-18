@@ -42,7 +42,13 @@ export async function POST(req: Request) {
       .eq("event_key", payload.data.depositId)
       .maybeSingle();
     const row = existing as { status?: string; error?: string | null } | null;
-    previouslyHeld = Boolean(row && row.status !== "processed" && (row.error || "").startsWith("held:"));
+    const priorError = row?.error || "";
+    previouslyHeld = Boolean(
+      row &&
+        row.status !== "processed" &&
+        priorError.startsWith("held:") &&
+        !priorError.startsWith("held: currency missing")
+    );
   }
 
   let savedAmount: number | null = null;

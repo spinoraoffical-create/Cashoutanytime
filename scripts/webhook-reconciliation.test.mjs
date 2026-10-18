@@ -20,7 +20,8 @@ assert.equal(decidePaydoraWebhook({ ...paid, status: "cancelled" }).action, "ign
 assert.equal(decidePaydoraWebhook({ ...paid, status: "failed" }).action, "ignore");
 assert.equal(decidePaydoraWebhook({ ...paid, status: "" }).action, "ignore");
 assert.equal(decidePaydoraWebhook({ ...paid, currency: "EUR" }).reason, "currency rejected");
-assert.equal(decidePaydoraWebhook({ ...paid, currency: "" }).reason, "held: currency missing");
+assert.equal(decidePaydoraWebhook({ ...paid, currency: "" }).action, "credit");
+assert.equal(decidePaydoraWebhook({ ...paid, currency: "" }).amount, 25);
 assert.equal(decidePaydoraWebhook({ ...paid, collectedAmount: 20 }).reason, "held: amount mismatch");
 assert.equal(decidePaydoraWebhook({ ...paid, savedAmount: 30 }).reason, "held: amount mismatch");
 assert.equal(decidePaydoraWebhook({ ...paid, hasIntent: false }).reason, "held: amount mismatch");
