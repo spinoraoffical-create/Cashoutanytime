@@ -3,7 +3,9 @@
 /** No non-atomic wallet writes. Use credit_wallet / debit_wallet / reset_wallet RPCs only. */
 
 import { revalidatePath } from "next/cache";
+import type { SupabaseClient } from "@supabase/supabase-js";
 import { createClient } from "@/lib/supabase/server";
+import { parseAdminTransactionUserId } from "@/lib/admin/transaction-selection";
 import { createNotification } from "@/lib/actions/notifications";
 import { walletTypeLabel, type WalletType } from "@/lib/wallet/types";
 import { getStaffContext } from "@/lib/data/admin";
@@ -140,7 +142,7 @@ const ADMIN_TX_SELECT =
   "id, amount, wallet_type, transaction_type, source, description, created_at, user_id";
 
 async function attachProfilesToTransactions(
-  supabase: NonNullable<Awaited<ReturnType<typeof requireAdmin>>["supabase"]>,
+  supabase: SupabaseClient,
   rows: Array<Record<string, unknown>>
 ): Promise<AdminTransactionRow[]> {
   if (!rows.length) return [];
@@ -209,14 +211,16 @@ export async function searchAdminTransactionUsers(
 ): Promise<{ users: AdminTransactionUser[] } | { error: string }> {
   const auth = await requireAdmin();
   if (auth.error) return { error: auth.error };
+  const admin = createAdminClient();
+  if (!admin) return { error: "Could not search players." };
 
-  let dbQuery = auth
-    .supabase!.from("profiles")
+  let dbQuery = admin
+    .from("profiles")
     .select("id, full_name, email")
     .order("full_name", { ascending: true, nullsFirst: false })
     .limit(limit);
 
-  const q = query.trim();
+  const q = query.trim().slice(0, 80).replace(/[^a-zA-Z0-9 @._+-]/g, "");
   if (q) {
     dbQuery = dbQuery.or(`email.ilike.%${q}%,full_name.ilike.%${q}%`);
   }
@@ -229,29 +233,59 @@ export async function searchAdminTransactionUsers(
   return { users: (data ?? []) as AdminTransactionUser[] };
 }
 
-export async function getAdminUserTransactions(
+export async function getAdminTransactionUser(
   userId: string
-): Promise<{ transactions: AdminTransactionRow[] } | { error: string }> {
+): Promise<{ user: AdminTransactionUser | null } | { error: string }> {
+  const parsed = parseAdminTransactionUserId(userId);
+  if (!parsed) return { error: "That player id is not valid." };
   const auth = await requireAdmin();
   if (auth.error) return { error: auth.error };
+  const admin = createAdminClient();
+  if (!admin) return { error: "Could not load that player." };
 
-  const { data, error } = await auth
-    .supabase!.from("wallet_transactions")
+  const { data, error } = await admin
+    .from("profiles")
+    .select("id, full_name, email")
+    .eq("id", parsed)
+    .maybeSingle();
+  if (error) {
+    console.error("[wallet] transaction user:", error.message);
+    return { error: "Could not load that player." };
+  }
+  return { user: (data as AdminTransactionUser | null) ?? null };
+}
+
+const ADMIN_TX_PAGE = 50;
+
+export async function getAdminUserTransactions(
+  userId: string,
+  page = 1
+): Promise<{ transactions: AdminTransactionRow[]; page: number; hasMore: boolean } | { error: string }> {
+  const parsed = parseAdminTransactionUserId(userId);
+  if (!parsed) return { error: "That player id is not valid." };
+  const auth = await requireAdmin();
+  if (auth.error) return { error: auth.error };
+  const admin = createAdminClient();
+  if (!admin) return { error: "Could not load that player's transactions." };
+  const safePage = Number.isFinite(page) && page > 0 ? Math.floor(page) : 1;
+  const from = (safePage - 1) * ADMIN_TX_PAGE;
+
+  const { data, error } = await admin
+    .from("wallet_transactions")
     .select(ADMIN_TX_SELECT)
-    .eq("user_id", userId)
+    .eq("user_id", parsed)
     .order("created_at", { ascending: false })
-    .limit(300);
+    .range(from, from + ADMIN_TX_PAGE);
 
   if (error) {
     console.error("[wallet] user transactions:", error.message);
     return { error: "Could not load that player's transactions." };
   }
 
-  const transactions = await attachProfilesToTransactions(
-    auth.supabase!,
-    (data ?? []) as Array<Record<string, unknown>>
-  );
-  return { transactions };
+  const rows = (data ?? []) as Array<Record<string, unknown>>;
+  const hasMore = rows.length > ADMIN_TX_PAGE;
+  const transactions = await attachProfilesToTransactions(admin, hasMore ? rows.slice(0, ADMIN_TX_PAGE) : rows);
+  return { transactions, page: safePage, hasMore };
 }
 
 export interface AdminUserBonusActivity {

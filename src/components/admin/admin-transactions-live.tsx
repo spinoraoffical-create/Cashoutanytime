@@ -13,15 +13,17 @@ interface AdminTransactionsLiveProps {
   initialTransactions?: AdminTransactionRow[];
   /** Skip heavy upfront fetch — search users and load txs on demand. */
   lazy?: boolean;
+  initialUserId?: string | null;
 }
 
 export function AdminTransactionsLive({
   users = [],
   initialTransactions = [],
   lazy = false,
+  initialUserId = null,
 }: AdminTransactionsLiveProps) {
   if (lazy) {
-    return <AdminUserTransactionHub lazy live />;
+    return <AdminUserTransactionHub lazy live initialUserId={initialUserId} />;
   }
 
   return (

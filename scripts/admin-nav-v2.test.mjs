@@ -53,4 +53,18 @@ const reviewer = visibleAdminNav({
 const reviewerHrefs = reviewer.flatMap((section) => section.children.map((child) => child.href));
 assert.equal(reviewerHrefs.includes("/admin/kyc"), true);
 
+const finance = visibleAdminNav({
+  isSuperAdmin: true,
+  permissions: new Set(["requests.manage"]),
+  roles: ["super_admin"],
+}).find((section) => section.label === "Financial Center");
+const financeLabels = finance?.children.map((child) => child.label) ?? [];
+for (const label of ["Overview", "Deposits", "Game transactions", "Withdrawals", "Transaction explorer", "Reconciliation", "Reports and audit"]) {
+  assert.ok(financeLabels.includes(label), label);
+}
+assert.equal(financeLabels.includes("Deposit records"), false);
+
+const storeFinance = store.find((section) => section.label === "Financial Center");
+assert.equal(storeFinance?.children.some((child) => child.href === "/admin/transaction-explorer"), false);
+
 console.log("admin nav v2 checks passed");

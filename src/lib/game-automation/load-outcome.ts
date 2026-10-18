@@ -34,6 +34,43 @@ export function shouldRefundProviderError(message: string | null | undefined, lo
   });
 }
 
+const FALSE_REFUND_CLAIM =
+  /your funds have been 100% refunded to your wallet balance\.?|100% refunded|the wallet refund is recorded\.?|the wallet refund is not confirmed\.?/gi;
+
+export function stripFalseRefundClaim(message: string): string {
+  return message.replace(FALSE_REFUND_CLAIM, " ").replace(/\s+/g, " ").trim();
+}
+
+/**
+ * A refund sentence is allowed only after wallet_refunded is read back.
+ * An unconfirmed provider failure does not get a refund sentence.
+ */
+export function loadRefundNotice(input: {
+  providerMessage: string;
+  walletRefunded: boolean;
+  refundExpected: boolean;
+}): string {
+  const base = stripFalseRefundClaim(input.providerMessage);
+  if (!input.refundExpected) return base;
+  if (input.walletRefunded) return `${base} The wallet refund is recorded.`.trim();
+  return `${base} The wallet refund is not confirmed.`.trim();
+}
+
+/** Admin display. A stored "refunded" sentence is not proof. */
+export function displayedLoadError(
+  message: string | null | undefined,
+  walletRefunded?: boolean | null
+): string | null {
+  const text = message?.trim();
+  if (!text) return null;
+  if (!/100% refunded|wallet refund is recorded|wallet refund is not confirmed/i.test(text)) return text;
+  return loadRefundNotice({
+    providerMessage: text,
+    walletRefunded: walletRefunded === true,
+    refundExpected: true,
+  });
+}
+
 /** A second load is refused while the first row is still open. */
 export function secondLoadBlocked(status: string | null): boolean {
   return status === "pending" || status === "processing";

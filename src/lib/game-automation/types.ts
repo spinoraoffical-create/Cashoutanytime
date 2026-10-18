@@ -21,6 +21,7 @@ export interface GameLoadRequest {
   game_password: string | null;
   status: GameLoadStatus;
   error_message: string | null;
+  wallet_refunded?: boolean | null;
   bot_attempts: number;
   admin_notes: string | null;
   created_at: string;

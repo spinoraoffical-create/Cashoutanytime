@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 
 import { AdminPageHeader } from "@/components/admin/admin-page-header";
 import { AdminQuickAction } from "@/components/admin/ui/admin-quick-action";
+import { loadFinancialOverview } from "@/lib/admin/financial-overview-data";
 import { getAgentScope } from "@/lib/agents/scope";
 import { requirePermission } from "@/lib/data/admin";
 
@@ -11,6 +12,7 @@ export default async function MoneyCenterPage() {
   const scope = await getAgentScope();
   const network = scope && (scope.level === "store" || scope.level === "sub");
   if (!network) await requirePermission("requests.manage");
+  const metrics = network ? [] : await loadFinancialOverview();
   const tools = network
     ? [
         {
@@ -30,43 +32,53 @@ export default async function MoneyCenterPage() {
     : [
         {
           href: "/admin/deposits?status=pending",
-          title: "Incoming deposits",
-            body: "Pending, processing, completed, and rejected deposit records. Completed records are not called revenue here.",
+          title: "Deposits",
+          body: "Pending, processing, completed, and rejected deposit records. A note is not proof of payment.",
         },
         {
           href: "/admin/game-loads",
-          title: "Wallet loads & redeems",
-          body: "Pending, processing, completed, and failed loads. Pending players stay first.",
-        },
-        {
-          href: "/admin/payouts",
-          title: "Cash-out / payouts",
-          body: "Players with a cash-out balance. Mark paid records the payout and removes that amount.",
-        },
-        {
-          href: "/admin/payout-operations",
-          title: "Payout activity",
-          body: "Read-only list of payout records and their stored status. Opening it does not send or refund a payment.",
-        },
-        {
-          href: "/admin/transactions",
-          title: "Transaction history",
-          body: "Search one player and open their stored deposit and redeem history.",
-        },
-        {
-          href: "/admin/requests",
-          title: "Deposit records",
-          body: "Opens the same deposit list. New deposits are confirmed by Paydora.",
+          title: "Game transactions",
+          body: "Loads and redeems. Failed loads stay on the failed filter. Pending players stay first.",
         },
         {
           href: "/admin/failed-loads",
           title: "Failed loads",
-          body: "Opens game loads marked failed. A retry does not credit the deposit again.",
+          body: "Failed loads, missing refunds, unknown provider results, and requests still open after 30 minutes.",
+        },
+        {
+          href: "/admin/payouts",
+          title: "Withdrawals",
+          body: "Players with a cash-out balance. This page does not send a payout. Paid is recorded only from the payout screen after confirmation.",
         },
         {
           href: "/admin/cashout-holds",
           title: "Held cash outs",
-          body: "Cash outs marked held. Saving the limit asks for confirmation.",
+          body: "Held withdrawals. A held cash out does not by itself mean the money was sent.",
+        },
+        {
+          href: "/admin/payout-operations",
+          title: "Payout activity",
+          body: "Read-only payout records. Submitted does not mean paid.",
+        },
+        {
+          href: "/admin/transactions",
+          title: "Wallet history",
+          body: "Open one player's stored deposit-wallet and cash-out rows.",
+        },
+        {
+          href: "/admin/transaction-explorer",
+          title: "Transaction explorer",
+          body: "Read-only search across wallet rows, deposits, game loads, and payout records.",
+        },
+        {
+          href: "/admin/reconciliation",
+          title: "Reconciliation",
+          body: "Read-only alerts. Opening one does not refund or pay anyone.",
+        },
+        {
+          href: "/admin/audit",
+          title: "Reports and audit",
+          body: "Staff audit records. An audit row is not a second wallet credit.",
         },
       ];
 
@@ -76,6 +88,17 @@ export default async function MoneyCenterPage() {
         title="Financial center"
         description="Open deposits, loads, cash outs, and history. Each tool keeps its current actions. Opening a tool does not move money by itself."
       />
+      {metrics.length ? (
+        <div className="mb-6 grid gap-3 sm:grid-cols-2">
+          {metrics.map((metric) => (
+            <div key={metric.label} className="rounded-2xl border border-white/10 p-4">
+              <p className="text-sm font-semibold text-white">{metric.label}</p>
+              <p className="mt-2 text-lg font-semibold text-white">{metric.error ? "Not available" : metric.value}</p>
+              <p className="mt-1 text-xs leading-5 text-[#9fb0d0]">{metric.error ?? metric.definition}</p>
+            </div>
+          ))}
+        </div>
+      ) : null}
       <div className="grid gap-3 sm:grid-cols-2">
         {tools.map((tool) => (
           <AdminQuickAction key={tool.href + tool.title} href={tool.href} label={tool.title} detail={tool.body} />

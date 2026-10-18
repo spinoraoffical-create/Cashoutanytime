@@ -8,10 +8,12 @@ import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import type { AdminTransactionRow } from "@/lib/actions/wallet";
 import {
+  getAdminTransactionUser,
   getAdminUserTransactions,
   searchAdminTransactionUsers,
   type AdminTransactionUser,
 } from "@/lib/actions/wallet";
+import { parseAdminTransactionUserId } from "@/lib/admin/transaction-selection";
 import {
   formatTransactionAmount,
   transactionSourceLabel,
@@ -31,6 +33,7 @@ interface AdminUserTransactionHubProps {
   live?: boolean;
   /** Load users and transactions on demand — much faster initial page load. */
   lazy?: boolean;
+  initialUserId?: string | null;
 }
 
 function TransactionEntry({ row, compact }: { row: AdminTransactionRow; compact?: boolean }) {
@@ -44,6 +47,9 @@ function TransactionEntry({ row, compact }: { row: AdminTransactionRow; compact?
           <div className="flex flex-wrap items-center gap-1.5 mb-1">
             <Badge variant="outline" className="text-[10px]">
               {transactionSourceLabel(row.source)}
+            </Badge>
+            <Badge variant="outline" className="text-[10px]">
+              {row.wallet_type === "current" ? "Deposit wallet" : row.wallet_type === "cashout" ? "Cash-out wallet" : row.wallet_type}
             </Badge>
             <Badge variant={isDebit ? "warning" : "success"} className="text-[10px]">
               {isDebit ? "Debit" : "Credit"}
@@ -118,11 +124,19 @@ export function AdminUserTransactionHub({
   transactions: initialTransactions = [],
   live,
   lazy = false,
+  initialUserId = null,
 }: AdminUserTransactionHubProps) {
   const [userQuery, setUserQuery] = useState("");
-  const [selectedUserId, setSelectedUserId] = useState<string | null>(null);
+  const [selectedUserId, setSelectedUserId] = useState<string | null>(() =>
+    parseAdminTransactionUserId(initialUserId)
+  );
+  const [selectedProfile, setSelectedProfile] = useState<AdminTransactionUser | null>(null);
   const [users, setUsers] = useState<AdminTransactionUser[]>(initialUsers);
   const [transactions, setTransactions] = useState<AdminTransactionRow[]>(initialTransactions);
+  const [loadError, setLoadError] = useState<string | null>(null);
+  const [loadedFor, setLoadedFor] = useState<string | null>(null);
+  const [txPage, setTxPage] = useState(1);
+  const [hasMore, setHasMore] = useState(false);
   const [debouncedQuery, setDebouncedQuery] = useState("");
   const [searchPending, startSearch] = useTransition();
   const [txPending, startTxLoad] = useTransition();
@@ -142,17 +156,44 @@ export function AdminUserTransactionHub({
   }, [lazy, debouncedQuery]);
 
   useEffect(() => {
+    const parsed = parseAdminTransactionUserId(initialUserId);
+    if (parsed) setSelectedUserId(parsed);
+  }, [initialUserId]);
+
+  useEffect(() => {
     if (!lazy || !selectedUserId) return;
     startTxLoad(async () => {
-      const result = await getAdminUserTransactions(selectedUserId);
-      if ("transactions" in result) setTransactions(result.transactions);
+      const [userResult, txResult] = await Promise.all([
+        getAdminTransactionUser(selectedUserId),
+        getAdminUserTransactions(selectedUserId, txPage),
+      ]);
+      if ("user" in userResult && userResult.user) {
+        setSelectedProfile(userResult.user);
+        setUsers((prev) =>
+          prev.some((user) => user.id === userResult.user!.id) ? prev : [userResult.user!, ...prev]
+        );
+      } else if ("error" in userResult) {
+        setSelectedProfile(null);
+        setLoadError(userResult.error);
+      } else {
+        setSelectedProfile(null);
+      }
+      if ("transactions" in txResult) {
+        setTransactions(txResult.transactions);
+        setHasMore(txResult.hasMore);
+        setLoadError(null);
+      } else {
+        setTransactions([]);
+        setLoadError(txResult.error);
+      }
+      setLoadedFor(selectedUserId);
     });
-  }, [lazy, selectedUserId]);
+  }, [lazy, selectedUserId, txPage]);
 
-  const selectedUser = useMemo(
-    () => users.find((u) => u.id === selectedUserId) ?? null,
-    [users, selectedUserId]
-  );
+  const selectedUser = useMemo(() => {
+    if (selectedProfile?.id === selectedUserId) return selectedProfile;
+    return users.find((u) => u.id === selectedUserId) ?? null;
+  }, [users, selectedUserId, selectedProfile]);
 
   useEffect(() => {
     if (!live || !selectedUserId) return;
@@ -225,12 +266,15 @@ export function AdminUserTransactionHub({
 
   const userTransactions = useMemo(() => {
     if (!selectedUserId) return { deposit: [], bonus: [] };
-    const mine = transactions.filter((t) => t.user?.id === selectedUserId);
+    const mine = transactions.filter((row) => {
+      if (row.user?.id === selectedUserId) return true;
+      return lazy && row.user == null;
+    });
     return {
       deposit: mine.filter((t) => categorizeAdminTransactionPanel(t) === "deposit"),
       bonus: mine.filter((t) => categorizeAdminTransactionPanel(t) === "bonus"),
     };
-  }, [transactions, selectedUserId]);
+  }, [transactions, selectedUserId, lazy]);
 
   return (
     <div className="space-y-6">
@@ -259,6 +303,9 @@ export function AdminUserTransactionHub({
                 className="h-auto py-2 px-3 text-left flex-col items-start gap-0.5"
                 onClick={() => {
                   setSelectedUserId(u.id);
+                  setSelectedProfile(u);
+                  setTxPage(1);
+                  setLoadError(null);
                   setUserQuery(u.full_name || u.email);
                   if (!lazy) return;
                   setTransactions([]);
@@ -303,6 +350,8 @@ export function AdminUserTransactionHub({
                   size="sm"
                   onClick={() => {
                     setSelectedUserId(null);
+                    setSelectedProfile(null);
+                    setLoadError(null);
                     setUserQuery("");
                     if (lazy) setTransactions([]);
                   }}
@@ -315,17 +364,35 @@ export function AdminUserTransactionHub({
           </Card>
 
           <p className="text-sm text-muted-foreground">
-            <strong className="text-foreground font-medium">Total Deposit</strong> — game loads and
-            redeems from the deposit wallet.
+            <strong className="text-foreground font-medium">Deposit wallet and cash-out wallet.</strong> Bonus
+            coins stay off this list. Each page shows 50 stored rows.
           </p>
 
+          {loadError ? <p className="text-sm text-destructive">{loadError}</p> : null}
           <WalletColumn
             title="Total Deposit"
             icon={Wallet}
             transactions={userTransactions.deposit}
-            emptyHint="No deposit-wallet loads or redeems yet for this user."
+            emptyHint="No deposit-wallet or cash-out rows are stored on this page."
           />
+          <div className="flex items-center gap-2">
+            <Button type="button" variant="outline" size="sm" disabled={txPage <= 1 || txPending} onClick={() => setTxPage((page) => Math.max(1, page - 1))}>
+              Newer
+            </Button>
+            <span className="text-xs text-muted-foreground">Page {txPage}</span>
+            <Button type="button" variant="outline" size="sm" disabled={!hasMore || txPending} onClick={() => setTxPage((page) => page + 1)}>
+              Older
+            </Button>
+          </div>
         </>
+      ) : selectedUserId ? (
+        <Card className="p-10 text-center">
+          <p className="font-medium">
+            {loadedFor !== selectedUserId || txPending
+              ? "Loading this player's transactions…"
+              : loadError ?? "That player was not found."}
+          </p>
+        </Card>
       ) : (
         <Card className="p-10 text-center">
           <User className="h-10 w-10 text-muted-foreground mx-auto mb-3 opacity-50" />

@@ -65,19 +65,9 @@ export function categorizeAdminTransactionPanel(tx: {
 
   if (wallet_type === "bonus" || wallet_type === "bonus_redeem") return "bonus";
 
-  if (
-    wallet_type === "current" ||
-    wallet_type === "cashout"
-  ) {
-    if (
-      source === "game_load" ||
-      source === "game_redeem" ||
-      source === "game_load_refund"
-    ) {
-      return "deposit";
-    }
-    if (source === "admin" || source === "deposit") return "deposit";
-  }
+  // Deposit-wallet history includes loads, redeems, refunds, deposits, and other
+  // debits. Leaving an unrecognized source out hid real wallet rows.
+  if (wallet_type === "current" || wallet_type === "cashout") return "deposit";
 
   return "bonus";
 }

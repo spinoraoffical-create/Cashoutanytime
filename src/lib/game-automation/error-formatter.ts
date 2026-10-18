@@ -59,7 +59,7 @@ export function formatGameAutomationError(
   }
 
   if (code === 6 || /code 6\b|insufficient agent balance|insufficient balance/i.test(msg)) {
-    return `GameVault agent balance is insufficient (code 6). Your funds have been 100% refunded to your wallet balance.`;
+    return "GameVault agent balance is insufficient (code 6).";
   }
 
   if (code === 7 || /code 7\b|insufficient user balance/i.test(msg)) {

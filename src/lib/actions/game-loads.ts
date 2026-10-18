@@ -45,10 +45,13 @@ import { usernameForOwner } from "@/lib/games/owned-account";
 import { finishGameLoad } from "@/lib/game-automation/finish-game-load";
 import {
   adminFinancialStatusDecision,
+  classifyProviderOutcome,
+  confirmedCheckBalance,
+  loadRefundNotice,
   PROVIDER_OUTCOME_UNVERIFIED,
+  shouldRefundProviderError,
   staleLoadRpcDecision,
 } from "@/lib/game-automation/load-outcome";
-import { classifyProviderOutcome, confirmedCheckBalance } from "@/lib/game-automation/load-outcome";
 import { isGameProviderReady } from "@/lib/game-automation/provider-ready";
 import { logIncident } from "@/lib/observability/incident";
 
@@ -198,6 +201,32 @@ async function blockPlayerMoney(
   });
 }
 
+/** Rewrite the stored sentence after the refund function has run. Does not move money. */
+async function recordRefundNotice(requestId: string, providerMessage: string, loadType: string) {
+  const admin = createAdminClient();
+  let walletRefunded = false;
+  if (admin) {
+    const { data } = await admin
+      .from("game_load_requests")
+      .select("wallet_refunded")
+      .eq("id", requestId)
+      .maybeSingle();
+    walletRefunded = Boolean((data as { wallet_refunded?: boolean } | null)?.wallet_refunded);
+  }
+  const notice = loadRefundNotice({
+    providerMessage,
+    walletRefunded,
+    refundExpected: shouldRefundProviderError(providerMessage, loadType),
+  });
+  if (admin) {
+    await admin
+      .from("game_load_requests")
+      .update({ error_message: notice, updated_at: new Date().toISOString() })
+      .eq("id", requestId);
+  }
+  return notice;
+}
+
 async function fulfillOrFail(
   gameSlug: string,
   requestId: string,
@@ -270,6 +299,10 @@ async function fulfillOrFail(
       gamePassword: result.password,
       redeemedAmount: redeemed,
     });
+    if (!result.success && (loadType === "load" || loadType === "reload")) {
+      const notice = await recordRefundNotice(requestId, result.error || "Game load failed.", loadType);
+      return { success: false as const, error: notice };
+    }
     if (!finished.ok) {
       return { success: false as const, error: finished.error };
     }

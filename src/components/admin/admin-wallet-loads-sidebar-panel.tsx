@@ -8,6 +8,7 @@ import { AdminStatusBadge } from "@/components/admin/ui/admin-status-badge";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { gameLoadStatusHelp } from "@/lib/admin/game-load-status";
+import { displayedLoadError } from "@/lib/game-automation/load-outcome";
 import { formatDate, formatRelativeTime, cn } from "@/lib/utils";
 import type {
   AdminGameLoadRow,
@@ -37,6 +38,7 @@ function requestLabel(load: AdminGameLoadRow) {
 
 function LoadEntry({ load, compact }: { load: AdminGameLoadRow; compact?: boolean }) {
   const isRedeem = load.load_type === "redeem";
+  const loadError = displayedLoadError(load.error_message, load.wallet_refunded);
 
   return (
     <div className="border-b border-white/[0.06] py-3 last:border-0 last:pb-0">
@@ -67,9 +69,7 @@ function LoadEntry({ load, compact }: { load: AdminGameLoadRow; compact?: boolea
           {!compact && load.admin_notes && (
             <p className="mt-1 text-xs text-amber-200">{load.admin_notes}</p>
           )}
-          {!compact && load.error_message && (
-            <p className="mt-1 text-xs text-red-400">{load.error_message}</p>
-          )}
+          {!compact && loadError ? <p className="mt-1 text-xs text-red-400">{loadError}</p> : null}
         </div>
         <GameLoadActions load={load} />
       </div>

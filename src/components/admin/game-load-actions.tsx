@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button";
 import { getAdminPanelUrlForGame } from "@/lib/actions/game-loads";
 import {
   adminFinancialStatusDecision,
+  displayedLoadError,
   PROVIDER_OUTCOME_UNVERIFIED,
 } from "@/lib/game-automation/load-outcome";
 import { toast } from "sonner";
@@ -23,6 +24,7 @@ export function GameLoadActions({ load }: GameLoadActionsProps) {
     status: load.status,
     loadType: load.load_type,
   });
+  const loadError = displayedLoadError(load.error_message, load.wallet_refunded);
 
   async function openPanel() {
     setBusy(true);
@@ -55,9 +57,7 @@ export function GameLoadActions({ load }: GameLoadActionsProps) {
       {load.admin_notes && (
         <p className="text-xs text-amber-200">{load.admin_notes}</p>
       )}
-      {load.error_message && (
-        <p className="text-xs text-destructive">{load.error_message}</p>
-      )}
+      {loadError ? <p className="text-xs text-destructive">{loadError}</p> : null}
     </div>
   );
 }

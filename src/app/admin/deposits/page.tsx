@@ -12,6 +12,7 @@ import { AdminSectionCard } from "@/components/admin/ui/admin-section-card";
 import { AdminStatusBadge } from "@/components/admin/ui/admin-status-badge";
 import { DepositsLiveRefresh } from "@/components/deposits/deposits-live-refresh";
 import { DepositProofImage } from "@/components/deposits/deposit-proof-image";
+import { depositRecordNote, isOnlinePaymentProof } from "@/lib/payments/deposit-record-display";
 import { getDepositMethod } from "@/lib/payments/methods";
 import { cn, formatDate } from "@/lib/utils";
 import type { RequestStatus } from "@/types/database";
@@ -150,6 +151,7 @@ export default async function AdminDepositsPage({
           deposits.map((dep) => {
             const user = dep.user as { full_name?: string; email?: string };
             const method = getDepositMethod(dep.payment_method);
+            const note = depositRecordNote(dep.admin_notes);
             return (
               <AdminSectionCard
                 key={dep.id}
@@ -165,8 +167,18 @@ export default async function AdminDepositsPage({
                         <span className="font-semibold text-white">${Number(dep.amount).toFixed(2)}</span>
                       ) : null}
                     </div>
-                    <DepositProofImage path={dep.proof_url ?? ""} />
-                    {dep.admin_notes ? <p className="text-sm text-cyan-100">Note: {dep.admin_notes}</p> : null}
+                    {isOnlinePaymentProof(dep.proof_url) ? (
+                      <p className="text-sm text-[#9fb0d0]">
+                        No payment screenshot. This is an online payment record.
+                      </p>
+                    ) : (
+                      <DepositProofImage path={dep.proof_url ?? ""} />
+                    )}
+                    {note ? (
+                      <p className="text-sm text-cyan-100">
+                        {note.label}: {note.text}
+                      </p>
+                    ) : null}
                     <p className="text-xs text-[#8ea0c3]">{formatDate(dep.created_at)}</p>
                   </div>
                   <DepositActions

@@ -1,7 +1,7 @@
 import { createUntilAccepted } from "./account-username";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { formatGameAutomationError } from "./error-formatter";
-import { shouldRefundProviderError } from "./load-outcome";
+import { loadRefundNotice, shouldRefundProviderError } from "./load-outcome";
 import {
   getGameVaultApiClient,
   GameVaultApiClient,
@@ -236,13 +236,27 @@ export async function autoFulfillGameVaultRequest(
 
     return { success: false, error: `Unknown load type: ${loadType}` };
   } catch (err: any) {
-    const userError = formatGameAutomationError(err, input.amount);
+    const providerMessage = formatGameAutomationError(err, input.amount);
+    const refundExpected = shouldRefundProviderError(providerMessage, loadType);
+    let walletRefunded = false;
 
-    if (shouldRefundProviderError(userError, loadType)) {
-      try {
-        await admin.rpc("refund_game_load_wallet", { p_request_id: requestId });
-      } catch {}
+    if (refundExpected) {
+      const refunded = await admin.rpc("refund_game_load_wallet", { p_request_id: requestId });
+      if (!refunded.error) {
+        const { data } = await admin
+          .from("game_load_requests")
+          .select("wallet_refunded")
+          .eq("id", requestId)
+          .maybeSingle();
+        walletRefunded = Boolean((data as { wallet_refunded?: boolean } | null)?.wallet_refunded);
+      }
     }
+
+    const userError = loadRefundNotice({
+      providerMessage,
+      walletRefunded,
+      refundExpected,
+    });
 
     await admin
       .from("game_load_requests")
