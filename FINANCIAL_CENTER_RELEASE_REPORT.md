@@ -28,4 +28,4 @@ The refund migration is already installed. No further database change is require
 
 ## Commit
 
-See the hash printed after `git rev-parse HEAD` in the session that created the branch.
+`e2af5aaa502aae9f071988b3814cd62f67d9119c` on `release/financial-center-2026-10-18`.
