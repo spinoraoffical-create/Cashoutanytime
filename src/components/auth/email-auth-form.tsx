@@ -226,8 +226,10 @@ export function EmailAuthForm({ mode, redirect = "/", referralCodeFromUrl, agent
       return;
     }
 
-    if (!/^\d{4}-\d{2}-\d{2}$/.test(dateOfBirth) || dateOfBirth >= new Date().toISOString().slice(0, 10)) {
-      toast.error("Enter your date of birth.");
+    const { ageDenial } = await import("@/lib/compliance/age");
+    const tooYoung = ageDenial(dateOfBirth);
+    if (tooYoung) {
+      toast.error(tooYoung);
       setLoading(false);
       return;
     }

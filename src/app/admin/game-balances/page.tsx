@@ -16,6 +16,7 @@ export const maxDuration = 60;
 function statusLabel(status: string, detail: string | null) {
   if (status === "live") return detail || "Live";
   if (status === "not_connected") return "Not connected";
+  if (status === "paused") return "Paused";
   return detail || "Could not read this game.";
 }
 
@@ -61,7 +62,7 @@ export default async function LiveGameBalancesPage() {
                     <td className="px-2 py-3 text-right tabular-nums text-[#e8eefc]">{coinText(row.playerCoins)}</td>
                     <td className="px-2 py-3 text-right tabular-nums text-[#e8eefc]">{row.playerCount == null ? "—" : row.playerCount}</td>
                     <td className="px-2 py-3">
-                      <AdminStatusBadge status={row.status === "live" ? "Live" : row.status === "not_connected" ? "Not connected" : "Read error"} />
+                      <AdminStatusBadge status={row.status === "live" ? "Live" : row.status === "not_connected" ? "Not connected" : row.status === "paused" ? "Paused" : "Read error"} />
                       <p className="mt-1 text-xs text-[#9fb0d0]">{statusLabel(row.status, row.detail)}</p>
                     </td>
                   </tr>

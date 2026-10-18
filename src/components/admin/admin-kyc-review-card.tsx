@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
 import { CheckCircle2, Eye, FileText, X, XCircle } from "lucide-react";
 import { KYCSubmissionRecord, updateKYCStatus } from "@/lib/actions/kyc-actions";
+import { applyReviewDecision, reviewCounts } from "@/lib/kyc/decision";
 import { AdminEmptyState } from "@/components/admin/ui/admin-empty-state";
 import { AdminSectionCard } from "@/components/admin/ui/admin-section-card";
 import { AdminStatusBadge } from "@/components/admin/ui/admin-status-badge";
@@ -27,42 +28,40 @@ export function AdminKYCReviewCard({
   const [submissions, setSubmissions] = useState<KYCSubmissionRecord[]>(initialSubmissions);
   const [previewDoc, setPreviewDoc] = useState<KYCSubmissionRecord | null>(null);
   const [filter, setFilter] = useState<Filter>("all");
+  const [savingId, setSavingId] = useState<string | null>(null);
 
   async function handleApprove(userId: string, name: string) {
+    if (savingId) return;
     if (!window.confirm(`Approve the identity check for ${name}?`)) return;
+    setSavingId(userId);
     const res = await updateKYCStatus(userId, "approved");
+    setSavingId(null);
     if (res.ok) {
-      setSubmissions((prev) =>
-        prev.map((s) => (s.user_id === userId ? { ...s, status: "approved" } : s))
-      );
-      toast.success(`Approved KYC for ${name}! Verified Player Badge granted.`);
+      setSubmissions((prev) => applyReviewDecision(prev, userId, "approved"));
+      toast.success("Identity verification approved.");
       setPreviewDoc(null);
     } else {
-      toast.error(res.error || "Failed to approve KYC.");
+      toast.error(res.error || "The identity status could not be saved.");
     }
   }
 
   async function handleReject(userId: string, name: string) {
+    if (savingId) return;
     if (!window.confirm(`Reject the identity check for ${name}?`)) return;
+    setSavingId(userId);
     const res = await updateKYCStatus(userId, "rejected");
+    setSavingId(null);
     if (res.ok) {
-      setSubmissions((prev) =>
-        prev.map((s) => (s.user_id === userId ? { ...s, status: "rejected" } : s))
-      );
-      toast.error(`Rejected KYC for ${name}.`);
+      setSubmissions((prev) => applyReviewDecision(prev, userId, "rejected"));
+      toast.success("Identity verification rejected.");
       setPreviewDoc(null);
     } else {
-      toast.error(res.error || "Failed to reject KYC.");
+      toast.error(res.error || "The identity status could not be saved.");
     }
   }
 
   const visible = filter === "all" ? submissions : submissions.filter((s) => s.status === filter);
-  const counts: Record<Filter, number> = {
-    all: submissions.length,
-    pending: submissions.filter((s) => s.status === "pending").length,
-    approved: submissions.filter((s) => s.status === "approved").length,
-    rejected: submissions.filter((s) => s.status === "rejected").length,
-  };
+  const counts = reviewCounts(submissions);
 
   return (
     <AdminSectionCard
@@ -127,6 +126,7 @@ export function AdminKYCReviewCard({
                   <>
                     <Button
                       size="sm"
+                      disabled={savingId === s.user_id}
                       onClick={() => handleApprove(s.user_id, s.user_name)}
                       className="gap-1 bg-emerald-500 text-black hover:bg-emerald-400"
                     >
@@ -135,6 +135,7 @@ export function AdminKYCReviewCard({
                     <Button
                       size="sm"
                       variant="outline"
+                      disabled={savingId === s.user_id}
                       onClick={() => handleReject(s.user_id, s.user_name)}
                       className="gap-1 border-rose-400/40 text-rose-200 hover:bg-rose-500/10"
                     >
@@ -195,12 +196,14 @@ export function AdminKYCReviewCard({
                     <Button
                       onClick={() => handleReject(previewDoc.user_id, previewDoc.user_name)}
                       variant="outline"
+                      disabled={savingId === previewDoc.user_id}
                       className="gap-1 border-rose-400/40 text-rose-200 hover:bg-rose-500/10"
                     >
                       <XCircle className="h-4 w-4" /> Reject
                     </Button>
                     <Button
                       onClick={() => handleApprove(previewDoc.user_id, previewDoc.user_name)}
+                      disabled={savingId === previewDoc.user_id}
                       className="gap-1 bg-emerald-500 text-black hover:bg-emerald-400"
                     >
                       <CheckCircle2 className="h-4 w-4" /> Approve

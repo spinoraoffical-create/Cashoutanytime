@@ -3,8 +3,7 @@ import { missedAuditMessage } from "@/lib/admin/audit-result";
 import { logIncident } from "@/lib/observability/incident";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { PaymentIdentityError, quotePaidDeposit, settleDepositSideEffects } from "@/lib/payments/auto-settle";
-
-const ALLOWED_METHODS = new Set(["paypal", "chime", "cashapp", "bitcoin", "usdt", "venmo"]);
+import { mapPaydoraMethod } from "@/lib/payments/paydora-method";
 
 export function paydoraProofPath(depositId: string) {
   return `paydora/${depositId}`;
@@ -12,18 +11,6 @@ export function paydoraProofPath(depositId: string) {
 
 export function isPaydoraProofPath(path: string | null | undefined) {
   return Boolean(path?.startsWith("paydora/"));
-}
-
-export function mapPaydoraMethod(value?: string | null) {
-  const v = (value || "").trim().toLowerCase();
-  if (ALLOWED_METHODS.has(v)) return v;
-  if (v.includes("chime")) return "chime";
-  if (v.includes("cash")) return "cashapp";
-  if (v.includes("venmo")) return "venmo";
-  if (v.includes("paypal")) return "paypal";
-  if (v.includes("bitcoin") || v.includes("btc")) return "bitcoin";
-  if (v.includes("usdt") || v.includes("tether")) return "usdt";
-  return "cashapp";
 }
 
 async function alreadyApplied(
@@ -60,21 +47,28 @@ async function ensureDepositRequest(
     methodName?: string | null;
     gameName?: string | null;
     gameSlug?: string | null;
+    allowUnlabeled?: boolean;
   }
 ) {
   const proof = paydoraProofPath(input.depositId);
   const methodName = input.methodName?.trim() || "Paydora";
-  const row = {
-    user_id: input.userId,
-    game_slug: input.gameSlug?.trim() || null,
-    game_name: input.gameName?.trim() || `Instant deposit · ${methodName}`,
-    payment_method: mapPaydoraMethod(input.methodValue || input.methodName),
-    amount: input.amount,
-    proof_url: proof,
-    status: "completed",
-    wallet_credited: true,
-    admin_notes: input.referenceId ? `Paid online · ${input.referenceId}` : "Paid online",
-  };
+  const paymentMethod = mapPaydoraMethod(input.methodValue || input.methodName);
+  if (!paymentMethod && !input.allowUnlabeled) {
+    throw new PaymentIdentityError("Paydora method is not recognized");
+  }
+  const row = paymentMethod
+    ? {
+        user_id: input.userId,
+        game_slug: input.gameSlug?.trim() || null,
+        game_name: input.gameName?.trim() || `Instant deposit · ${methodName}`,
+        payment_method: paymentMethod,
+        amount: input.amount,
+        proof_url: proof,
+        status: "completed",
+        wallet_credited: true,
+        admin_notes: input.referenceId ? `Paid online · ${input.referenceId}` : "Paid online",
+      }
+    : null;
 
   const { data: existing } = await admin
     .from("deposit_requests")
@@ -87,6 +81,7 @@ async function ensureDepositRequest(
       status: string;
       wallet_credited: boolean;
       amount: number;
+      payment_method?: string;
       game_name?: string;
       game_slug?: string;
       admin_notes?: string;
@@ -94,6 +89,7 @@ async function ensureDepositRequest(
       status: "completed",
       wallet_credited: true,
       amount: input.amount,
+      ...(paymentMethod ? { payment_method: paymentMethod } : {}),
     };
     if (input.gameName?.trim()) patch.game_name = input.gameName.trim();
     if (input.gameSlug?.trim()) patch.game_slug = input.gameSlug.trim();
@@ -103,6 +99,7 @@ async function ensureDepositRequest(
     return;
   }
 
+  if (!row) return;
   const { error } = await admin.from("deposit_requests").insert(row);
   if (error) throw new Error(error.message);
 }
@@ -128,6 +125,14 @@ export async function creditPaydoraDeposit(input: {
   /** Failed payout refund. Credits the reserved amount and does not apply a game bonus. */
   payoutVoid?: boolean;
 }): Promise<CreditResult> {
+  const { realValueDenial } = await import("@/lib/compliance/real-value");
+  if (!input.payoutVoid) {
+    const blocked = realValueDenial("deposits");
+    if (blocked) return { credited: false };
+    if (!mapPaydoraMethod(input.methodValue || input.methodName)) {
+      throw new PaymentIdentityError("Paydora method is not recognized");
+    }
+  }
   const admin = createAdminClient();
   if (!admin) throw new Error("Admin client unavailable");
   if (!input.userId || input.amount <= 0 || !input.depositId) return { credited: false };
@@ -143,6 +148,7 @@ export async function creditPaydoraDeposit(input: {
       marker,
       creditAmount: amount,
       description: `Payout refund $${amount.toFixed(2)} (${marker})`,
+      allowUnlabeled: true,
     });
     const audited = await writeAudit({
       actorId: input.userId,
@@ -273,6 +279,7 @@ async function creditMarkedAmount(
     marker: string;
     creditAmount: number;
     description: string;
+    allowUnlabeled?: boolean;
   }
 ) {
   const { data: rpcData, error: rpcError } = await admin.rpc("credit_paydora_deposit", {
@@ -308,6 +315,9 @@ export async function reversePaydoraDeposit(input: {
   amount: number;
   depositId: string;
 }) {
+  const { realValueDenial } = await import("@/lib/compliance/real-value");
+  const blocked = realValueDenial("deposits");
+  if (blocked) return { reversed: false };
   const admin = createAdminClient();
   if (!admin) throw new Error("Admin client unavailable");
   const { data: ledger, error: ledgerError } = await admin

@@ -5,7 +5,7 @@ import {
   payoutAmount,
   payoutDestinationKey,
 } from "@/lib/payments/payout-reservation";
-import { isRestrictedPaymentRequest } from "@/lib/compliance/restricted-state";
+import { playerMoneyDenial } from "@/lib/compliance/real-value";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { checkRateLimit, rateLimitUserMessage } from "@/lib/rate-limit";
@@ -34,10 +34,6 @@ type ProviderAttempt = {
 
 export async function POST(req: Request) {
   try {
-    if (isRestrictedPaymentRequest(req.headers)) {
-      return NextResponse.json({ error: "Cash outs are unavailable in your state." }, { status: 403 });
-    }
-
     const supabase = await createClient();
     const {
       data: { user },
@@ -62,9 +58,16 @@ export async function POST(req: Request) {
 
     const { data: profile } = await supabase
       .from("profiles")
-      .select("cashout_wallet, kyc_status")
+      .select("cashout_wallet, kyc_status, date_of_birth")
       .eq("id", user.id)
       .single();
+
+    const stopped = playerMoneyDenial({
+      operation: "payouts",
+      headers: req.headers,
+      dateOfBirth: (profile as { date_of_birth?: string | null } | null)?.date_of_birth,
+    });
+    if (stopped) return NextResponse.json({ error: stopped }, { status: 403 });
 
     const kyc = (profile as { kyc_status?: string | null } | null)?.kyc_status;
     if (kyc !== "verified" && kyc !== "approved") {

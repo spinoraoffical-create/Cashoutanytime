@@ -12,6 +12,7 @@ import {
   startOfUtcDayIso,
   type GlobalSpinStats,
 } from "@/lib/spin/prize-engine";
+import { adjustmentDenial } from "@/lib/compliance/real-value";
 import { creditCurrentWallet } from "@/lib/wallet/service-mutate";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { assertFreeplayAllowed } from "@/lib/actions/security";
@@ -179,6 +180,10 @@ export async function spinWheel(): Promise<SpinResult> {
 
   const globalStats = await getGlobalSpinStats();
   const { prize, index } = resolveSpinPrize(globalStats);
+  if (prize.type === "cash" && prize.value > 0) {
+    const blocked = adjustmentDenial();
+    if (blocked) return { error: blocked };
+  }
 
   const { error } = await supabase.rpc("record_wheel_spin", {
     p_prize_label: prize.label,

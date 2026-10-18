@@ -93,13 +93,14 @@ export async function loadGameAutomationHealth(): Promise<{
   const store = new SupabaseTransferStore();
   const counts = await store.counts();
   const checkedAt = new Date().toISOString();
-  const [fire, milky] = await Promise.all([readAgent("fire-kirin"), readAgent("milky-way")]);
 
   const pauses = new Map<string, { paused: boolean; reason: string }>();
   const reviews: ReviewRow[] = [];
   const db = getSupabaseServiceRoleKey() ? createAdminClient() : null;
+  let pauseReadFailed = !db;
   if (db && counts.installed) {
-    const { data: controls } = await db.from("provider_automation_controls").select("provider, paused, reason");
+    const { data: controls, error: pauseError } = await db.from("provider_automation_controls").select("provider, paused, reason");
+    if (pauseError) pauseReadFailed = true;
     for (const row of (controls || []) as { provider: string; paused: boolean; reason: string | null }[]) {
       pauses.set(row.provider, { paused: row.paused, reason: row.reason || "" });
     }
@@ -130,6 +131,13 @@ export async function loadGameAutomationHealth(): Promise<{
     }
   }
 
+  const skipped = { ok: false, balance: null, detail: "Paused. This page did not contact the provider." };
+  const resumed = (id: string) => !pauseReadFailed && pauses.get(id)?.paused === false;
+  const [fire, milky] = await Promise.all([
+    resumed("fire-kirin") ? readAgent("fire-kirin") : Promise.resolve(skipped),
+    resumed("milky-way") ? readAgent("milky-way") : Promise.resolve(skipped),
+  ]);
+
   function pauseFor(id: string): AutomationProviderRow["pause"] {
     if (id === "panda-master") return "none";
     if (!counts.installed) return "not_installed";
@@ -142,7 +150,7 @@ export async function loadGameAutomationHealth(): Promise<{
     {
       id: "fire-kirin",
       name: "Fire Kirin",
-      connection: fire.ok ? "working" : "failed",
+      connection: fire.ok ? "working" : resumed("fire-kirin") ? "failed" : "blocked",
       connectionDetail: fire.detail,
       lastAuthentication: fire.ok ? checkedAt : "No successful authentication on this refresh.",
       agentBalance: fire.ok ? money(fire.balance) : "Not read",
@@ -157,7 +165,7 @@ export async function loadGameAutomationHealth(): Promise<{
     {
       id: "milky-way",
       name: "Milky Way",
-      connection: milky.ok ? "working" : "failed",
+      connection: milky.ok ? "working" : resumed("milky-way") ? "failed" : "blocked",
       connectionDetail: milky.detail,
       lastAuthentication: milky.ok ? checkedAt : "No successful authentication on this refresh.",
       agentBalance: milky.ok ? money(milky.balance) : "Not read",

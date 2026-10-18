@@ -38,6 +38,9 @@ import { isJuwaApiConfigured } from "@/lib/game-automation/juwa-api";
 import { autoFulfillVegasRequest } from "@/lib/game-automation/vegas-service";
 import { isVegasApiConfigured } from "@/lib/game-automation/vegas-api";
 import { userFacingGameLoadError } from "@/lib/game-automation/user-facing-errors";
+import { providerFulfillmentDenial } from "@/lib/game-automation/provider-pause-read";
+import { playerMoneyDenial, realValueDenial } from "@/lib/compliance/real-value";
+import { headers } from "next/headers";
 import { usernameForOwner } from "@/lib/games/owned-account";
 import { finishGameLoad } from "@/lib/game-automation/finish-game-load";
 import {
@@ -182,6 +185,19 @@ function playerGameError(message: string | null | undefined, loadType?: string |
   );
 }
 
+async function blockPlayerMoney(
+  operation: "game_loads" | "redemptions",
+  supabase: Awaited<ReturnType<typeof createClient>>,
+  userId: string
+) {
+  const { data } = await supabase.from("profiles").select("date_of_birth").eq("id", userId).maybeSingle();
+  return playerMoneyDenial({
+    operation,
+    headers: await headers(),
+    dateOfBirth: (data as { date_of_birth?: string | null } | null)?.date_of_birth,
+  });
+}
+
 async function fulfillOrFail(
   gameSlug: string,
   requestId: string,
@@ -194,6 +210,11 @@ async function fulfillOrFail(
     requestedPassword?: string | null;
   }
 ) {
+  const stopped =
+    loadType === "redeem" ? realValueDenial("redemptions") : loadType === "load" || loadType === "reload" ? realValueDenial("game_loads") : null;
+  if (stopped) return { success: false as const, error: stopped };
+  const paused = await providerFulfillmentDenial(gameSlug);
+  if (paused) return { success: false as const, error: paused };
   try {
     const result = await withAdminStoreLogin(gameSlug, () =>
       autoFulfillGameRequest(gameSlug, requestId, loadType, input)
@@ -490,6 +511,8 @@ export async function requestGameAccountCreate(input: {
   if (!isGameApiReady(input.gameSlug)) {
     return { error: GAME_API_UNAVAILABLE };
   }
+  const paused = await providerFulfillmentDenial(input.gameSlug);
+  if (paused) return { error: paused };
 
   const existing = await getMyGameAccount(input.gameSlug);
   const hasAccount = Boolean(existing?.game_username);
@@ -589,6 +612,8 @@ export async function requestGameCheckBalance(input: {
   if (!isGameApiReady(input.gameSlug)) {
     return { error: GAME_API_UNAVAILABLE };
   }
+  const paused = await providerFulfillmentDenial(input.gameSlug);
+  if (paused) return { error: paused };
 
   const gameUsername = await ownedGameUsername(user.id, input.gameSlug);
   if (!gameUsername) return { error: "Account not found" };
@@ -659,6 +684,9 @@ export async function requestGameLoad(input: {
   } = await supabase.auth.getUser();
   if (!user) return { error: "Not authenticated" };
 
+  const stopped = await blockPlayerMoney("game_loads", supabase, user.id);
+  if (stopped) return { error: stopped };
+
   const { responsibleBlock } = await import("@/lib/responsible/play-guard");
   const blocked = await responsibleBlock(input.amount);
   if (blocked) return { error: blocked };
@@ -669,6 +697,8 @@ export async function requestGameLoad(input: {
   if (!isGameApiReady(input.gameSlug)) {
     return { error: GAME_API_UNAVAILABLE };
   }
+  const paused = await providerFulfillmentDenial(input.gameSlug);
+  if (paused) return { error: paused };
 
   const amount = Math.round(input.amount * 100) / 100;
   if (amount < WALLET_LOAD_LIMITS.min || amount > WALLET_LOAD_LIMITS.max) {
@@ -751,12 +781,17 @@ export async function requestGameRedeem(input: {
   } = await supabase.auth.getUser();
   if (!user) return { error: "Not authenticated" };
 
+  const stopped = await blockPlayerMoney("redemptions", supabase, user.id);
+  if (stopped) return { error: stopped };
+
   if (!isWalletLoadEnabledForGame(input.gameSlug) || !(await gameIsActive(input.gameSlug))) {
     return { error: "Wallet load is not enabled for this game yet." };
   }
   if (!isGameApiReady(input.gameSlug)) {
     return { error: GAME_API_UNAVAILABLE };
   }
+  const paused = await providerFulfillmentDenial(input.gameSlug);
+  if (paused) return { error: paused };
 
   const redeemAll = Boolean(input.redeemAll);
 

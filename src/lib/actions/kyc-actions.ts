@@ -5,6 +5,7 @@ import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { authorize, writeAudit } from "@/lib/actions/admin/core";
+import { identityDecisionLogCode, identityDecisionMessage } from "@/lib/kyc/decision";
 import { checkKycDataUrl } from "@/lib/kyc/upload-rules";
 import { logIncident } from "@/lib/observability/incident";
 
@@ -200,11 +201,6 @@ export async function getAdminKYCSubmissions(): Promise<KYCSubmissionRecord[]> {
   return rows;
 }
 
-function identityRpcUnavailable(error: { message: string; code?: string }): boolean {
-  if (error.code === "PGRST202") return true;
-  return /could not find the function|schema cache/i.test(error.message) && /admin_decide_kyc/i.test(error.message);
-}
-
 /** Approve or Reject KYC (Admin) — submissionIdOrUserId can be row id or user_id */
 export async function updateKYCStatus(
   submissionIdOrUserId: string,
@@ -240,13 +236,8 @@ export async function updateKYCStatus(
   });
 
   if (error) {
-    if (identityRpcUnavailable(error)) {
-      return { ok: false, error: "Identity review is not ready on this server." };
-    }
-    if (/player profile not found/i.test(error.message)) {
-      return { ok: false, error: "The identity status could not be saved. The check was left as it was." };
-    }
-    return { ok: false, error: "The identity status could not be saved." };
+    console.error("[KYC decision]", identityDecisionLogCode(error));
+    return { ok: false, error: identityDecisionMessage(error) };
   }
 
   revalidatePath("/dashboard/kyc");

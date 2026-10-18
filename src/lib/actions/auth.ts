@@ -538,6 +538,10 @@ export async function finalizeRegistrationAfterSignUp(input: {
   agentCode?: string | null;
   offersConsent?: boolean;
 }): Promise<{ ok: boolean; error?: string }> {
+  const { ageDenial } = await import("@/lib/compliance/age");
+  const tooYoung = ageDenial(input.dateOfBirth);
+  if (tooYoung) return { ok: false, error: tooYoung };
+
   if (input.offersConsent !== true) {
     return { ok: false, error: "Agree to email notices before creating an account." };
   }

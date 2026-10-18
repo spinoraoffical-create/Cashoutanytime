@@ -1,10 +1,12 @@
 import { NextResponse } from "next/server";
 import {
-  collectedDepositAmount,
-  isPaidDepositStatus,
   verifyPaydoraSignature,
   type PaydoraWebhookEnvelope,
 } from "@/lib/payments/paydora";
+import { ageDenial } from "@/lib/compliance/age";
+import { realValueDenial } from "@/lib/compliance/real-value";
+import { recordHeldPaydoraWebhook } from "@/lib/payments/auto-settle";
+import { collectedFromWebhook, decidePaydoraWebhook } from "@/lib/payments/paydora-webhook-decision";
 import { creditPaydoraDeposit, reversePaydoraDeposit } from "@/lib/payments/paydora-wallet";
 import { createAdminClient } from "@/lib/supabase/admin";
 
@@ -28,50 +30,102 @@ export async function POST(req: Request) {
     return new NextResponse("BAD JSON", { status: 400 });
   }
 
-  try {
-    const userId = payload.data?.userName || "";
-    const amount = Number(payload.data?.paidAmount ?? payload.data?.amount ?? 0);
+  const depositId = payload.data?.depositId || payload.deliveryId || "";
+  const eventName = payload.event || "unknown";
+  const admin = createAdminClient();
+  let previouslyHeld = false;
+  if (admin && payload.data?.depositId) {
+    const { data: existing } = await admin
+      .from("webhook_events")
+      .select("status, error")
+      .eq("provider", "paydora")
+      .eq("event_key", payload.data.depositId)
+      .maybeSingle();
+    const row = existing as { status?: string; error?: string | null } | null;
+    previouslyHeld = Boolean(row && row.status !== "processed" && (row.error || "").startsWith("held:"));
+  }
 
-    if (payload.event === "deposit.paid" && payload.data?.depositId && userId && amount > 0) {
-      if (isPaidDepositStatus(payload.data.status || "paid") || payload.event === "deposit.paid") {
-        const admin = createAdminClient();
-        if (!admin) throw new Error("Admin client unavailable");
-        const { data: intent, error: intentError } = await admin
-          .from("payment_intents")
-          .select("user_id, game_slug, game_name, promo_code, base_amount")
-          .eq("provider", "paydora")
-          .eq("external_id", payload.data.depositId)
-          .maybeSingle();
-        if (intentError) throw new Error(intentError.message);
-        const saved = intent as {
-          user_id?: string;
-          game_slug?: string | null;
-          game_name?: string | null;
-          promo_code?: string | null;
-          base_amount?: number | null;
-        } | null;
-        const savedAmount = Number(saved?.base_amount);
-        const collected = collectedDepositAmount(payload.data);
-        const creditBase = Math.min(savedAmount, collected);
-        if (!saved?.user_id || !saved.game_slug || !Number.isFinite(savedAmount) || savedAmount <= 0 || !(creditBase > 0)) {
-          throw new Error("Payment intent or game is missing");
-        }
-        await creditPaydoraDeposit({
-          userId: saved.user_id,
-          amount: creditBase,
-          depositId: payload.data.depositId,
-          referenceId: payload.data.referenceId,
-          gameSlug: saved.game_slug,
-          gameName: saved.game_name,
-          provider: "paydora",
-        });
+  let savedAmount: number | null = null;
+  let hasIntent = false;
+  let ageBlocked = false;
+  let savedUserId = "";
+  let savedGameSlug: string | null = null;
+  let savedGameName: string | null = null;
+  let savedPaymentMethod: string | null = null;
+  if (admin && payload.event === "deposit.paid" && payload.data?.depositId && !realValueDenial("deposits") && !previouslyHeld) {
+    const { data: intent, error: intentError } = await admin
+      .from("payment_intents")
+      .select("user_id, game_slug, game_name, promo_code, base_amount, payment_method")
+      .eq("provider", "paydora")
+      .eq("external_id", payload.data.depositId)
+      .maybeSingle();
+    if (intentError) {
+      console.error("[paydora/webhook]", intentError.message);
+      return new NextResponse("RETRY", { status: 500 });
+    }
+    const saved = intent as {
+      user_id?: string;
+      game_slug?: string | null;
+      game_name?: string | null;
+      base_amount?: number | null;
+      payment_method?: string | null;
+    } | null;
+    savedAmount = Number(saved?.base_amount);
+    hasIntent = Boolean(saved?.user_id && saved.game_slug && Number.isFinite(savedAmount) && savedAmount > 0);
+    savedUserId = saved?.user_id || "";
+    savedGameSlug = saved?.game_slug ?? null;
+    savedGameName = saved?.game_name ?? null;
+    savedPaymentMethod = saved?.payment_method ?? null;
+    if (hasIntent) {
+      const { data: profile } = await admin.from("profiles").select("date_of_birth").eq("id", savedUserId).maybeSingle();
+      ageBlocked = Boolean(ageDenial((profile as { date_of_birth?: string | null } | null)?.date_of_birth));
+    }
+  }
+
+  const decision = decidePaydoraWebhook({
+    depositsOn: !realValueDenial("deposits"),
+    previouslyHeld,
+    event: eventName,
+    status: payload.data?.status,
+    currency: payload.data?.currency,
+    savedAmount,
+    collectedAmount: collectedFromWebhook(payload.data || {}),
+    hasIntent,
+    ageBlocked,
+  });
+
+  if (decision.action !== "credit" && decision.action !== "reverse") {
+    const saved = await recordHeldPaydoraWebhook({
+      depositId,
+      eventName,
+      error: decision.reason,
+      status: decision.action === "ignore" ? "ignored" : "received",
+    });
+    if (!saved) return new NextResponse("RETRY", { status: 500 });
+    return new NextResponse("HELD", { status: 200 });
+  }
+
+  try {
+    if (decision.action === "credit") {
+      if (!payload.data?.depositId || !hasIntent || !savedGameSlug) {
+        throw new Error("Payment intent or game is missing");
       }
+      await creditPaydoraDeposit({
+        userId: savedUserId,
+        amount: decision.amount,
+        depositId: payload.data.depositId,
+        referenceId: payload.data.referenceId,
+        gameSlug: savedGameSlug,
+        gameName: savedGameName,
+        methodValue: savedPaymentMethod,
+        provider: "paydora",
+      });
     }
 
-    if (payload.event === "deposit.refunded" && payload.data?.depositId && userId && amount > 0) {
+    if (decision.action === "reverse" && payload.data?.depositId) {
       await reversePaydoraDeposit({
-        userId,
-        amount,
+        userId: payload.data.userName || "",
+        amount: decision.amount,
         depositId: payload.data.depositId,
       });
     }

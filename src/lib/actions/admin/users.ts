@@ -12,6 +12,7 @@ import {
 import { partialAuditResult } from "@/lib/admin/audit-result";
 import { adminLink, tgEsc, tgNotify } from "@/lib/telegram";
 import { getAgentScope, playerInScope } from "@/lib/agents/scope";
+import { REAL_VALUE_OFF, realValueDenial } from "@/lib/compliance/real-value";
 
 export async function setBanAction(input: {
   userId: string;
@@ -165,6 +166,10 @@ export async function adjustWalletAction(input: {
     return { ok: false, error: parsed.error.issues[0]?.message ?? "Invalid input" };
   }
 
+  if (process.env.REAL_VALUE_ADJUSTMENTS !== "on") {
+    return { ok: false, error: REAL_VALUE_OFF };
+  }
+
   const db = adminDb();
   const credit = parsed.data.amount > 0;
   const { error } = await db.rpc(credit ? "credit_wallet" : "debit_wallet", {
@@ -218,6 +223,9 @@ export async function recordCashoutPayoutAction(input: {
   if (!parsed.success) {
     return { ok: false, error: parsed.error.issues[0]?.message ?? "Invalid input" };
   }
+
+  const stopped = realValueDenial("payouts");
+  if (stopped) return { ok: false, error: stopped };
 
   const db = adminDb();
   const { error } = await db.rpc("admin_payout_cashout", {

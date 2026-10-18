@@ -1,5 +1,6 @@
 import "server-only";
 
+import { adjustmentDenial, ledgerOperation, realValueDenial } from "@/lib/compliance/real-value";
 import { createAdminClient } from "@/lib/supabase/admin";
 
 const LEDGER_KINDS = new Set([
@@ -22,6 +23,16 @@ export async function creditCurrentWallet(
   description?: string | null
 ): Promise<{ success?: boolean; error?: string }> {
   if (!Number.isFinite(amount) || amount <= 0) return { error: "Invalid amount" };
+  const creditKind = ledgerKind(kind);
+  const creditOperation = ledgerOperation(creditKind);
+  if (creditOperation) {
+    const blocked = realValueDenial(creditOperation);
+    if (blocked) return { error: blocked };
+  }
+  if (creditKind === "adjustment") {
+    const blocked = adjustmentDenial();
+    if (blocked) return { error: blocked };
+  }
   const admin = createAdminClient();
   if (!admin) return { error: "Could not update that wallet." };
 
@@ -45,6 +56,16 @@ export async function debitCurrentWallet(
   description?: string | null
 ): Promise<{ success?: boolean; error?: string }> {
   if (!Number.isFinite(amount) || amount <= 0) return { error: "Invalid amount" };
+  const debitKind = ledgerKind(kind);
+  const debitOperation = ledgerOperation(debitKind);
+  if (debitOperation) {
+    const blocked = realValueDenial(debitOperation);
+    if (blocked) return { error: blocked };
+  }
+  if (debitKind === "adjustment") {
+    const blocked = adjustmentDenial();
+    if (blocked) return { error: blocked };
+  }
   const admin = createAdminClient();
   if (!admin) return { error: "Could not update that wallet." };
 
@@ -70,6 +91,8 @@ export async function debitCashoutWallet(
   note?: string | null
 ): Promise<{ success?: boolean; error?: string }> {
   if (!Number.isFinite(amount) || amount <= 0) return { error: "Invalid amount" };
+  const blocked = realValueDenial("payouts");
+  if (blocked) return { error: blocked };
   const admin = createAdminClient();
   if (!admin) return { error: "Could not update that wallet." };
 

@@ -13,9 +13,12 @@ const create = readFileSync(new URL("../src/app/api/payments/paydora/create/rout
 assert.match(create, /amountsForMethod/);
 
 const webhook = readFileSync(new URL("../src/app/api/payments/paydora/webhook/route.ts", import.meta.url), "utf8");
-assert.match(webhook, /collectedDepositAmount/);
-assert.match(webhook, /Math\.min\(savedAmount, collected\)/);
+const decision = readFileSync(new URL("../src/lib/payments/paydora-webhook-decision.ts", import.meta.url), "utf8");
+assert.match(webhook, /collectedFromWebhook/);
+assert.match(decision, /collectedDepositAmount/);
+assert.equal(webhook.includes("Math.min(savedAmount, collected)"), false);
 assert.match(webhook, /verifyPaydoraSignature/);
+assert.match(decision, /amountsMatch/);
 
 const payout = readFileSync(new URL("../src/app/api/payments/paydora/payout/route.ts", import.meta.url), "utf8");
 assert.equal(payout.includes("body.idempotencyKey"), false);

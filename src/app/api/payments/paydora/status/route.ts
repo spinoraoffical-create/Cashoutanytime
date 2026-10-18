@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { canReadDeposit } from "@/lib/payments/deposit-access";
-import { getPaydoraDeposit, isPaidDepositStatus } from "@/lib/payments/paydora";
-import { playerPaymentError } from "@/lib/player-safe-error";
+import { getPaydoraDeposit, isPaidDepositStatus, isPaydoraConfigured } from "@/lib/payments/paydora";
+import { DEPOSITS_UNAVAILABLE, playerPaymentError } from "@/lib/player-safe-error";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
 
@@ -24,6 +24,9 @@ export async function GET(req: Request) {
     const url = new URL(req.url);
     const depositId = url.searchParams.get("id")?.trim();
     if (!depositId) return NextResponse.json({ error: "Missing deposit id." }, { status: 400 });
+    if (!isPaydoraConfigured()) {
+      return NextResponse.json({ error: DEPOSITS_UNAVAILABLE }, { status: 503 });
+    }
 
     const deposit = await getPaydoraDeposit(depositId);
     const admin = createAdminClient();
@@ -60,6 +63,10 @@ export async function GET(req: Request) {
       credited,
     });
   } catch (err) {
-    return NextResponse.json({ error: playerPaymentError(err) }, { status: 500 });
+    const status = (err as { status?: number }).status;
+    return NextResponse.json(
+      { error: playerPaymentError(err) },
+      { status: status && status < 500 ? status : 503 }
+    );
   }
 }

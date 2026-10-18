@@ -4,12 +4,15 @@ import { revalidatePath } from "next/cache";
 
 import { adminDb, authorize, writeAudit } from "@/lib/actions/admin/core";
 import { fulfillTrackedRequest } from "@/lib/actions/game-loads";
+import { realValueDenial } from "@/lib/compliance/real-value";
 import { getAgentScope, playerInScope } from "@/lib/agents/scope";
 
 export async function retryFailedLoadAction(requestId: string) {
   const scope = await getAgentScope();
   const platform = await authorize("requests.manage");
   const allowed = !("error" in platform) || scope?.level === "store" || scope?.level === "platform";
+  const loadsOff = realValueDenial("game_loads");
+  if (loadsOff) return { ok: false as const, error: loadsOff };
   if (!allowed) return { ok: false as const, error: "error" in platform ? platform.error : "You can't retry loads." };
   if (scope?.level === "sub") return { ok: false as const, error: "A store creator retries failed loads." };
 
@@ -81,6 +84,9 @@ export async function setCashoutLimitAction(amount: number) {
   if ("error" in auth) return { ok: false as const, error: auth.error };
   if (!Number.isFinite(amount) || amount < 0 || amount > 100000) {
     return { ok: false as const, error: "Enter a limit between 0 and 100000." };
+  }
+  if (amount > 0 && realValueDenial("payouts")) {
+    return { ok: false as const, error: realValueDenial("payouts") || "This money action is turned off." };
   }
   const { error } = await adminDb().from("platform_ops").upsert({
     key: "cashout",

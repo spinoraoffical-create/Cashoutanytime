@@ -6,6 +6,7 @@ import { adminListScope } from "@/lib/admin/list-scope";
 import { playerInScope, readAgentScope } from "@/lib/agents/scope";
 import { getStaffContext } from "@/lib/data/admin";
 import { partialAuditResult, payoutOperatorMessage } from "@/lib/admin/audit-result";
+import { realValueDenial } from "@/lib/compliance/real-value";
 import { adminDb, authorize, writeAudit, type AdminActionResult } from "./core";
 import { adminLink, tgEsc, tgNotify } from "@/lib/telegram";
 
@@ -36,6 +37,8 @@ export async function payoutCashout(formData: FormData): Promise<AdminActionResu
     scopeStatus: scopeRead.status,
     scope: scopeRead.scope,
   });
+  const stopped = realValueDenial("payouts");
+  if (stopped) return { ok: false, error: stopped };
   if (decision.mode === "deny") return { ok: false, error: "You cannot pay this player." };
   if (decision.mode === "network") {
     if (!scopeRead.scope || !(await playerInScope(scopeRead.scope, userId))) {

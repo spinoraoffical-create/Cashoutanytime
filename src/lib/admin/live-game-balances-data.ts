@@ -24,6 +24,7 @@ import { getMrAllInOneApiClient } from "@/lib/game-automation/mrallinone-api";
 import { isMrAllInOneApiConfigured } from "@/lib/game-automation/mrallinone-service";
 import { isOrionStarsApiConfigured, OrionStarsApiClient } from "@/lib/game-automation/orionstars-api";
 import { getVegasApiClient, isVegasApiConfigured } from "@/lib/game-automation/vegas-api";
+import { pausedProviderSlugs } from "@/lib/game-automation/provider-pause-read";
 
 const READ_MS = 12000;
 
@@ -106,8 +107,21 @@ async function readGame(
   slug: string,
   name: string,
   configured: boolean,
+  paused: boolean,
   read: () => Promise<ListedCoins>
 ): Promise<LiveGameBalance> {
+  if (paused) {
+    return {
+      slug,
+      name,
+      storeCoins: null,
+      playerCoins: null,
+      playerCount: null,
+      partial: false,
+      status: "paused",
+      detail: "Paused",
+    };
+  }
   if (!configured) {
     return {
       slug,
@@ -144,14 +158,28 @@ async function readGame(
 }
 
 export async function loadLiveGameBalances(): Promise<LiveGameBalance[]> {
+  const paused = await pausedProviderSlugs([
+    "cash-frenzy",
+    "cash-machine",
+    "gameroom",
+    "mr-all-in-one",
+    "mafia",
+    "juwa",
+    "vegas-sweeps",
+    "fire-kirin",
+    "game-vault",
+    "orion-stars",
+    "milky-way",
+  ]);
+  const stopped = (slug: string) => paused.has(slug);
   return Promise.all([
-    readGame("cash-frenzy", "Cash Frenzy", isCashFrenzyApiConfigured(), () => layuiBalance(getCashFrenzyApiClient())),
-    readGame("cash-machine", "Cash Machine", isCashMachineApiConfigured(), () => layuiBalance(getCashMachineApiClient())),
-    readGame("gameroom", "Game Room", isGameroomApiConfigured(), () => layuiBalance(getGameroomApiClient())),
-    readGame("mr-all-in-one", "Mr All in One", isMrAllInOneApiConfigured(), () =>
+    readGame("cash-frenzy", "Cash Frenzy", isCashFrenzyApiConfigured(), stopped("cash-frenzy"), () => layuiBalance(getCashFrenzyApiClient())),
+    readGame("cash-machine", "Cash Machine", isCashMachineApiConfigured(), stopped("cash-machine"), () => layuiBalance(getCashMachineApiClient())),
+    readGame("gameroom", "Game Room", isGameroomApiConfigured(), stopped("gameroom"), () => layuiBalance(getGameroomApiClient())),
+    readGame("mr-all-in-one", "Mr All in One", isMrAllInOneApiConfigured(), stopped("mr-all-in-one"), () =>
       layuiBalance(getMrAllInOneApiClient())
     ),
-    readGame("mafia", "Mafia", isMafiaApiConfigured(), async () => {
+    readGame("mafia", "Mafia", isMafiaApiConfigured(), stopped("mafia"), async () => {
       const api = new MafiaApiClient();
       await api.getValidToken();
       const players = await collectPages(async (page) => ({
@@ -160,27 +188,27 @@ export async function loadLiveGameBalances(): Promise<LiveGameBalance[]> {
       }));
       return { storeCoins: api.getStoreCoins(), ...players };
     }),
-    readGame("juwa", "Juwa", isJuwaApiConfigured(), () => agentBalance(() => new JuwaApiClient().getAgentBalance())),
-    readGame("vegas-sweeps", "Vegas Sweeps", isVegasApiConfigured(), () =>
+    readGame("juwa", "Juwa", isJuwaApiConfigured(), stopped("juwa"), () => agentBalance(() => new JuwaApiClient().getAgentBalance())),
+    readGame("vegas-sweeps", "Vegas Sweeps", isVegasApiConfigured(), stopped("vegas-sweeps"), () =>
       agentBalance(() => getVegasApiClient().getAgentBalance())
     ),
-    readGame("fire-kirin", "Fire Kirin", isFireKirinApiConfigured(), () =>
+    readGame("fire-kirin", "Fire Kirin", isFireKirinApiConfigured(), stopped("fire-kirin"), () =>
       agentBalance(() => new FireKirinApiClient().getAgentBalance())
     ),
-    readGame("game-vault", "Game Vault", isGameVaultApiConfigured(), () =>
+    readGame("game-vault", "Game Vault", isGameVaultApiConfigured(), stopped("game-vault"), () =>
       agentBalance(async () => {
         const res = await getGameVaultApiClient().getAgentBalance();
         return Number(res.data?.agent_balance);
       })
     ),
-    readGame("orion-stars", "Orion Stars", isOrionStarsApiConfigured(), () =>
+    readGame("orion-stars", "Orion Stars", isOrionStarsApiConfigured(), stopped("orion-stars"), () =>
       agentBalance(async () => {
         const api = new OrionStarsApiClient();
         await api.getValidSession();
         return api.lastAgentBalance;
       })
     ),
-    readGame("milky-way", "Milky Way", isMilkyWayApiConfigured(), () =>
+    readGame("milky-way", "Milky Way", isMilkyWayApiConfigured(), stopped("milky-way"), () =>
       agentBalance(async () => {
         const session = await new MilkyWayApiClient().getFreshSession();
         return session.balance;

@@ -3,6 +3,9 @@ import { readFileSync } from "node:fs";
 import {
   isRestrictedPaymentRequest,
   isRestrictedUsRegion,
+  moneyRegionDenial,
+  REGION_BLOCKED,
+  REGION_MISSING,
   restrictedStateCodes,
 } from "../src/lib/compliance/restricted-state.ts";
 
@@ -17,8 +20,9 @@ assert.equal(isRestrictedUsRegion("", "WA", states), false);
 assert.equal(isRestrictedUsRegion(null, null, states), false);
 assert.equal(isRestrictedUsRegion("CA", "WA", states), false);
 
-function headers(country, region) {
+function headers(country, region, platform = true) {
   const values = new Map();
+  if (platform) values.set("x-vercel-id", "req_test");
   if (country != null) values.set("x-vercel-ip-country", country);
   if (region != null) values.set("x-vercel-ip-country-region", region);
   return { get: (name) => values.get(name) ?? null };
@@ -38,11 +42,20 @@ const middleware = readFileSync(new URL("../src/middleware.ts", import.meta.url)
 const create = readFileSync(new URL("../src/app/api/payments/paydora/create/route.ts", import.meta.url), "utf8");
 const payout = readFileSync(new URL("../src/app/api/payments/paydora/payout/route.ts", import.meta.url), "utf8");
 const webhook = readFileSync(new URL("../src/app/api/payments/paydora/webhook/route.ts", import.meta.url), "utf8");
+const vercel = { VERCEL: "1" };
+assert.equal(moneyRegionDenial(headers("US", "WA"), vercel), REGION_BLOCKED);
+assert.equal(moneyRegionDenial(headers("US", null), vercel), REGION_MISSING);
+assert.equal(moneyRegionDenial(headers(null, null), vercel), REGION_MISSING);
+assert.equal(moneyRegionDenial(headers("US", "TX"), vercel), null);
+assert.equal(moneyRegionDenial(headers("US", "TX"), {}), REGION_MISSING);
+assert.equal(moneyRegionDenial(headers("GB", null), vercel), null);
+assert.equal(middleware.includes("x-vercel-ip-country"), true);
+
 assert.match(middleware, /isRestrictedUsRegion/);
 assert.match(middleware, /pathname = "\/restricted"/);
 assert.match(middleware, /api\|_next\/static/);
-assert.match(create, /isRestrictedPaymentRequest/);
-assert.match(payout, /isRestrictedPaymentRequest/);
+assert.match(create, /playerMoneyDenial/);
+assert.match(payout, /playerMoneyDenial/);
 assert.equal(webhook.includes("isRestrictedPaymentRequest"), false);
 assert.equal(webhook.includes("isRestrictedUsRegion"), false);
 assert.match(webhook, /verifyPaydoraSignature/);

@@ -1,8 +1,12 @@
 import { NextResponse } from "next/server";
-import { amountsForMethod, checkoutMethodRank, getPaydoraPaymentMethods, isRemovedCheckoutMethod } from "@/lib/payments/paydora";
-import { playerPaymentError } from "@/lib/player-safe-error";
+import { realValueDenial } from "@/lib/compliance/real-value";
+import { amountsForMethod, checkoutMethodRank, getPaydoraPaymentMethods, isPaydoraConfigured, isRemovedCheckoutMethod } from "@/lib/payments/paydora";
+import { DEPOSITS_UNAVAILABLE } from "@/lib/player-safe-error";
 
 export async function GET() {
+  if (realValueDenial("deposits") || !isPaydoraConfigured()) {
+    return NextResponse.json({ error: DEPOSITS_UNAVAILABLE }, { status: 503 });
+  }
   try {
     const methods = await getPaydoraPaymentMethods();
     return NextResponse.json({
@@ -16,7 +20,7 @@ export async function GET() {
       withdrawals: methods.withdrawals,
     });
   } catch (err) {
-    const status = (err as { status?: number }).status || 500;
-    return NextResponse.json({ error: playerPaymentError(err) }, { status });
+    console.error("[paydora/methods]", err instanceof Error ? err.message : "payment methods failed");
+    return NextResponse.json({ error: DEPOSITS_UNAVAILABLE }, { status: 503 });
   }
 }

@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { amountsForMethod, createPaydoraDeposit, getPaydoraPaymentMethods, isRemovedCheckoutMethod } from "@/lib/payments/paydora";
-import { isRestrictedPaymentRequest } from "@/lib/compliance/restricted-state";
+import { playerMoneyDenial } from "@/lib/compliance/real-value";
 import { rememberPaymentIntent } from "@/lib/payments/auto-settle";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
@@ -10,10 +10,6 @@ import { responsibleBlock } from "@/lib/responsible/play-guard";
 
 export async function POST(req: Request) {
   try {
-    if (isRestrictedPaymentRequest(req.headers)) {
-      return NextResponse.json({ error: "Deposits are unavailable in your state." }, { status: 403 });
-    }
-
     const supabase = await createClient();
     const {
       data: { user },
@@ -22,6 +18,14 @@ export async function POST(req: Request) {
     if (!user) {
       return NextResponse.json({ error: "Sign in to deposit." }, { status: 401 });
     }
+
+    const { data: profile } = await supabase.from("profiles").select("date_of_birth").eq("id", user.id).maybeSingle();
+    const stopped = playerMoneyDenial({
+      operation: "deposits",
+      headers: req.headers,
+      dateOfBirth: (profile as { date_of_birth?: string | null } | null)?.date_of_birth,
+    });
+    if (stopped) return NextResponse.json({ error: stopped }, { status: 403 });
 
     const limited = await checkRateLimit("paydoraCreate", user.id);
     if (!limited.allowed) {
@@ -106,6 +110,7 @@ export async function POST(req: Request) {
       gameName,
       promoCode,
       baseAmount: amount,
+      paymentMethod: chosen.value,
     });
 
     return NextResponse.json({

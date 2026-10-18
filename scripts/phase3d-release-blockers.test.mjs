@@ -82,7 +82,7 @@ const decision = kycApp.slice(
 assert.equal((decision.match(/\.rpc\("admin_decide_kyc"/g) ?? []).length, 1);
 assert.ok(decision.indexOf('authorize("kyc.manage")') < decision.indexOf('.rpc("admin_decide_kyc"'));
 assert.match(decision, /p_status: newStatus/);
-assert.match(decision, /Identity review is not ready on this server/);
+assert.match(decision, /identityDecisionMessage\(error\)/);
 assert.equal(decision.includes("writeAudit"), false);
 assert.equal(decision.includes(".update("), false);
 assert.match(kycSql, /CASE WHEN p_status = 'approved' THEN 'verified' ELSE 'rejected'/);

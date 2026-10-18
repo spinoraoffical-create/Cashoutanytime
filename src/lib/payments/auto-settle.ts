@@ -7,6 +7,7 @@ import { logIncident } from "@/lib/observability/incident";
 import { fulfillTrackedRequest } from "@/lib/actions/game-loads";
 import { assignPlayerToAgentByCode } from "@/lib/agents/assign";
 import { bonusForPercent, depositKind } from "@/lib/payments/bonus-math";
+import { realValueDenial } from "@/lib/compliance/real-value";
 import { wholeCoinAmount } from "@/lib/payments/whole-coin";
 import { ensureGameAccountUsername, generateGamePassword } from "@/lib/game-automation/account-username";
 import { isJuwaApiConfigured } from "@/lib/game-automation/juwa-api";
@@ -94,6 +95,7 @@ export async function rememberPaymentIntent(
     gameName?: string | null;
     promoCode?: string | null;
     baseAmount: number;
+    paymentMethod?: string | null;
   }
 ) {
   const row: Record<string, string | number | null> = {
@@ -105,6 +107,7 @@ export async function rememberPaymentIntent(
   if (input.gameSlug) row.game_slug = input.gameSlug;
   if (input.gameName) row.game_name = input.gameName;
   if (input.promoCode) row.promo_code = input.promoCode;
+  if (input.paymentMethod) row.payment_method = input.paymentMethod;
   const { error } = await admin.from("payment_intents").upsert(row, { onConflict: "provider,external_id" });
   if (error) throw migrationError(error);
 }
@@ -250,6 +253,50 @@ export async function quotePaidDeposit(
   };
 }
 
+export async function recordHeldPaydoraWebhook(input: {
+  depositId: string;
+  eventName: string;
+  error?: string;
+  status?: "received" | "ignored" | "failed";
+}): Promise<boolean> {
+  const depositId = input.depositId.trim();
+  if (!depositId) return false;
+  const admin = createAdminClient();
+  if (!admin) return false;
+  const nextStatus = input.status || "received";
+  const nextError = (input.error || "held: deposits off").slice(0, 500);
+  const { data: existing, error: readError } = await admin
+    .from("webhook_events")
+    .select("status")
+    .eq("provider", "paydora")
+    .eq("event_key", depositId)
+    .maybeSingle();
+  if (readError) return false;
+  const current = (existing as { status?: string } | null)?.status;
+  if (current === "processed" || current === "ignored") return true;
+  const row = {
+    provider: "paydora",
+    event_key: depositId,
+    event_name: input.eventName.slice(0, 80),
+    status: nextStatus,
+    error: nextError,
+    processed_at: nextStatus === "received" ? null : new Date().toISOString(),
+  };
+  if (!current) {
+    const { error } = await admin.from("webhook_events").insert(row);
+    if (!error) return true;
+    if (!/duplicate|unique/i.test(error.message)) return false;
+  }
+  const { error } = await admin
+    .from("webhook_events")
+    .update(row)
+    .eq("provider", "paydora")
+    .eq("event_key", depositId)
+    .neq("status", "processed")
+    .neq("status", "ignored");
+  return !error;
+}
+
 async function markWebhook(admin: Admin, depositId: string, status: "processed" | "failed", error?: string) {
   await admin.from("webhook_events").upsert(
     {
@@ -347,6 +394,14 @@ async function loadGameOnce(
   admin: Admin,
   input: { userId: string; depositId: string; quote: DepositQuote }
 ) {
+  if (realValueDenial("game_loads")) {
+    await admin
+      .from("deposit_bonus_ledger")
+      .update({ game_load_status: "skipped", game_load_error: "Game loads are turned off." })
+      .eq("deposit_key", input.depositId)
+      .eq("game_load_status", "pending");
+    return;
+  }
   if (!input.quote.gameSlug) {
     await admin
       .from("deposit_bonus_ledger")

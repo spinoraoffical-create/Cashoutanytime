@@ -58,6 +58,7 @@ export interface PaydoraWebhookEnvelope {
     status?: string;
     amount?: number;
     paidAmount?: number | null;
+    currency?: string | null;
     userName?: string | null;
   };
   deliveryId: string;
@@ -142,6 +143,9 @@ export async function createPaydoraDeposit(input: {
   deviceFingerprint: string;
   idempotencyKey: string;
 }): Promise<PaydoraDeposit> {
+  const { realValueDenial } = await import("@/lib/compliance/real-value");
+  const blocked = realValueDenial("deposits");
+  if (blocked) throw new Error(blocked);
   const body: Record<string, unknown> = {
     paymentMethodId: input.paymentMethodId,
     amount: input.amount,
@@ -173,6 +177,9 @@ export async function createPaydoraWithdrawal(input: {
   payoutEmailOrPhone?: string;
   idempotencyKey: string;
 }): Promise<PaydoraWithdrawal> {
+  const { realValueDenial } = await import("@/lib/compliance/real-value");
+  const blocked = realValueDenial("payouts");
+  if (blocked) throw new Error(blocked);
   const body: Record<string, unknown> = {
     paymentMethodId: input.paymentMethodId,
     amount: input.amount,

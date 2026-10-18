@@ -7,7 +7,7 @@ export type LiveGameBalance = {
   playerCoins: number | null;
   playerCount: number | null;
   partial: boolean;
-  status: "live" | "not_connected" | "error";
+  status: "live" | "not_connected" | "paused" | "error";
   detail: string | null;
 };
 
