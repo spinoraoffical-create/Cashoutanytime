@@ -2,7 +2,9 @@
 
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
+import { createAdminClient } from "@/lib/supabase/admin";
 import { createNotification } from "@/lib/actions/notifications";
+import { getStaffContext } from "@/lib/data/admin";
 
 export async function updateUserRole(userId: string, role: "user" | "admin") {
   const supabase = await createClient();
@@ -180,21 +182,24 @@ export interface AdminUserSearchResult {
   conversationId: string | null;
 }
 
-async function requireAdmin() {
+async function requireStaff() {
   const supabase = await createClient();
   const {
     data: { user },
   } = await supabase.auth.getUser();
-  if (!user) return { error: "Not authenticated" as const, supabase, user: null };
+  if (!user) return { error: "Not authenticated" as const, supabase, user: null, staff: null };
+  const staff = await getStaffContext();
+  if (!staff) return { error: "Unauthorized" as const, supabase, user: null, staff: null };
+  return { supabase, user, error: null, staff };
+}
 
-  const { data: profile } = await supabase
-    .from("profiles")
-    .select("role")
-    .eq("id", user.id)
-    .single();
-
-  if (profile?.role !== "admin") return { error: "Unauthorized" as const, supabase, user: null };
-  return { supabase, user, error: null };
+async function requireAdmin() {
+  const auth = await requireStaff();
+  if (auth.error || !auth.staff) return { error: auth.error ?? "Unauthorized", supabase: auth.supabase, user: null };
+  if (!auth.staff.isSuperAdmin && !auth.staff.roles.includes("admin")) {
+    return { error: "Unauthorized" as const, supabase: auth.supabase, user: null };
+  }
+  return { supabase: auth.supabase, user: auth.user, error: null };
 }
 
 export async function searchUsersForAdmin(query: string): Promise<{
@@ -204,14 +209,15 @@ export async function searchUsersForAdmin(query: string): Promise<{
   const trimmed = query.trim();
   if (trimmed.length < 2) return { users: [] };
 
-  const auth = await requireAdmin();
+  const auth = await requireStaff();
   if (auth.error) return { error: auth.error, users: [] };
+  const db = createAdminClient() ?? auth.supabase;
 
   const pattern = `"%${trimmed.replace(/"/g, '""')}%"`;
-  const { data: users, error } = await auth.supabase
+  const { data: users, error } = await db
     .from("profiles")
     .select("id, full_name, email, phone, whatsapp, role")
-    .eq("role", "user")
+    .in("role", ["customer", "user"])
     .or(
       `full_name.ilike.${pattern},email.ilike.${pattern},phone.ilike.${pattern},whatsapp.ilike.${pattern}`
     )
@@ -222,7 +228,7 @@ export async function searchUsersForAdmin(query: string): Promise<{
   if (!users?.length) return { users: [] };
 
   const userIds = users.map((u) => u.id);
-  const { data: conversations } = await auth.supabase
+  const { data: conversations } = await db
     .from("conversations")
     .select("id, user_id")
     .in("user_id", userIds)
@@ -247,21 +253,22 @@ export async function ensureAdminConversation(targetUserId: string): Promise<{
   user?: { full_name: string | null; email: string; is_online?: boolean };
   error?: string;
 }> {
-  const auth = await requireAdmin();
+  const auth = await requireStaff();
   if (auth.error) return { error: auth.error };
+  const db = createAdminClient() ?? auth.supabase;
 
-  const { data: targetUser } = await auth.supabase
+  const { data: targetUser } = await db
     .from("profiles")
     .select("id, role, full_name, email, is_online")
     .eq("id", targetUserId)
     .single();
 
   if (!targetUser) return { error: "User not found" };
-  if (targetUser.role === "admin" && targetUserId !== auth.user?.id) {
+  if ((targetUser.role === "admin" || targetUser.role === "super_admin") && targetUserId !== auth.user?.id) {
     return { error: "Cannot start a chat with an admin account" };
   }
 
-  const { data: existing } = await auth.supabase
+  const { data: existing } = await db
     .from("conversations")
     .select("id")
     .eq("user_id", targetUserId)
@@ -279,13 +286,23 @@ export async function ensureAdminConversation(targetUserId: string): Promise<{
     };
   }
 
-  const { data: created, error } = await auth.supabase
+  let { data: created, error } = await db
     .from("conversations")
     .insert({ user_id: targetUserId, admin_id: auth.user!.id })
     .select("id")
     .single();
 
-  if (error) return { error: error.message };
+  if (error) {
+    const retry = await db
+      .from("conversations")
+      .insert({ user_id: targetUserId })
+      .select("id")
+      .single();
+    created = retry.data;
+    error = retry.error;
+  }
+
+  if (error || !created) return { error: error?.message ?? "Could not start chat" };
 
   revalidatePath("/admin/chat");
   return {

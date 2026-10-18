@@ -12,6 +12,7 @@ import {
   getAdminConversationUnreads,
   getSupportBotSenderId,
   type AdminConversationUnread,
+  type RecentChatPlayer,
 } from "@/lib/actions/messages";
 import { uploadChatAttachment } from "@/lib/chat/attachments";
 import { ChatComposer } from "@/components/chat/chat-composer";
@@ -53,6 +54,7 @@ export interface AdminConversation {
 
 interface AdminChatInboxProps {
   conversations: AdminConversation[];
+  recentPlayers?: RecentChatPlayer[];
   initialUserId?: string;
   initialUnreads?: AdminConversationUnread[];
 }
@@ -232,6 +234,7 @@ function AdminChatPanel({
 
 export function AdminChatInbox({
   conversations: initialConversations,
+  recentPlayers = [],
   initialUserId,
   initialUnreads,
 }: AdminChatInboxProps) {
@@ -643,7 +646,27 @@ export function AdminChatInbox({
         <AdminUserSearch onStartChat={startChatWithUser} />
       </div>
       <div className={`${CHAT_SCROLL_CLASS} p-2 space-y-1`}>
-        {conversations.length === 0 ? (
+        {recentPlayers.filter((player) => !conversations.some((conv) => conv.user_id === player.id)).length > 0 && (
+          <div className="pb-2">
+            <p className="px-2 py-2 text-xs font-semibold text-[#9fb0d0]">New signups</p>
+            {recentPlayers
+              .filter((player) => !conversations.some((conv) => conv.user_id === player.id))
+              .map((player) => (
+                <button
+                  key={player.id}
+                  type="button"
+                  onClick={() => void startChatWithUser(player.id)}
+                  className="w-full rounded-xl border border-transparent p-3 text-left hover:bg-white/5"
+                >
+                  <span className="block truncate text-sm font-medium text-white">
+                    {player.full_name?.trim() || player.email || player.phone || "New player"}
+                  </span>
+                  <span className="block text-[11px] text-[#9fb0d0]">Signed up · no chat yet</span>
+                </button>
+              ))}
+          </div>
+        )}
+        {conversations.length === 0 && recentPlayers.length === 0 ? (
           <p className="text-sm text-muted-foreground text-center py-8 px-3">
             Search for a user above to start a conversation.
           </p>

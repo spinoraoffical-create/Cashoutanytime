@@ -593,6 +593,53 @@ export async function getAdminChatConversations(): Promise<AdminChatConversation
   });
 }
 
+export interface RecentChatPlayer {
+  id: string;
+  full_name: string | null;
+  email: string | null;
+  phone: string | null;
+  created_at: string;
+  conversationId: string | null;
+}
+
+/** Newest player accounts, including signups that have not sent a chat yet. */
+export async function getRecentCustomersForChat(): Promise<RecentChatPlayer[]> {
+  const staff = await getStaffContext();
+  if (!staff) return [];
+  const admin = createAdminClient();
+  if (!admin) return [];
+  const { data: profiles, error } = await admin
+    .from("profiles")
+    .select("id, full_name, email, phone, created_at")
+    .in("role", ["customer", "user"])
+    .order("created_at", { ascending: false })
+    .limit(30);
+  if (error || !profiles?.length) return [];
+  const ids = profiles.map((profile) => profile.id);
+  const { data: conversations } = await admin
+    .from("conversations")
+    .select("id, user_id")
+    .in("user_id", ids)
+    .eq("is_active", true);
+  const chatByUser = new Map(
+    ((conversations ?? []) as { id: string; user_id: string }[]).map((row) => [row.user_id, row.id])
+  );
+  return (profiles as {
+    id: string;
+    full_name: string | null;
+    email: string | null;
+    phone: string | null;
+    created_at: string;
+  }[]).map((profile) => ({
+    id: profile.id,
+    full_name: profile.full_name,
+    email: profile.email,
+    phone: profile.phone,
+    created_at: profile.created_at,
+    conversationId: chatByUser.get(profile.id) ?? null,
+  }));
+}
+
 export async function getAdminConversationUnreads(): Promise<AdminConversationUnread[]> {
   const supabase = await createClient();
   const {

@@ -1,7 +1,7 @@
 import { redirect } from "next/navigation";
 
 import { AdminChatInbox, type AdminConversation } from "@/components/admin/admin-chat-inbox";
-import { getAdminChatConversations, getAdminConversationUnreads } from "@/lib/actions/messages";
+import { getAdminChatConversations, getAdminConversationUnreads, getRecentCustomersForChat } from "@/lib/actions/messages";
 import { CHAT_PAGE_SHELL_CLASS } from "@/lib/chat/chat-layout";
 import { platformTicketAccess } from "@/lib/support/ticket-access";
 
@@ -16,9 +16,10 @@ export default async function AdminChatPage({
   const { allowed, isSub, isStore } = await platformTicketAccess();
   if (isStore || isSub) redirect("/admin/agent-inbox");
   if (!allowed) redirect("/admin");
-  const [conversations, initialUnreads] = await Promise.all([
+  const [conversations, initialUnreads, recentPlayers] = await Promise.all([
     getAdminChatConversations(),
     getAdminConversationUnreads(),
+    getRecentCustomersForChat(),
   ]);
 
   return (
@@ -33,6 +34,7 @@ export default async function AdminChatPage({
       <div className="flex-1 min-h-0">
         <AdminChatInbox
           conversations={(conversations as AdminConversation[]) || []}
+          recentPlayers={recentPlayers}
           initialUserId={userId}
           initialUnreads={initialUnreads}
         />
