@@ -19,6 +19,39 @@ const SEGMENT_LABEL: Record<string, string> = {
   vip_elite: "Elite",
 };
 
+async function DeliveryReport() {
+  const db = adminDb();
+  const [targeted, prefs, devices, accepted, failed, expired] = await Promise.all([
+    db.from("broadcasts").select("recipient_count").limit(500),
+    db.from("notification_preferences").select("user_id", { count: "exact", head: true }).eq("email_promotions", false),
+    db.from("push_subscriptions").select("id", { count: "exact", head: true }).is("disabled_at", null),
+    db.from("push_attempts").select("id", { count: "exact", head: true }).eq("status", "accepted"),
+    db.from("push_attempts").select("id", { count: "exact", head: true }).eq("status", "failed"),
+    db.from("push_attempts").select("id", { count: "exact", head: true }).eq("status", "expired"),
+  ]);
+  const targetedRows = (targeted.data ?? []) as { recipient_count: number }[];
+  const inApp = targetedRows.reduce((sum, row) => sum + Number(row.recipient_count || 0), 0);
+  const inAppLabel = targeted.error ? "Unavailable" : targetedRows.length === 500 ? "Incomplete" : inApp.toLocaleString();
+  const countLabel = (result: { count: number | null; error: { message: string } | null }) =>
+    result.error ? "Unavailable" : (result.count ?? 0).toLocaleString();
+  const cell = (label: string, value: string) => (
+    <div className="rounded-xl border border-white/10 bg-[#0c1224] p-3">
+      <p className="text-xs text-[#9fb0d0]">{label}</p>
+      <p className="mt-1 text-lg font-semibold text-white">{value}</p>
+    </div>
+  );
+  return (
+    <div className="grid gap-3 sm:grid-cols-2">
+      {cell("In-app notices saved", inAppLabel)}
+      {cell("Marketing opt-outs", countLabel(prefs))}
+      {cell("Phone devices saved", countLabel(devices))}
+      {cell("Phone provider accepted", countLabel(accepted))}
+      {cell("Phone failed", countLabel(failed))}
+      {cell("Expired devices", countLabel(expired))}
+    </div>
+  );
+}
+
 export default async function AdminBroadcastsPage() {
   await requirePermission("notifications.broadcast");
   const db = adminDb();
@@ -40,7 +73,11 @@ export default async function AdminBroadcastsPage() {
 
       <BroadcastComposer />
 
-      <AdminSectionCard title="Recent notices" description="These rows were already sent. The count is the stored recipient count.">
+      <AdminSectionCard title="Delivery report" description="In-app rows are saved notices. Phone accepted means the push provider took the alert. It does not mean the phone showed it.">
+        <DeliveryReport />
+      </AdminSectionCard>
+
+      <AdminSectionCard title="Recent notices" description="The count is how many in-app notices were saved. It is not a phone delivery count.">
         {broadcasts.length === 0 ? (
           <AdminEmptyState title="No notices sent yet" body="A notice appears here after the existing send button is used." />
         ) : (

@@ -14,6 +14,7 @@ export const RATE_LIMITS = {
   reviewCreate: { max: 5, windowSeconds: 3600 },
   profileUpdate: { max: 15, windowSeconds: 60 },
   broadcast: { max: 5, windowSeconds: 60 },
+  pushSubscribe: { max: 8, windowSeconds: 60 },
   telegramAdmin: { max: 30, windowSeconds: 60 },
   telegramCustomer: { max: 20, windowSeconds: 60 },
   paydoraCreate: { max: 8, windowSeconds: 60 },

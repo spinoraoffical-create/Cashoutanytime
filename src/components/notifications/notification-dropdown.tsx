@@ -5,7 +5,7 @@ import { createPortal } from "react-dom";
 import Link from "next/link";
 import { Bell, Loader2 } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
-import { markNotificationsRead } from "@/lib/actions/notifications";
+import { PLAYER_INBOX_PATH, safeNotificationPath } from "@/lib/notifications/player-notice-rules";
 import { formatRelativeTime, cn, createClientId } from "@/lib/utils";
 import { unlockMessageNotificationSound, playMessageNotificationSound } from "@/lib/chat/message-notification-sound";
 
@@ -16,6 +16,7 @@ interface NotificationItem {
   type: string;
   is_read: boolean;
   created_at: string;
+  link_url?: string | null;
 }
 
 interface NotificationDropdownProps {
@@ -25,6 +26,19 @@ interface NotificationDropdownProps {
 }
 
 const PANEL_WIDTH = 320;
+
+function NoticeCopy({ notif }: { notif: NotificationItem }) {
+  return (
+    <>
+      <div className="flex items-start justify-between gap-2 mb-0.5">
+        <p className="text-sm font-medium text-white leading-snug">{notif.title}</p>
+        {!notif.is_read && <span className="shrink-0 w-1.5 h-1.5 rounded-full bg-orange-500 mt-1.5" />}
+      </div>
+      <p className="text-xs text-muted-foreground leading-relaxed">{notif.message}</p>
+      <p className="text-[10px] text-muted-foreground/70 mt-1">{formatRelativeTime(notif.created_at)}</p>
+    </>
+  );
+}
 
 export function NotificationDropdown({
   className,
@@ -36,6 +50,7 @@ export function NotificationDropdown({
   const [panelStyle, setPanelStyle] = useState<{ top: number; left: number }>({ top: 0, left: 0 });
   const [notifications, setNotifications] = useState<NotificationItem[]>([]);
   const [loading, setLoading] = useState(false);
+  const [loadError, setLoadError] = useState<string | null>(null);
   const [isLoggedIn, setIsLoggedIn] = useState<boolean | null>(null);
   const [userId, setUserId] = useState<string | null>(null);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -65,14 +80,26 @@ export function NotificationDropdown({
     if (!user) return;
 
     setLoading(true);
-    const { data } = await supabase
+    const { data, error } = await supabase
       .from("notifications")
-      .select("id, title, message, type, is_read, created_at")
+      .select("id, title, message, body, type, is_read, created_at, link_url")
       .eq("user_id", user.id)
       .order("created_at", { ascending: false })
       .limit(6);
 
-    setNotifications(data || []);
+    if (error) {
+      setLoadError("Notifications could not be loaded.");
+      setLoading(false);
+      return;
+    }
+    setLoadError(null);
+    setNotifications(
+      ((data ?? []) as (NotificationItem & { body?: string | null; link_url?: string | null })[]).map((row) => ({
+        ...row,
+        message: row.message || row.body || "",
+        link_url: row.link_url ?? null,
+      }))
+    );
     setLoading(false);
   }, []);
 
@@ -145,14 +172,7 @@ export function NotificationDropdown({
     if (!open) return;
 
     updatePanelPosition();
-    async function loadAndMarkRead() {
-      await fetchNotifications();
-      const result = await markNotificationsRead();
-      if (!result.error) {
-        setNotifications((prev) => prev.map((n) => ({ ...n, is_read: true })));
-      }
-    }
-    loadAndMarkRead();
+    void fetchNotifications();
 
     function onScrollOrResize() {
       updatePanelPosition();
@@ -209,15 +229,15 @@ export function NotificationDropdown({
     >
       <div className="flex items-center justify-between px-4 py-3 border-b border-white/5 bg-[#121212]">
         <h3 className="text-sm font-semibold text-white">Notifications</h3>
-        {unreadCount > 0 && (
-          <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-orange-500/20 text-orange-400">
-            {unreadCount} new
-          </span>
-        )}
+        <Link href={PLAYER_INBOX_PATH} className="text-xs font-bold text-orange-300">
+          Open inbox
+        </Link>
       </div>
 
       <div className="max-h-[min(360px,60vh)] overflow-y-auto">
-        {loading && notifications.length === 0 ? (
+        {loadError ? (
+          <p className="py-10 text-center text-sm text-rose-200">{loadError}</p>
+        ) : loading && notifications.length === 0 ? (
           <div className="flex items-center justify-center py-10 text-muted-foreground">
             <Loader2 className="h-5 w-5 animate-spin" />
           </div>
@@ -231,16 +251,13 @@ export function NotificationDropdown({
                   !notif.is_read && "bg-orange-500/5"
                 )}
               >
-                <div className="flex items-start justify-between gap-2 mb-0.5">
-                  <p className="text-sm font-medium text-white leading-snug">{notif.title}</p>
-                  {!notif.is_read && (
-                    <span className="shrink-0 w-1.5 h-1.5 rounded-full bg-orange-500 mt-1.5" />
-                  )}
-                </div>
-                <p className="text-xs text-muted-foreground leading-relaxed">{notif.message}</p>
-                <p className="text-[10px] text-muted-foreground/70 mt-1">
-                  {formatRelativeTime(notif.created_at)}
-                </p>
+                {safeNotificationPath(notif.link_url) ? (
+                  <Link href={safeNotificationPath(notif.link_url)!} className="block">
+                    <NoticeCopy notif={notif} />
+                  </Link>
+                ) : (
+                  <NoticeCopy notif={notif} />
+                )}
               </li>
             ))}
           </ul>

@@ -18,6 +18,7 @@ const ACTION_ENUM: Record<string, SecurityAction> = {
   reviewCreate: "login",
   profileUpdate: "login",
   broadcast: "login",
+  pushSubscribe: "login",
   telegramAdmin: "login",
   telegramCustomer: "login",
   paydoraCreate: "deposit",

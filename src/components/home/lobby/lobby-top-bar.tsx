@@ -3,12 +3,13 @@
 import Link from "next/link";
 import { Bell, Wallet } from "lucide-react";
 import { useLobbyProfile } from "@/components/home/lobby/use-lobby-profile";
-import { useUnreadMessages } from "@/hooks/use-unread-messages";
+import { useUnreadNotifications } from "@/hooks/use-unread-notifications";
+import { PLAYER_INBOX_PATH } from "@/lib/notifications/player-notice-rules";
 import { SITE_NAME } from "@/lib/constants";
 
 export function LobbyTopBar() {
   const { balance, balancesHidden, profile, displayName, wallet } = useLobbyProfile();
-  const { count: unreadMessages } = useUnreadMessages();
+  const { count: unreadNotices } = useUnreadNotifications();
 
   const money = (n: number) =>
     balancesHidden ? "••••" : n.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
@@ -40,14 +41,14 @@ export function LobbyTopBar() {
             </span>
           </Link>
           <Link
-            href="/dashboard/messages"
+            href={PLAYER_INBOX_PATH}
             className="relative grid h-11 w-11 place-items-center rounded-full text-[#fcf9fb] hover:bg-white/10"
             aria-label="Notifications"
           >
             <Bell className="h-4 w-4" />
-            {unreadMessages > 0 && (
+            {unreadNotices > 0 && (
               <span className="absolute right-1 top-1 grid h-4 min-w-4 place-items-center rounded-full bg-[#f3264f] px-1 text-[10px] font-extrabold text-white">
-                {unreadMessages > 9 ? "9+" : unreadMessages}
+                {unreadNotices > 9 ? "9+" : unreadNotices}
               </span>
             )}
           </Link>

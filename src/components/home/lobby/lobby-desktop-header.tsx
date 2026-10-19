@@ -5,7 +5,8 @@ import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { Bell, Search, Wallet } from "lucide-react";
 import { useLobbyProfile } from "@/components/home/lobby/use-lobby-profile";
-import { useUnreadMessages } from "@/hooks/use-unread-messages";
+import { useUnreadNotifications } from "@/hooks/use-unread-notifications";
+import { PLAYER_INBOX_PATH } from "@/lib/notifications/player-notice-rules";
 
 function pageTitle(pathname: string) {
   if (pathname === "/" || pathname === "/home") return "Home";
@@ -18,7 +19,8 @@ function pageTitle(pathname: string) {
   if (pathname === "/dashboard") return "Account";
   if (pathname.startsWith("/support")) return "Support";
   if (pathname.startsWith("/help")) return "Help";
-  if (pathname.startsWith("/dashboard/messages")) return "Inbox";
+  if (pathname.startsWith("/dashboard/messages")) return "Live chat";
+  if (pathname.startsWith("/dashboard/inbox")) return "Notifications";
   if (pathname.startsWith("/dashboard/security")) return "Security";
   if (pathname.startsWith("/dashboard/responsible")) return "Responsible Gaming";
   if (pathname.startsWith("/dashboard/affiliate")) return "Affiliate Program";
@@ -31,7 +33,7 @@ export function LobbyDesktopHeader() {
   const pathname = usePathname();
   const router = useRouter();
   const { balance, balancesHidden, profile, displayName } = useLobbyProfile();
-  const { count: unreadMessages } = useUnreadMessages();
+  const { count: unreadNotices } = useUnreadNotifications();
   const fmt = balancesHidden
     ? "••••"
     : balance.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
@@ -71,14 +73,14 @@ export function LobbyDesktopHeader() {
           <span className="font-mono text-sm font-extrabold tabular-nums">${fmt}</span>
         </Link>
         <Link
-          href="/dashboard/messages"
+          href={PLAYER_INBOX_PATH}
           className="relative grid h-11 w-11 place-items-center rounded-full hover:bg-white/10"
           aria-label="Notifications"
         >
           <Bell className="h-4 w-4" />
-          {unreadMessages > 0 ? (
+          {unreadNotices > 0 ? (
             <span className="absolute right-1 top-1 grid h-4 min-w-4 place-items-center rounded-full bg-[#f3264f] px-1 text-[10px] font-extrabold text-white">
-              {unreadMessages > 9 ? "9+" : unreadMessages}
+              {unreadNotices > 9 ? "9+" : unreadNotices}
             </span>
           ) : null}
         </Link>

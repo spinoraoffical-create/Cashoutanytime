@@ -13,6 +13,7 @@ import { getStaffContext } from "@/lib/data/admin";
 import { checkRateLimit } from "@/lib/rate-limit";
 import { createAdminClient } from "@/lib/supabase/admin";
 import type { BroadcastSegment } from "@/lib/database.types";
+import { sendBroadcastPush } from "@/lib/notifications/broadcast-push";
 import {
   BROADCAST_SEGMENTS,
   executeBroadcast,
@@ -272,6 +273,24 @@ export async function sendBroadcastAction(input: {
     after: { segment: parsed.data.segment, title: parsed.data.title, recipient_count: result.total },
   });
 
+  let message = result.message;
+  try {
+    const notes = await db.from("notifications").select("user_id").contains("metadata", { broadcast_id: result.id });
+    const userIds = [...new Set(((notes.data ?? []) as { user_id: string }[]).map((row) => row.user_id))];
+    const push = await sendBroadcastPush({
+      broadcastId: result.id,
+      title: parsed.data.title,
+      body: parsed.data.body,
+      linkUrl: parsed.data.link_url || null,
+      userIds,
+    });
+    message = `${result.message} ${push.note}`;
+  } catch (error) {
+    console.error("[broadcast] push", safeBroadcastDiagnostic(error instanceof Error ? error.message : "push failed"));
+    message = `${result.message} Phone alerts could not be attempted. The in-app notice was still saved.`;
+  }
+
   revalidatePath("/admin/notifications");
-  return { ok: true, message: result.message, id: result.id };
+  revalidatePath("/dashboard/inbox");
+  return { ok: true, message, id: result.id };
 }

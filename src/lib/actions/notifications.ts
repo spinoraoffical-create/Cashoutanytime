@@ -39,10 +39,27 @@ export async function markNotificationsRead() {
 
   await supabase
     .from("notifications")
-    .update({ is_read: true })
+    .update({ is_read: true, read_at: new Date().toISOString() })
     .eq("user_id", user.id)
     .eq("is_read", false);
 
   revalidatePath("/dashboard");
+  revalidatePath("/dashboard/inbox");
+  return { success: true };
+}
+
+export async function markNotificationRead(id: string) {
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) return { error: "Sign in to update this notice." };
+  const { error } = await supabase
+    .from("notifications")
+    .update({ is_read: true, read_at: new Date().toISOString() })
+    .eq("id", id)
+    .eq("user_id", user.id);
+  if (error) return { error: "That notice could not be marked read." };
+  revalidatePath("/dashboard/inbox");
   return { success: true };
 }

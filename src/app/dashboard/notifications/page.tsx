@@ -4,6 +4,7 @@ import { useEffect, useState, type ReactNode } from "react";
 import { Bell, Download, Gift, Megaphone, Shield } from "lucide-react";
 import { toast } from "sonner";
 import { getAccountPrefs, saveAccountPrefs } from "@/lib/actions/account-prefs";
+import { EnablePhoneNotifications } from "@/components/notifications/enable-phone-notifications";
 
 type PrefState = {
   emailNotices: boolean;
@@ -19,7 +20,6 @@ export default function NotificationSettingsPage() {
     smsMarketing: false,
     whatsappMarketing: false,
   });
-  const [pushOn, setPushOn] = useState(false);
   const [quiet, setQuiet] = useState(false);
   const [snooze, setSnooze] = useState("");
   const [saving, setSaving] = useState(false);
@@ -33,7 +33,6 @@ export default function NotificationSettingsPage() {
         whatsappMarketing: loaded.whatsappMarketing,
       });
     });
-    setPushOn(localStorage.getItem("hub-push") === "on" && Notification.permission === "granted");
     setQuiet(localStorage.getItem("hub-quiet-hours") === "1");
     const until = localStorage.getItem("hub-promo-snooze-until");
     if (until && new Date(until).getTime() > Date.now()) setSnooze(until);
@@ -52,46 +51,11 @@ export default function NotificationSettingsPage() {
     }
   }
 
-  async function togglePush() {
-    if (pushOn) {
-      localStorage.setItem("hub-push", "off");
-      setPushOn(false);
-      toast.success("Lock-screen alerts are off on this device.");
-      return;
-    }
-    if (!("Notification" in window)) {
-      toast.error("This browser does not support lock-screen alerts.");
-      return;
-    }
-    const permission = await Notification.requestPermission();
-    if (permission !== "granted") {
-      toast.error("Allow notifications in the browser to turn this on.");
-      return;
-    }
-    localStorage.setItem("hub-push", "on");
-    setPushOn(true);
-    toast.success("Lock-screen alerts are on.");
-  }
-
   function snoozeFor(hours: number) {
     const until = new Date(Date.now() + hours * 60 * 60 * 1000).toISOString();
     localStorage.setItem("hub-promo-snooze-until", until);
     setSnooze(until);
     toast.success(`Promo alerts snoozed for ${hours === 1 ? "1 hour" : hours === 8 ? "8 hours" : "1 day"}.`);
-  }
-
-  async function testPush() {
-    if (!("Notification" in window)) {
-      toast.error("This browser does not support lock-screen alerts.");
-      return;
-    }
-    const permission = Notification.permission === "granted" ? "granted" : await Notification.requestPermission();
-    if (permission !== "granted") {
-      toast.error("Allow notifications, then send the test again.");
-      return;
-    }
-    new Notification("Sweepstakes Hub", { body: "Test push delivered to this device." });
-    toast.success("Test push sent.");
   }
 
   return (
@@ -105,18 +69,12 @@ export default function NotificationSettingsPage() {
           Control device alerts, account updates, and optional offers from one clear place.
         </p>
         <div className="mt-4 flex gap-2 text-xs font-bold">
-          <span className="rounded-full bg-black/30 px-3 py-1">{pushOn ? "Device push on" : "Device push off"}</span>
+          <span className="rounded-full bg-black/30 px-3 py-1">Inbox and phone alerts are separate</span>
           <span className="rounded-full bg-black/30 px-3 py-1">Preferences ready</span>
         </div>
       </section>
 
-      <section className="rounded-2xl border border-white/10 bg-[#1a1024] p-4">
-        <p className="flex items-center gap-2 font-bold"><Bell className="h-4 w-4" /> Push notifications</p>
-        <p className="text-sm text-[#b9b3c6]">{pushOn ? "On — you'll get lock-screen alerts on this device." : "Off — lock-screen alerts stay off on this device."}</p>
-        <button type="button" onClick={() => void togglePush()} className="mt-3 rounded-lg bg-black px-3 py-1.5 text-sm font-bold">
-          {pushOn ? "Disable" : "Enable"}
-        </button>
-      </section>
+      <EnablePhoneNotifications />
 
       <p className="rounded-2xl border border-white/10 px-4 py-3 text-sm text-[#b9b3c6]">
         These controls do different jobs. News + game launches below controls your offer opt-in. Browser push only controls lock-screen alerts. Your in-app inbox works either way.
@@ -193,13 +151,7 @@ export default function NotificationSettingsPage() {
         </button>
       </section>
 
-      <section className="rounded-2xl border border-white/10 bg-[#1a1024] p-4">
-        <p className="font-bold">Test push delivery</p>
-        <p className="text-sm text-[#b9b3c6]">Send a real push to this device to confirm everything&apos;s working.</p>
-        <button type="button" onClick={() => void testPush()} className="mt-3 rounded-lg bg-[#ff6b89] px-3 py-2 text-sm font-bold text-[#3a1020]">
-          Send test push
-        </button>
-      </section>
+      <p className="text-sm text-[#b9b3c6]">A phone alert is accepted by the provider before anyone can know whether the phone showed it. Promotional phone alerts also require offer opt-in.</p>
     </div>
   );
 }
