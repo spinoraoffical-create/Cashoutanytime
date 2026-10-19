@@ -19,6 +19,7 @@ import {
 import { Textarea } from "@/components/ui/textarea";
 import { sendBroadcastAction } from "@/lib/actions/admin/broadcasts";
 import type { BroadcastSegment } from "@/lib/database.types";
+import { createClientId } from "@/lib/utils";
 
 const SEGMENTS: { value: BroadcastSegment; label: string }[] = [
   { value: "all", label: "All members" },
@@ -36,21 +37,28 @@ export function BroadcastComposer() {
   const [body, setBody] = React.useState("");
   const [linkUrl, setLinkUrl] = React.useState("");
   const [segment, setSegment] = React.useState<BroadcastSegment>("all");
+  const requestId = React.useRef(createClientId());
 
   function submit(e: React.FormEvent) {
     e.preventDefault();
+    if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(requestId.current)) {
+      toast.error("Refresh the page and try the notice again.");
+      return;
+    }
     startTransition(async () => {
       const result = await sendBroadcastAction({
         title,
         body,
         link_url: linkUrl || undefined,
         segment,
+        request_id: requestId.current,
       });
       if (!result.ok) {
         toast.error(result.error);
         return;
       }
       toast.success(result.message ?? "Broadcast sent");
+      requestId.current = createClientId();
       setTitle("");
       setBody("");
       setLinkUrl("");
