@@ -7,5 +7,6 @@ Overall Marketing Center: 4/10. The screens tell the truth and reuse the email s
 - Telegram promo can still land in the admin alert chat until a separate promo chat is set.
 - Accepted is not delivered.
 - Clicks, conversions, and revenue are not tracked.
-- Browser tests and database concurrency tests were not run.
+- The email job runs once a day at 09:00 UTC because the Hobby plan rejected a 15-minute schedule.
+- Logged-out pages were checked in a browser. The signed-in campaign screen was not opened. Database concurrency tests were not run.
 - Financial Center behavior was not changed. The $5 refund from 18 October stays as already recorded.
