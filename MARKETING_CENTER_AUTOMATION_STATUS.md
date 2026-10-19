@@ -2,7 +2,7 @@
 
 | Job | Schedule | Will this deploy send anything? |
 | --- | --- | --- |
-| Email campaign sender | Every 15 minutes | No. There are no campaign rows, and `CRON_SECRET` is not on Vercel, so the route stays closed. |
+| Email campaign sender | Daily at 09:00 UTC. A 15-minute schedule was rejected because this Vercel account is on the Hobby plan. | No. There are no campaign rows, and `CRON_SECRET` is not on Vercel, so the route stays closed. |
 | Search indexing | Daily 08:00 UTC | Already scheduled before this work. It does not send marketing. |
 | Telegram promo | Not scheduled | No |
 | Telegram auto-post | Not scheduled | No |

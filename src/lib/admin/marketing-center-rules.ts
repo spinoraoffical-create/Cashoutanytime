@@ -58,7 +58,7 @@ export const MARKETING_CRON_JOBS = [
     name: "Email campaign sender",
     path: "/api/cron/newsletter-send",
     scheduled: true,
-    schedule: "Every 15 minutes",
+    schedule: "Daily at 09:00 UTC. The Hobby plan allows one run a day.",
     sendsOnDeploy: false,
   },
   {

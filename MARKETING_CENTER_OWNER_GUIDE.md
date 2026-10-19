@@ -20,7 +20,7 @@ Only people who still have promotional email on, have an email address, and are 
 
 ## 5. Preview and schedule
 
-The draft uses the existing email template and an unsubscribe link. To schedule, enter a time and check the confirmation box before saving. The sender looks every 15 minutes. It will not run until the site has a cron secret.
+The draft uses the existing email template and an unsubscribe link. To schedule, enter a time and check the confirmation box before saving. The sender runs once a day at 09:00 UTC. It will not run until the site has a cron secret. A time earlier the same day waits until the next morning.
 
 ## 6. Did it send
 

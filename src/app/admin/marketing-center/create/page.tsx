@@ -31,7 +31,7 @@ export default async function CreateCampaignPage({
     <div className="mx-auto max-w-3xl">
       <AdminPageHeader
         title="Create campaign"
-        description="This saves an email through the existing campaign system. It does not text anyone and it does not change a wallet. Scheduling sends only after you check the confirmation and the 15-minute job reaches that time."
+        description="This saves an email through the existing campaign system. It does not text anyone and it does not change a wallet. Scheduling sends only after you check the confirmation and the daily 09:00 UTC job reaches that time."
       />
       {params.error ? <p className="mb-4 rounded-xl border border-amber-300/40 bg-amber-300/10 p-3 text-sm text-amber-100">{params.error}</p> : null}
       {countError ? <p className="mb-4 text-sm text-amber-100">Eligible counts: Unavailable</p> : null}

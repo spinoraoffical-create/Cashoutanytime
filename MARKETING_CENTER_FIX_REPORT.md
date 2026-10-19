@@ -4,5 +4,5 @@
 - Create campaign at `/admin/marketing-center/create` saves through the existing newsletter action. The confirmation box is required before a schedule. An unchecked box stays a draft and sends nothing.
 - Audience reads now say when the account or deposit scan hits its cap.
 - Saving a campaign returns its id so a confirmed schedule can use the existing scheduler.
-- `/api/cron/newsletter-send` is on a 15-minute Vercel schedule. It still refuses to run without `CRON_SECRET`. No campaign rows were waiting.
+- `/api/cron/newsletter-send` is on a daily 09:00 UTC Vercel schedule. Hobby accounts cannot run it every 15 minutes. It still refuses to run without `CRON_SECRET`. No campaign rows were waiting.
 - Telegram, SMS, offers, promotions, and AI blog keep their existing pages. Wallet math was not changed.
