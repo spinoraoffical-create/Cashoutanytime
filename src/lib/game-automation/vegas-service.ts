@@ -122,12 +122,14 @@ export async function autoFulfillVegasRequest(
     }
 
     if (loadType === "redeem") {
-      if (amount <= 0) {
-        throw new Error("Invalid redeem amount for Vegas");
-      }
-
       const userId = await client.getUserID(cleanAccount);
-      const res = await client.withdraw(userId, amount, requestId);
+      let sendAmount = amount;
+      if (!(sendAmount > 0)) {
+        const balance = await client.getUserBalance(userId);
+        sendAmount = Math.floor(balance);
+        if (!(sendAmount > 0)) throw new Error("No game balance to redeem.");
+      }
+      const res = await client.withdraw(userId, sendAmount, requestId);
       const newBal = parseFloat(res.data?.user_balance || "0");
 
       if (admin && requestId) {
@@ -142,7 +144,7 @@ export async function autoFulfillVegasRequest(
 
       return {
         success: true,
-        message: `Vegas redeemed $${amount}.00 from ${cleanAccount}`,
+        message: `Vegas redeemed $${sendAmount}.00 from ${cleanAccount}`,
         accountName: cleanAccount,
         newBalance: newBal,
         rawResponse: res,

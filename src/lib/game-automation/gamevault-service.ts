@@ -92,6 +92,7 @@ async function resolveGameVaultUserId(
       .from("game_load_requests")
       .select("admin_notes, game_username")
       .eq("user_id", userId)
+      .eq("game_slug", "game-vault")
       .eq("status", "completed")
       .order("created_at", { ascending: false })
       .limit(5);

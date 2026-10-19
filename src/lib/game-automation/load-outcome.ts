@@ -2,7 +2,12 @@
 
 export type ProviderOutcome = "confirmed_success" | "confirmed_failure" | "unknown";
 
-const UNKNOWN_PROVIDER = /timed out|timeout|ECONNRESET|ECONNREFUSED|ENOTFOUND|EAI_AGAIN|socket hang up|network|aborted|unreachable|empty response|invalid JSON|bad gateway|fetch failed|worker interrupted|outcome unknown/i;
+const UNKNOWN_PROVIDER =
+  /timed out|timeout|ECONNRESET|ECONNREFUSED|ENOTFOUND|EAI_AGAIN|socket hang up|network|aborted|unreachable|empty response|invalid JSON|bad gateway|gateway timeout|fetch failed|worker interrupted|outcome unknown|HTTP 5\d\d|internal server error|system failed|service unavailable|cloudflare/i;
+
+/** Clear provider rejections only. Vague or server errors stay unknown and are not refunded. */
+const CONFIRMED_REJECTION =
+  /not found|does not exist|insufficient|invalid|rejected|refused|code \d+|agent balance|transfer was not sent|wrong password|frozen|permission denied|already exists/i;
 
 export function classifyProviderOutcome(input: {
   success: boolean;
@@ -10,8 +15,19 @@ export function classifyProviderOutcome(input: {
 }): ProviderOutcome {
   if (input.success) return "confirmed_success";
   const message = input.error?.trim() ?? "";
-  if (!message || UNKNOWN_PROVIDER.test(message)) return "unknown";
+  if (!message || UNKNOWN_PROVIDER.test(message) || !CONFIRMED_REJECTION.test(message)) return "unknown";
   return "confirmed_failure";
+}
+
+/** A tracked load may call the provider only while it is still open and the wallet hold is in place. */
+export function trackedFulfillmentDecision(
+  status: string,
+  walletRefunded: boolean
+): "completed" | "run" | "stop" {
+  if (status === "completed") return "completed";
+  if (walletRefunded) return "stop";
+  if (status === "pending" || status === "processing") return "run";
+  return "stop";
 }
 
 export function mayRefundLoad(input: {

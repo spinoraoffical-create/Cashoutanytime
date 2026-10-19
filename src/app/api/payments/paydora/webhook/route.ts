@@ -8,6 +8,7 @@ import { realValueDenial } from "@/lib/compliance/real-value";
 import { recordHeldPaydoraWebhook } from "@/lib/payments/auto-settle";
 import { collectedFromWebhook, decidePaydoraWebhook } from "@/lib/payments/paydora-webhook-decision";
 import { creditPaydoraDeposit, reversePaydoraDeposit } from "@/lib/payments/paydora-wallet";
+import { isPaydoraWithdrawalEvent, reconcilePaydoraWithdrawal } from "@/lib/payments/paydora-payout-reconcile";
 import { createAdminClient } from "@/lib/supabase/admin";
 
 export async function POST(req: Request) {
@@ -33,6 +34,18 @@ export async function POST(req: Request) {
   const depositId = payload.data?.depositId || payload.deliveryId || "";
   const eventName = payload.event || "unknown";
   const admin = createAdminClient();
+
+  if (isPaydoraWithdrawalEvent(eventName)) {
+    if (!admin) return new NextResponse("RETRY", { status: 500 });
+    const withdrawal = await reconcilePaydoraWithdrawal(admin, {
+      event: eventName,
+      withdrawalId: payload.data?.withdrawalId,
+      status: payload.data?.status,
+      referenceId: payload.data?.referenceId,
+    });
+    if (!withdrawal.ok) return new NextResponse("RETRY", { status: 500 });
+    return new NextResponse("OK", { status: 200 });
+  }
   let previouslyHeld = false;
   if (admin && payload.data?.depositId) {
     const { data: existing } = await admin

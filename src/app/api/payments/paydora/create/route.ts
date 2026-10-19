@@ -7,6 +7,7 @@ import { createClient } from "@/lib/supabase/server";
 import { checkRateLimit, publicClientIp, rateLimitUserMessage } from "@/lib/rate-limit";
 import { playerPaymentError } from "@/lib/player-safe-error";
 import { responsibleBlock } from "@/lib/responsible/play-guard";
+import { gameIsActive } from "@/lib/actions/game-loads";
 
 export async function POST(req: Request) {
   try {
@@ -19,7 +20,14 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: "Sign in to deposit." }, { status: 401 });
     }
 
-    const { data: profile } = await supabase.from("profiles").select("date_of_birth").eq("id", user.id).maybeSingle();
+    const { data: profile } = await supabase
+      .from("profiles")
+      .select("date_of_birth, is_suspended")
+      .eq("id", user.id)
+      .maybeSingle();
+    if ((profile as { is_suspended?: boolean | null } | null)?.is_suspended) {
+      return NextResponse.json({ error: "This account is paused. Contact support." }, { status: 403 });
+    }
     const stopped = playerMoneyDenial({
       operation: "deposits",
       headers: req.headers,
@@ -43,8 +51,8 @@ export async function POST(req: Request) {
     if (!Number.isFinite(amount) || amount <= 0) {
       return NextResponse.json({ error: "Choose a deposit amount." }, { status: 400 });
     }
-    if (!gameSlug) {
-      return NextResponse.json({ error: "Choose a game before paying." }, { status: 400 });
+    if (!gameSlug || !(await gameIsActive(gameSlug))) {
+      return NextResponse.json({ error: "Choose a game that is open." }, { status: 400 });
     }
     const blocked = await responsibleBlock(amount);
     if (blocked) {

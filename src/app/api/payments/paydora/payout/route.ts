@@ -58,9 +58,12 @@ export async function POST(req: Request) {
 
     const { data: profile } = await supabase
       .from("profiles")
-      .select("cashout_wallet, kyc_status, date_of_birth")
+      .select("cashout_wallet, kyc_status, date_of_birth, is_suspended")
       .eq("id", user.id)
       .single();
+    if ((profile as { is_suspended?: boolean | null } | null)?.is_suspended) {
+      return NextResponse.json({ error: "This account is paused. Contact support." }, { status: 403 });
+    }
 
     const stopped = playerMoneyDenial({
       operation: "payouts",
@@ -119,7 +122,7 @@ export async function POST(req: Request) {
     const flagged = Boolean(
       risk && (risk.blocked || risk.rewards_blocked || risk.manual_review || Number(risk.risk_score ?? 0) >= 50)
     );
-    const hold = autoLimit <= 0 || amount > autoLimit || flagged;
+    let hold = autoLimit <= 0 || amount > autoLimit || flagged;
     const holdReason = flagged
       ? "Risk review"
       : amount > autoLimit && autoLimit > 0
@@ -134,6 +137,27 @@ export async function POST(req: Request) {
       cardNumber: body.cardNumber ? String(body.cardNumber) : "",
       cardValid: body.cardValid ? String(body.cardValid) : "",
     });
+    if (hold) {
+      const { data: waiting } = await admin
+        .from("paydora_payout_requests")
+        .select("idempotency_key")
+        .eq("user_id", user.id)
+        .eq("amount", amount)
+        .eq("method", methodValue)
+        .eq("destination_key", destinationKey)
+        .eq("status", "manual_review")
+        .maybeSingle();
+      const payoutKey = (waiting as { idempotency_key?: string } | null)?.idempotency_key;
+      if (payoutKey) {
+        const { data: released } = await admin
+          .from("cashout_holds")
+          .select("id")
+          .eq("payout_key", payoutKey)
+          .eq("status", "released")
+          .maybeSingle();
+        if (released) hold = false;
+      }
+    }
     const { data: reservedRaw, error: reserveError } = await admin.rpc("reserve_paydora_payout", {
       p_user_id: user.id,
       p_amount: amount,

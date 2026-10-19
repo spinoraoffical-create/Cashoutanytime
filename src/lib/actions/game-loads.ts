@@ -14,6 +14,7 @@ import {
 } from "@/lib/game-automation/account-username";
 import type { GameLoadWalletType } from "@/lib/game-automation/types";
 import { canonicalGameSlug } from "@/lib/games";
+import { registerTrackedFulfillment } from "@/lib/game-automation/fulfill-tracked-request";
 import { withAdminStoreLogin } from "@/lib/game-automation/store-login";
 import {
   depositRolloverBounds,
@@ -52,6 +53,7 @@ import {
   PROVIDER_OUTCOME_UNVERIFIED,
   shouldRefundProviderError,
   staleLoadRpcDecision,
+  trackedFulfillmentDecision,
 } from "@/lib/game-automation/load-outcome";
 import { isGameProviderReady } from "@/lib/game-automation/provider-ready";
 import { logIncident } from "@/lib/observability/incident";
@@ -194,11 +196,17 @@ async function blockPlayerMoney(
   supabase: Awaited<ReturnType<typeof createClient>>,
   userId: string
 ) {
-  const { data } = await supabase.from("profiles").select("date_of_birth").eq("id", userId).maybeSingle();
+  const { data } = await supabase
+    .from("profiles")
+    .select("date_of_birth, is_suspended")
+    .eq("id", userId)
+    .maybeSingle();
+  const profile = data as { date_of_birth?: string | null; is_suspended?: boolean | null } | null;
+  if (profile?.is_suspended) return "This account is paused. Contact support.";
   return playerMoneyDenial({
     operation,
     headers: await headers(),
-    dateOfBirth: (data as { date_of_birth?: string | null } | null)?.date_of_birth,
+    dateOfBirth: profile?.date_of_birth,
   });
 }
 
@@ -342,12 +350,12 @@ async function fulfillOrFail(
   }
 }
 
-export async function fulfillTrackedRequest(requestId: string) {
+async function fulfillTrackedRequestInternal(requestId: string) {
   const admin = createAdminClient();
   if (!admin) return { success: false as const, error: "SUPABASE_SERVICE_ROLE_KEY is not configured." };
   const { data } = await admin
     .from("game_load_requests")
-    .select("id, user_id, game_slug, game_name, amount, load_type, game_username, game_password, status")
+    .select("id, user_id, game_slug, game_name, amount, load_type, game_username, game_password, status, wallet_refunded")
     .eq("id", requestId)
     .maybeSingle();
   const row = data as {
@@ -355,13 +363,18 @@ export async function fulfillTrackedRequest(requestId: string) {
     user_id: string;
     game_slug: string;
     amount: number | null;
-    load_type: "create_account" | "new_account" | "load" | "reload";
+    load_type: "create_account" | "new_account" | "check_balance" | "load" | "reload" | "redeem";
     game_username: string | null;
     game_password: string | null;
     status: string;
+    wallet_refunded?: boolean | null;
   } | null;
   if (!row) return { success: false as const, error: "Load request not found." };
-  if (row.status === "completed") return { success: true as const };
+  const decision = trackedFulfillmentDecision(row.status, Boolean(row.wallet_refunded));
+  if (decision === "completed") return { success: true as const };
+  if (decision === "stop") {
+    return { success: false as const, error: "This request is not open, so it was not sent to the game." };
+  }
   const result = await fulfillOrFail(row.game_slug, row.id, row.load_type, {
     userId: row.user_id,
     gameUsername: row.game_username,
@@ -373,6 +386,8 @@ export async function fulfillTrackedRequest(requestId: string) {
     ? { success: true as const }
     : { success: false as const, error: result.error || "Game load failed." };
 }
+
+registerTrackedFulfillment(fulfillTrackedRequestInternal);
 
 const API_CONFIGURED_GAMES = ["cash-machine", "cash-frenzy", "gameroom", "game-vault", "mafia", "juwa", "vegas-sweeps", "mr-all-in-one", "orion-stars", "milky-way", "fire-kirin", "vblink"];
 

@@ -4,7 +4,7 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { writeAudit } from "@/lib/actions/admin/core";
 import { missedAuditMessage } from "@/lib/admin/audit-result";
 import { logIncident } from "@/lib/observability/incident";
-import { fulfillTrackedRequest } from "@/lib/actions/game-loads";
+import { fulfillTrackedRequest } from "@/lib/game-automation/fulfill-tracked-request";
 import { assignPlayerToAgentByCode } from "@/lib/agents/assign";
 import { bonusForPercent, depositKind } from "@/lib/payments/bonus-math";
 import { realValueDenial } from "@/lib/compliance/real-value";
@@ -39,6 +39,13 @@ export class PaymentIdentityError extends Error {
   constructor(message: string) {
     super(message);
     this.name = "PaymentIdentityError";
+  }
+}
+
+class FirstDepositTaken extends Error {
+  constructor() {
+    super("first deposit already locked");
+    this.name = "FirstDepositTaken";
   }
 }
 
@@ -128,7 +135,11 @@ async function lockQuote(admin: Admin, provider: string, externalId: string, quo
     .is("final_credit", null)
     .select("bonus_percent, bonus_amount, final_credit, deposit_kind, game_slug, game_name, promo_code, base_amount")
     .maybeSingle();
-  if (error) throw migrationError(error);
+  if (error) {
+    const unique = error.code === "23505" || /unique|duplicate/i.test(error.message || "");
+    if (quote.kind === "first" && unique) throw new FirstDepositTaken();
+    throw migrationError(error);
+  }
   if (data) return data as QuoteRow;
   const { data: existing, error: readError } = await admin
     .from("payment_intents")
@@ -227,7 +238,7 @@ export async function quotePaidDeposit(
   const offered = Number(input.baseAmount);
   const paidBase = Math.min(savedBase, Number.isFinite(offered) && offered > 0 ? offered : savedBase);
   const priced = bonusForPercent(paidBase, percent);
-  const quote: DepositQuote = {
+  let quote: DepositQuote = {
     gameSlug,
     gameName: stored.name || row.game_name,
     promoCode: row.promo_code,
@@ -237,7 +248,23 @@ export async function quotePaidDeposit(
     finalCredit: priced.finalCredit,
     kind,
   };
-  const locked = await lockQuote(admin, provider, input.depositId, quote);
+  let locked: QuoteRow | null;
+  try {
+    locked = await lockQuote(admin, provider, input.depositId, quote);
+  } catch (err) {
+    if (!(err instanceof FirstDepositTaken) || kind !== "first") throw err;
+    const reloadPercent = Number(stored.reload_bonus_percent);
+    if (!Number.isFinite(reloadPercent)) throw err;
+    const reload = bonusForPercent(paidBase, reloadPercent);
+    quote = {
+      ...quote,
+      kind: "reload",
+      bonusPercent: reload.percent,
+      bonusAmount: reload.bonus,
+      finalCredit: reload.finalCredit,
+    };
+    locked = await lockQuote(admin, provider, input.depositId, quote);
+  }
   if (locked?.final_credit == null || !locked.game_slug) {
     throw new PaymentIdentityError("Payment intent or game is missing");
   }
@@ -548,7 +575,6 @@ async function loadGameOnce(
       game_load_status: loaded.success ? "loaded" : "failed",
       game_load_request_id: String(requestId),
       game_load_error: loaded.success ? null : loaded.error || "Game load failed.",
-      ...(loaded.success && sent !== input.quote.finalCredit ? { final_credit: sent } : {}),
     })
     .eq("deposit_key", input.depositId);
 }

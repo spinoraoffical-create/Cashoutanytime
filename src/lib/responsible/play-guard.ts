@@ -1,5 +1,6 @@
 import "server-only";
 
+import { createAdminClient } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
 
 type Prefs = {
@@ -50,14 +51,30 @@ export async function responsibleBlock(amount: number): Promise<string | null> {
   if (daily <= 0 && weekly <= 0 && monthly <= 0) return null;
 
   const since = new Date(now - 30 * DAY).toISOString();
-  const { data } = await supabase
+  const { data, error } = await supabase
     .from("wallet_transactions")
     .select("amount, created_at")
     .eq("user_id", user.id)
     .eq("source", "deposit")
     .gte("created_at", since);
+  if (error) return "Spending limits could not be checked. Try again.";
 
-  const rows = data ?? [];
+  const rows = [...(data ?? [])];
+  const admin = createAdminClient();
+  if (admin) {
+    const { data: pending } = await admin
+      .from("payment_intents")
+      .select("base_amount, created_at")
+      .eq("user_id", user.id)
+      .is("final_credit", null)
+      .gte("created_at", new Date(now - 2 * 60 * 60 * 1000).toISOString());
+    for (const intent of pending ?? []) {
+      rows.push({
+        amount: (intent as { base_amount?: number }).base_amount,
+        created_at: (intent as { created_at?: string }).created_at,
+      });
+    }
+  }
   const spent = (windowMs: number) =>
     rows.reduce((sum, row) => {
       const at = new Date(String(row.created_at)).getTime();

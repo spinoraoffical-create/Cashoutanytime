@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 
 import { AdminPageHeader } from "@/components/admin/admin-page-header";
+import { CashoutHoldActions } from "@/components/admin/cashout-hold-actions";
 import { CashoutLimitForm } from "@/components/admin/cashout-limit-form";
 import { AdminEmptyState } from "@/components/admin/ui/admin-empty-state";
 import { AdminErrorState } from "@/components/admin/ui/admin-error-state";
@@ -46,6 +47,7 @@ export default async function CashoutHoldsPage() {
                 <div className="text-right">
                   <AdminStatusBadge status="held" />
                   <p className="mt-1 text-xs text-[#8ea0c3]">{new Date(row.created_at).toLocaleString()}</p>
+                  <CashoutHoldActions holdId={row.id} />
                 </div>
               </li>
             ))}

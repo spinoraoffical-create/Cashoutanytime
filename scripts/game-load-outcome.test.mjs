@@ -91,7 +91,16 @@ assert.equal(classifyProviderOutcome({ success: false, error: "socket hang up" }
 assert.equal(completionApplies("pending"), true);
 
 const misleadingHold = "Needs review abc. ";
-assert.equal(classifyProviderOutcome({ success: false, error: misleadingHold }), "confirmed_failure");
+assert.equal(classifyProviderOutcome({ success: false, error: misleadingHold }), "unknown");
+assert.equal(classifyProviderOutcome({ success: false, error: "HTTP 500" }), "unknown");
+assert.equal(classifyProviderOutcome({ success: false, error: "System failed" }), "unknown");
+assert.equal(classifyProviderOutcome({ success: false, error: "Service unavailable" }), "unknown");
+assert.equal(mayRefundLoad({
+  outcome: classifyProviderOutcome({ success: false, error: "HTTP 500" }),
+  loadType: "load",
+  gameApiDebited: false,
+  walletRefunded: false,
+}), false);
 assert.equal(
   adminFinancialStatusDecision({ status: "pending", loadType: "load" }).reason,
   PROVIDER_OUTCOME_UNVERIFIED

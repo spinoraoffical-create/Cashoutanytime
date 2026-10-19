@@ -3,7 +3,7 @@
 import { revalidatePath } from "next/cache";
 
 import { adminDb, authorize, writeAudit } from "@/lib/actions/admin/core";
-import { fulfillTrackedRequest } from "@/lib/actions/game-loads";
+import { fulfillTrackedRequest } from "@/lib/game-automation/fulfill-tracked-request";
 import { realValueDenial } from "@/lib/compliance/real-value";
 import { getAgentScope, playerInScope } from "@/lib/agents/scope";
 
@@ -104,4 +104,63 @@ export async function setCashoutLimitAction(amount: number) {
   });
   revalidatePath("/admin/cashout-holds");
   return { ok: true as const, message: "Automatic cash-out limit saved." };
+}
+
+/** Approve lets the player submit the same cash out again. Reject closes a hold that never charged the wallet. */
+export async function resolveCashoutHoldAction(holdId: string, decision: "released" | "rejected") {
+  const auth = await authorize("requests.manage");
+  if ("error" in auth) return { ok: false as const, error: auth.error };
+  if (decision !== "released" && decision !== "rejected") {
+    return { ok: false as const, error: "Choose approve or reject." };
+  }
+  const db = adminDb();
+  const { data } = await db
+    .from("cashout_holds")
+    .select("id, payout_key, status")
+    .eq("id", holdId)
+    .maybeSingle();
+  const row = data as { id: string; payout_key: string; status: string } | null;
+  if (!row || row.status !== "held") return { ok: false as const, error: "That hold is no longer open." };
+
+  if (decision === "rejected") {
+    const { data: payout } = await db
+      .from("paydora_payout_requests")
+      .select("status")
+      .eq("idempotency_key", row.payout_key)
+      .maybeSingle();
+    const status = (payout as { status?: string } | null)?.status;
+    if (status && status !== "manual_review") {
+      return { ok: false as const, error: "This cash out already moved. It was not rejected." };
+    }
+    if (status === "manual_review") {
+      const { error } = await db
+        .from("paydora_payout_requests")
+        .update({ status: "failed", updated_at: new Date().toISOString() })
+        .eq("idempotency_key", row.payout_key)
+        .eq("status", "manual_review");
+      if (error) return { ok: false as const, error: "Could not reject that hold." };
+    }
+  }
+
+  const { error } = await db
+    .from("cashout_holds")
+    .update({ status: decision, resolved_at: new Date().toISOString() })
+    .eq("id", holdId)
+    .eq("status", "held");
+  if (error) return { ok: false as const, error: "Could not update that hold." };
+  await writeAudit({
+    actorId: auth.staff.userId,
+    action: decision === "released" ? "ops.cashout_hold_release" : "ops.cashout_hold_reject",
+    entityType: "cashout_holds",
+    entityId: holdId,
+    after: { status: decision },
+  });
+  revalidatePath("/admin/cashout-holds");
+  return {
+    ok: true as const,
+    message:
+      decision === "released"
+        ? "Approved. The player submits this same cash out again. The wallet is charged only when it is sent."
+        : "Rejected. The wallet was not charged.",
+  };
 }

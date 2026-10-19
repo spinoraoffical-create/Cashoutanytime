@@ -12,6 +12,7 @@ import { pickLoginDestination, signedInUsesAdminHome } from "@/lib/auth/account-
 import { buildAuthCallbackUrl } from "@/lib/auth/callback-url";
 import { createClient } from "@/lib/supabase/server";
 import { missingProfileColumn } from "@/lib/admin/spinora-profile";
+import { registrationWriteDenial } from "@/lib/auth/registration-guard";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { rateLimit } from "@/lib/rate-limit";
 import { headers } from "next/headers";
@@ -528,6 +529,47 @@ export async function registerWithEmail(input: {
   return { ok: true, email: normalizedEmail };
 }
 
+async function registrationOwnershipDenial(userId: string, email: string): Promise<string | null> {
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  const admin = createAdminClient();
+  let authEmail: string | null = null;
+  let createdAtMs: number | null = null;
+  let emailConfirmed = false;
+  let profilePhone: string | null = null;
+  let profileDob: string | null = null;
+  if (!user && admin) {
+    const { data } = await admin.auth.admin.getUserById(userId);
+    const authUser = data?.user;
+    authEmail = authUser?.email ?? null;
+    const created = authUser?.created_at ? new Date(authUser.created_at).getTime() : Number.NaN;
+    createdAtMs = Number.isFinite(created) ? created : null;
+    emailConfirmed = Boolean(authUser?.email_confirmed_at);
+    const { data: profile } = await admin
+      .from("profiles")
+      .select("phone, date_of_birth")
+      .eq("id", userId)
+      .maybeSingle();
+    const row = profile as { phone?: string | null; date_of_birth?: string | null } | null;
+    profilePhone = row?.phone ?? null;
+    profileDob = row?.date_of_birth ?? null;
+  }
+  return registrationWriteDenial({
+    sessionUserId: user?.id ?? null,
+    sessionEmail: user?.email ?? null,
+    claimedUserId: userId,
+    claimedEmail: normalizeEmail(email),
+    authEmail,
+    createdAtMs,
+    emailConfirmed,
+    profilePhone,
+    profileDob,
+    now: Date.now(),
+  });
+}
+
 /** Save phone/profile after client-side signUp (keeps PKCE cookies in the browser). */
 export async function finalizeRegistrationAfterSignUp(input: {
   userId: string;
@@ -541,6 +583,9 @@ export async function finalizeRegistrationAfterSignUp(input: {
   const { ageDenial } = await import("@/lib/compliance/age");
   const tooYoung = ageDenial(input.dateOfBirth);
   if (tooYoung) return { ok: false, error: tooYoung };
+
+  const denied = await registrationOwnershipDenial(input.userId, input.email);
+  if (denied) return { ok: false, error: denied };
 
   if (input.offersConsent !== true) {
     return { ok: false, error: "Agree to email notices before creating an account." };

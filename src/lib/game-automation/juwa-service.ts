@@ -123,12 +123,14 @@ export async function autoFulfillJuwaRequest(
     }
 
     if (loadType === "redeem") {
-      if (amount <= 0) {
-        throw new Error("Invalid redeem amount for Juwa");
-      }
-
       const userId = await client.getUserID(cleanAccount);
-      const res = await client.withdraw(userId, amount, requestId);
+      let sendAmount = amount;
+      if (!(sendAmount > 0)) {
+        const balance = await client.getPlayerBalance(userId);
+        sendAmount = Math.floor(balance);
+        if (!(sendAmount > 0)) throw new Error("No game balance to redeem.");
+      }
+      const res = await client.withdraw(userId, sendAmount, requestId);
       const newBal = parseFloat(res.data?.user_balance || "0");
 
       if (admin && requestId) {
@@ -143,7 +145,7 @@ export async function autoFulfillJuwaRequest(
 
       return {
         success: true,
-        message: `Juwa redeemed $${amount}.00 from ${cleanAccount}`,
+        message: `Juwa redeemed $${sendAmount}.00 from ${cleanAccount}`,
         accountName: cleanAccount,
         newBalance: newBal,
         rawResponse: res,

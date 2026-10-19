@@ -1,6 +1,7 @@
 "use server";
 
 import { requireUser } from "@/lib/data/dashboard";
+import { lockedRestrictionUntil } from "@/lib/responsible/restriction-lock";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { getSupabaseServiceRoleKey } from "@/lib/supabase/env";
 
@@ -136,6 +137,8 @@ export async function saveAccountPrefs(next: Partial<AccountPrefs>): Promise<{ o
     next.whatsappMarketing !== undefined;
 
   const prefs: Record<string, unknown> = { ...prev, ...next };
+  prefs.selfExcludeUntil = lockedRestrictionUntil(prev.selfExcludeUntil, prefs.selfExcludeUntil);
+  prefs.timeoutUntil = lockedRestrictionUntil(prev.timeoutUntil, prefs.timeoutUntil);
 
   if (touchesMarketing) {
     const stored = await readStoredMarketing(user.id);
