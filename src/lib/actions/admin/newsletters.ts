@@ -69,8 +69,8 @@ export async function upsertNewsletterCampaignAction(
   const payload = { ...parsed.data, created_by: auth.staff.userId };
 
   const result = input.id
-    ? await db.from("newsletter_campaigns").update(payload).eq("id", input.id)
-    : await db.from("newsletter_campaigns").insert(payload);
+    ? await db.from("newsletter_campaigns").update(payload).eq("id", input.id).select("id").maybeSingle()
+    : await db.from("newsletter_campaigns").insert(payload).select("id").single();
 
   if (result.error) {
     const message = result.error.message ?? "";
@@ -93,7 +93,9 @@ export async function upsertNewsletterCampaignAction(
   });
 
   revalidatePath("/admin/newsletters");
-  return { ok: true, message: "Campaign saved." };
+  revalidatePath("/admin/marketing-center");
+  const savedId = (result.data as { id?: string } | null)?.id ?? input.id;
+  return { ok: true, message: "Campaign saved.", id: savedId };
 }
 
 export async function deleteNewsletterCampaignAction(id: string): Promise<AdminActionResult> {

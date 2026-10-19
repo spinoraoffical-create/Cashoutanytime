@@ -134,6 +134,8 @@ export const ADMIN_NAV: AdminNavSection[] = [
     permission: null,
     anyPermissions: ["newsletters.manage", "cms.manage", "notifications.broadcast", "promotions.manage"],
     children: [
+      { href: "/admin/marketing-center", label: "Overview", permission: null },
+      { href: "/admin/marketing-center/create", label: "Create campaign", permission: "newsletters.manage" },
       { href: "/admin/newsletters", label: "Email campaigns", permission: "newsletters.manage" },
       { href: "/admin/marketing", label: "Text one player", permission: "cms.manage" },
       { href: "/admin/telegram", label: "Telegram channel", permission: "cms.manage" },

@@ -29,6 +29,7 @@ type AudienceLoad = {
   people: Person[];
   depositsAvailable: boolean;
   profilesAvailable: boolean;
+  accountsTruncated: boolean;
 };
 
 const VIP_TIER_KEYS = new Set(["silver", "gold", "platinum", "diamond", "elite"]);
@@ -53,11 +54,13 @@ function metadataOptOut(metadata: unknown): boolean {
   return (prefs as { promoNotices?: unknown }).promoNotices === false;
 }
 
-async function listAuthUsers(db: SupabaseClient): Promise<
-  { id: string; email: string | null; promoOptOut: boolean }[]
-> {
+async function listAuthUsers(db: SupabaseClient): Promise<{
+  users: { id: string; email: string | null; promoOptOut: boolean }[];
+  truncated: boolean;
+}> {
   const users: { id: string; email: string | null; promoOptOut: boolean }[] = [];
   const perPage = 1000;
+  let truncated = false;
   for (let page = 1; page <= 20; page += 1) {
     const { data, error } = await db.auth.admin.listUsers({ page, perPage });
     if (error || !data?.users?.length) break;
@@ -69,8 +72,9 @@ async function listAuthUsers(db: SupabaseClient): Promise<
       });
     }
     if (data.users.length < perPage) break;
+    if (page === 20) truncated = true;
   }
-  return users;
+  return { users, truncated };
 }
 
 async function loadProfiles(db: SupabaseClient): Promise<{ rows: Record<string, unknown>[]; ok: boolean }> {
@@ -125,7 +129,7 @@ async function loadVipIds(db: SupabaseClient): Promise<Set<string>> {
 
 async function loadDeposits(
   db: SupabaseClient
-): Promise<{ latest: Map<string, number>; ok: boolean }> {
+): Promise<{ latest: Map<string, number>; ok: boolean; capped: boolean }> {
   const latest = new Map<string, number>();
   const pageSize = 1000;
   for (let from = 0; from < 50000; from += pageSize) {
@@ -134,8 +138,8 @@ async function loadDeposits(
       .select("user_id, created_at")
       .eq("status", "completed")
       .range(from, from + pageSize - 1);
-    if (error) return { latest, ok: false };
-    if (!data?.length) return { latest, ok: true };
+    if (error) return { latest, ok: false, capped: false };
+    if (!data?.length) return { latest, ok: true, capped: false };
     for (const row of data as { user_id: string | null; created_at: string | null }[]) {
       if (!row.user_id) continue;
       const ts = parseTime(row.created_at);
@@ -143,9 +147,9 @@ async function loadDeposits(
       const prev = latest.get(row.user_id);
       if (prev == null || ts > prev) latest.set(row.user_id, ts);
     }
-    if (data.length < pageSize) return { latest, ok: true };
+    if (data.length < pageSize) return { latest, ok: true, capped: false };
   }
-  return { latest, ok: true };
+  return { latest, ok: true, capped: true };
 }
 
 async function loadOptOuts(db: SupabaseClient): Promise<Set<string>> {
@@ -176,7 +180,7 @@ async function loadAudience(db: SupabaseClient): Promise<AudienceLoad> {
 
   const people = new Map<string, Person>();
 
-  for (const user of authUsers) {
+  for (const user of authUsers.users) {
     people.set(user.id, {
       id: user.id,
       email: user.email,
@@ -212,6 +216,7 @@ async function loadAudience(db: SupabaseClient): Promise<AudienceLoad> {
     people: [...people.values()],
     depositsAvailable: deposits.ok,
     profilesAvailable: profiles.ok,
+    accountsTruncated: authUsers.truncated || deposits.capped,
   };
 }
 
@@ -251,6 +256,9 @@ export async function previewNewsletterAudiences(db: SupabaseClient): Promise<{
   const counts = {} as Record<NewsletterSegmentId, AudienceCounts>;
   const warnings = new Set<string>();
 
+  if (load.accountsTruncated) {
+    warnings.add("This audience count is incomplete. The account or deposit read reached its safety cap.");
+  }
   for (const segment of NEWSLETTER_SEGMENTS) {
     const blocked = segmentBlocked(segment, load);
     if (blocked) warnings.add(blocked);
