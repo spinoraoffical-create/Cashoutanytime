@@ -53,3 +53,31 @@ export async function generateTelegramLinkCode(
     expiresInMinutes: CODE_TTL_MINUTES,
   };
 }
+
+/** Hashed one-time code for the support bot. The raw code is not stored. */
+export async function createCustomerTelegramLink(): Promise<TelegramLinkResult> {
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) return { ok: false, error: "Please sign in again." };
+  const username = process.env.TELEGRAM_SUPPORT_BOT_USERNAME;
+  if (!username) return { ok: false, error: "The support bot username is not set." };
+  const { hashLinkCode } = await import("@/lib/telegram/control/delivery");
+  const { randomBytes } = await import("node:crypto");
+  const code = randomBytes(24).toString("hex");
+  const codeHash = hashLinkCode(code);
+  if (!codeHash) return { ok: false, error: "Telegram linking is not configured yet." };
+  const { error } = await adminDb().from("telegram_link_challenges").insert({
+    code_hash: codeHash,
+    purpose: "customer",
+    user_id: user.id,
+    expires_at: new Date(Date.now() + CODE_TTL_MINUTES * 60_000).toISOString(),
+  });
+  if (error) return { ok: false, error: "Apply the Telegram SQL before linking." };
+  return {
+    ok: true,
+    deepLink: `https://t.me/${username.replace(/^@/, "")}?start=${code}`,
+    expiresInMinutes: CODE_TTL_MINUTES,
+  };
+}

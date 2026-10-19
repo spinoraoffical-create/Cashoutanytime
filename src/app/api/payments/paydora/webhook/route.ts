@@ -139,6 +139,20 @@ export async function POST(req: Request) {
         methodValue: savedPaymentMethod,
         provider: "paydora",
       });
+      try {
+        const { safePaymentAlert } = await import("@/lib/telegram/control/safe-emit");
+        await safePaymentAlert({
+          category: "deposit_credited",
+          eventKey: `deposit-credited:${payload.data.depositId}`,
+          source: "ledger",
+          reference: payload.data.depositId,
+          amount: decision.amount,
+          detail: "The wallet credit was recorded after the provider callback.",
+          adminPath: "/admin/deposits",
+        });
+      } catch {
+        // A Telegram failure must not change the credit.
+      }
     }
 
     if (decision.action === "reverse" && payload.data?.depositId) {
@@ -147,6 +161,20 @@ export async function POST(req: Request) {
         amount: decision.amount,
         depositId: payload.data.depositId,
       });
+      try {
+        const { safePaymentAlert } = await import("@/lib/telegram/control/safe-emit");
+        await safePaymentAlert({
+          category: "refund_confirmed",
+          eventKey: `deposit-reversed:${payload.data.depositId}`,
+          source: "provider",
+          reference: payload.data.depositId,
+          amount: decision.amount,
+          detail: "The provider reported this deposit refunded.",
+          adminPath: "/admin/deposits",
+        });
+      } catch {
+        // A Telegram failure must not change the reversal.
+      }
     }
   } catch (err) {
     console.error("[paydora/webhook]", err);

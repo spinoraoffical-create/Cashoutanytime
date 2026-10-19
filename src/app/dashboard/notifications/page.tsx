@@ -5,6 +5,7 @@ import { Bell, Download, Gift, Megaphone, Shield } from "lucide-react";
 import { toast } from "sonner";
 import { getAccountPrefs, saveAccountPrefs } from "@/lib/actions/account-prefs";
 import { EnablePhoneNotifications } from "@/components/notifications/enable-phone-notifications";
+import { createCustomerTelegramLink } from "@/lib/actions/telegram";
 
 type PrefState = {
   emailNotices: boolean;
@@ -75,6 +76,28 @@ export default function NotificationSettingsPage() {
       </section>
 
       <EnablePhoneNotifications />
+
+      <section className="rounded-2xl border border-white/10 p-4">
+        <h2 className="text-lg font-black">Telegram support</h2>
+        <p className="mt-1 text-sm text-[#b9b3c6]">
+          Create a one-time link, open it in Telegram, and press Start. The code expires in 10 minutes. Telegram cannot move money.
+        </p>
+        <button
+          type="button"
+          className="mt-3 rounded-full bg-white px-4 py-2 text-sm font-bold text-[#12081c]"
+          onClick={() => {
+            void createCustomerTelegramLink().then((result) => {
+              if (!result.ok) toast.error(result.error);
+              else {
+                window.open(result.deepLink, "_blank", "noopener,noreferrer");
+                toast.success("Telegram link opened. It expires in 10 minutes.");
+              }
+            });
+          }}
+        >
+          Link Telegram
+        </button>
+      </section>
 
       <p className="rounded-2xl border border-white/10 px-4 py-3 text-sm text-[#b9b3c6]">
         These controls do different jobs. News + game launches below controls your offer opt-in. Browser push only controls lock-screen alerts. Your in-app inbox works either way.

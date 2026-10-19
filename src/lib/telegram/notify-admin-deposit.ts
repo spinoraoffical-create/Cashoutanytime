@@ -9,6 +9,7 @@ import {
   sendTelegramPhoto,
 } from "@/lib/telegram/client";
 import { isAnyAdminOnline } from "@/lib/telegram/admin-presence";
+import { safePaymentAlert } from "@/lib/telegram/control/safe-emit";
 import { CHAT_ATTACHMENT_BUCKET } from "@/lib/chat/attachments";
 
 export async function notifyAdminOfDeposit(input: {
@@ -20,6 +21,16 @@ export async function notifyAdminOfDeposit(input: {
   depositId: string;
 }): Promise<void> {
   try {
+  const routed = await safePaymentAlert({
+    category: "deposit_requested",
+    eventKey: `deposit-proof:${input.depositId}`,
+    source: "ledger",
+    reference: input.depositId,
+    amount: input.amount,
+    detail: "A deposit proof was uploaded. Payment is not confirmed.",
+    adminPath: "/admin/deposits",
+  });
+  if (routed === "handled") return;
   if (!isTelegramConfigured()) return;
 
   const admin = createAdminClient();

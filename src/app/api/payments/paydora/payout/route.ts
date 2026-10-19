@@ -274,6 +274,20 @@ export async function POST(req: Request) {
         p_user_id: user.id,
         p_idempotency_key: idempotencyKey,
       });
+      try {
+        const { safePaymentAlert } = await import("@/lib/telegram/control/safe-emit");
+        await safePaymentAlert({
+          category: "payout_failed",
+          eventKey: `payout-failed:${idempotencyKey}`,
+          source: "provider",
+          reference: idempotencyKey,
+          amount,
+          detail: "The provider rejected this cash-out.",
+          adminPath: "/admin/payouts",
+        });
+      } catch {
+        // A Telegram failure must not change the cash-out.
+      }
       throw err;
     }
 
@@ -284,6 +298,23 @@ export async function POST(req: Request) {
       p_reference_id: withdrawal.referenceId,
       p_provider_status: withdrawal.status,
     });
+    try {
+      const { safePaymentAlert } = await import("@/lib/telegram/control/safe-emit");
+      const providerPaid = String(withdrawal.status || "").toLowerCase() === "paid";
+      await safePaymentAlert({
+        category: providerPaid ? "payout_provider_paid" : "payout_submitted",
+        eventKey: `payout:${idempotencyKey}:${providerPaid ? "paid" : "submitted"}`,
+        source: "provider",
+        reference: withdrawal.id || idempotencyKey,
+        amount: withdrawal.amount,
+        detail: providerPaid
+          ? "The provider status was paid."
+          : "The cash-out was submitted. Provider payment is not confirmed.",
+        adminPath: "/admin/payouts",
+      });
+    } catch {
+      // A Telegram failure must not change the cash-out.
+    }
 
     return NextResponse.json({
       success: true,

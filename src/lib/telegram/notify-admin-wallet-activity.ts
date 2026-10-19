@@ -3,6 +3,7 @@ import { SITE_URL } from "@/lib/constants";
 import type { GameLoadWalletType } from "@/lib/game-automation/types";
 import { escapeTelegramHtml, isTelegramConfigured, sendTelegramMessage } from "@/lib/telegram/client";
 import { isAnyAdminOnline } from "@/lib/telegram/admin-presence";
+import { safePaymentAlert } from "@/lib/telegram/control/safe-emit";
 
 export type WalletActivityKind = "create_account" | "load" | "reload" | "redeem";
 
@@ -24,6 +25,16 @@ export async function notifyAdminOfWalletActivity(input: {
   requestId: string;
 }): Promise<void> {
   try {
+  const routed = await safePaymentAlert({
+    category: "load_requested",
+    eventKey: `game-request:${input.requestId}`,
+    source: "ledger",
+    reference: input.requestId,
+    amount: input.amount,
+    detail: `${input.kind} opened for ${input.gameName}. This is a request, not a finished provider result.`,
+    adminPath: "/admin/game-loads",
+  });
+  if (routed === "handled") return;
   if (!isTelegramConfigured()) {
     console.error("[telegram] wallet activity skipped: TELEGRAM_BOT_TOKEN or TELEGRAM_ADMIN_CHAT_ID not set");
     return;

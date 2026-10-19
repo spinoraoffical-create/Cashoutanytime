@@ -251,7 +251,22 @@ export async function recordCashoutPayoutAction(input: {
     after: { amount: parsed.data.amount, note: parsed.data.note ?? null },
   });
 
-  await tgNotify("finance", `💸 <b>Cashout payout</b>\n$${parsed.data.amount.toFixed(2)} · ${tgEsc(parsed.data.userId.slice(0, 8))}...${parsed.data.note ? `\n${tgEsc(parsed.data.note)}` : ""}\n${adminLink("/admin/payouts", "👉 View Payouts")}`);
+  const { safePaymentAlert } = await import("@/lib/telegram/control/safe-emit");
+  const routed = await safePaymentAlert({
+    category: "payout_requested",
+    eventKey: `admin-cashout-user:${parsed.data.userId}:${parsed.data.amount}:${Date.now()}`,
+    source: "admin",
+    reference: parsed.data.userId,
+    amount: parsed.data.amount,
+    detail: "Staff recorded a cash-out in the admin panel.",
+    adminPath: "/admin/payouts",
+  });
+  if (routed !== "handled") {
+    await tgNotify(
+      "finance",
+      `💸 <b>Admin cash-out record</b>\n$${parsed.data.amount.toFixed(2)} · ${tgEsc(parsed.data.userId.slice(0, 8))}...${parsed.data.note ? `\n${tgEsc(parsed.data.note)}` : ""}\nThis is not a provider confirmation.\n${adminLink("/admin/payouts", "👉 View Payouts")}`
+    );
+  }
   revalidatePath(`/admin/users/${parsed.data.userId}`);
   revalidatePath("/admin/users");
   return { ok: true, message: "Cash-out payout recorded.", ...partialAuditResult(audited) };

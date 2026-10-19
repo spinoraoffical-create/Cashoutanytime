@@ -233,6 +233,7 @@ export const ADMIN_NAV: AdminNavSection[] = [
     anyPermissions: ["settings.manage", "users.roles", "cms.manage"],
     children: [
       { href: "/admin/settings", label: "Site settings", permission: "settings.manage" },
+      { href: "/admin/telegram-center", label: "Telegram Control Center", permission: "settings.manage", superOnly: true },
       { href: "/admin/payments", label: "Payment methods", permission: "cms.manage" },
       { href: "/admin/roles", label: "Staff roles", permission: "users.roles" },
       { href: "/admin/cms", label: "Pages and FAQ", permission: "cms.manage" },
