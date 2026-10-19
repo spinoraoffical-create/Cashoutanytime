@@ -10,4 +10,6 @@ Vercel project: `cashoutanytime`
 
 No production migration was applied. No campaign was sent. Financial switches were not changed.
 
-The commit hash and deployment id are recorded after the push and deploy finish.
+Code commit: `72b62ea86d7a97b20b93f0c425755d54d23e3d46`
+
+`main` was not pushed. No migration was applied.
