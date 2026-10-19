@@ -289,7 +289,7 @@ export async function createStoredTicket(input: {
   userId: string;
   subject: string;
   body: string;
-}): Promise<{ ok: true; ticketNo: number } | { ok: false; error: string }> {
+}): Promise<{ ok: true; ticketNo: number; id: string } | { ok: false; error: string }> {
   const now = new Date().toISOString();
   if (await usesTicketTable()) {
     const db = adminDb();
@@ -306,7 +306,7 @@ export async function createStoredTicket(input: {
         body: input.body,
       });
       if (messageError) return { ok: false, error: "Ticket could not be created." };
-      return { ok: true, ticketNo: created.ticket_no as number };
+      return { ok: true, ticketNo: created.ticket_no as number, id: created.id as string };
     }
     if (!missingTable(error)) return { ok: false, error: "Ticket could not be created." };
     tableReady = false;
@@ -331,14 +331,18 @@ export async function createStoredTicket(input: {
       },
     ],
   };
-  const { error } = await adminDb().from("activity_log").insert({
-    user_id: input.userId,
-    action: TICKET_ACTION,
-    description: input.subject,
-    metadata: meta,
-  });
-  if (error) return { ok: false, error: "Ticket could not be created." };
-  return { ok: true, ticketNo };
+  const { data: activity, error } = await adminDb()
+    .from("activity_log")
+    .insert({
+      user_id: input.userId,
+      action: TICKET_ACTION,
+      description: input.subject,
+      metadata: meta,
+    })
+    .select("id")
+    .single();
+  if (error || !activity?.id) return { ok: false, error: "Ticket could not be created." };
+  return { ok: true, ticketNo, id: activity.id as string };
 }
 
 async function updateActivityTicket(id: string, change: (meta: TicketMeta) => TicketMeta) {

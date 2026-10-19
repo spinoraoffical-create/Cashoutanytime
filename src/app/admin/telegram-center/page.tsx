@@ -1,14 +1,14 @@
 import type { Metadata } from "next";
 
 import { AdminPageHeader } from "@/components/admin/admin-page-header";
-import { TelegramCenterActions } from "@/components/admin/telegram-center-actions";
+import { TelegramCenterActions, TelegramUpdateRecovery } from "@/components/admin/telegram-center-actions";
 import { AdminEmptyState } from "@/components/admin/ui/admin-empty-state";
 import { AdminSectionCard } from "@/components/admin/ui/admin-section-card";
 import { AdminStatusBadge } from "@/components/admin/ui/admin-status-badge";
 import { requireSuperAdmin } from "@/lib/data/admin";
 import { adminDb } from "@/lib/actions/admin/core";
 import { botStatus } from "@/lib/telegram/control/delivery";
-import { TELEGRAM_BOTS, webhookPath } from "@/lib/telegram/control/rules";
+import { TELEGRAM_BOTS, TELEGRAM_DELIVERY_CRON, webhookPath } from "@/lib/telegram/control/rules";
 import { SITE_URL } from "@/lib/constants";
 
 export const metadata: Metadata = { title: "Telegram Control Center" };
@@ -37,13 +37,27 @@ export default async function TelegramCenterPage({
     last_error: string | null;
     created_at: string;
   }>;
-  const failed = jobs.filter((job) => job.status === "failed" || job.status === "uncertain" || job.status === "retry_pending");
+  const failed = jobs.filter((job) => job.status === "failed" || job.status === "uncertain" || job.status === "retry_pending" || job.status === "needs_investigation");
+  const updatesQuery = await db
+    .from("telegram_webhook_updates")
+    .select("bot_key, update_id, status, attempts, command_name, last_error")
+    .eq("status", "exhausted")
+    .order("update_id", { ascending: false })
+    .limit(20);
+  const updates = (updatesQuery.data ?? []) as Array<{
+    bot_key: string;
+    update_id: number;
+    status: string;
+    attempts: number;
+    command_name: string | null;
+    last_error: string | null;
+  }>;
 
   return (
     <div className="mx-auto max-w-6xl space-y-4 px-1">
       <AdminPageHeader
         title="Telegram Control Center"
-        description="Five bots, one delivery record. A message Telegram accepts is not a message a person has read. Tokens stay on the server."
+        description={`Checkout only queues an alert. The Hobby cron at ${TELEGRAM_DELIVERY_CRON} UTC is a daily recovery sweep, not an urgent sender. An external worker must call the protected delivery route for payment and security alerts. Telegram acceptance is not a read receipt.`}
       />
       <nav className="flex gap-2 overflow-x-auto pb-1 text-sm">
         {[
@@ -51,6 +65,7 @@ export default async function TelegramCenterPage({
           ["bots", "Bots"],
           ["delivery", "Delivery"],
           ["failed", "Failed"],
+          ["updates", "Updates"],
           ["settings", "Settings"],
         ].map(([key, label]) => (
           <a
@@ -108,6 +123,29 @@ export default async function TelegramCenterPage({
             <ul className="space-y-2 text-sm text-[#d7e3ff]">
               {failed.map((job) => (
                 <li key={job.id}>{job.status}: {job.category} {job.last_error ? `— ${job.last_error}` : ""}</li>
+              ))}
+            </ul>
+          )}
+        </AdminSectionCard>
+      ) : null}
+
+      {section === "updates" ? (
+        <AdminSectionCard title="Exhausted webhook updates" description="These updates stopped after five attempts. Reopen lets Telegram deliver the same update id again. It does not run the command and it does not move money.">
+          {updatesQuery.error ? (
+            <AdminEmptyState title="Webhook history unavailable" body="Apply the Telegram SQL before recovery tools can read update ids." />
+          ) : updates.length === 0 ? (
+            <AdminEmptyState title="No exhausted updates" body="A command that fails five times appears here with its command name, not the message text." />
+          ) : (
+            <ul className="space-y-3">
+              {updates.map((update) => (
+                <li key={`${update.bot_key}-${update.update_id}`} className="rounded-xl bg-white/5 p-3 text-sm text-[#d7e3ff]">
+                  <p className="font-semibold text-white">{update.bot_key} · update {update.update_id}</p>
+                  <p>Command: {update.command_name && /^[a-z]+$/.test(update.command_name) ? `/${update.command_name}` : "unavailable"} · attempts {update.attempts}</p>
+                  {update.last_error ? <p className="text-[#f0b4b4]">{update.last_error}</p> : null}
+                  <div className="mt-2">
+                    <TelegramUpdateRecovery bot={update.bot_key} updateId={update.update_id} />
+                  </div>
+                </li>
               ))}
             </ul>
           )}

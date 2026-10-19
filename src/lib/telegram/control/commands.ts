@@ -7,11 +7,11 @@ import {
   REPORT_TIMEZONE,
   customerCommandAllowed,
   customerWalletText,
+  formatOwnerCount,
+  formatOwnerMoney,
   ownerCommandAllowed,
   reportWindow,
-  summarizeMoney,
   type CommandActor,
-  type MoneyRow,
 } from "@/lib/telegram/control/rules";
 
 const HELP_OWNER = [
@@ -82,11 +82,12 @@ async function ownerReply(actor: CommandActor, name: string): Promise<string> {
   }
   if (name === "deposits") return reportText("today", "deposits");
   if (name === "payouts") return reportText("today", "payouts");
-  if (name === "pending") return countText("game_load_requests", "pending");
-  if (name === "failedloads") return countText("game_load_requests", "failed");
+  if (name === "pending") return countFromReport("loads_pending", "Pending game requests");
+  if (name === "failedloads") return countFromReport("loads_failed", "Failed game requests");
   if (name === "reconcile") return "Open /admin/reconciliation. This chat does not change those rows.";
-  if (name === "players" || name === "signups") return signupText(name === "signups" ? "today" : "all");
-  if (name === "tickets") return countText("support_tickets", "open");
+  if (name === "players") return countFromReport("players", "Player profiles");
+  if (name === "signups") return countFromReport("signups", "Signups today");
+  if (name === "tickets") return countFromReport("tickets_open", "Open tickets");
   return HELP_OWNER;
 }
 
@@ -138,56 +139,70 @@ function healthText(): string {
   return `Bots with a token set: ${ready} of ${names.length}. Time zone: ${REPORT_TIMEZONE}.`;
 }
 
+type Totals = {
+  deposits?: MoneyBlock | null;
+  payouts?: MoneyBlock | null;
+  loads_pending?: number | null;
+  loads_failed?: number | null;
+  tickets_open?: number | null;
+  signups?: number | null;
+  players?: number | null;
+};
+
+type MoneyBlock = {
+  complete?: boolean;
+  confirmed?: number | null;
+  confirmed_count?: number | null;
+  pending?: number | null;
+  pending_count?: number | null;
+  failed?: number | null;
+  failed_count?: number | null;
+  failed_known?: boolean;
+};
+
+async function ownerTotals(which: "today" | "yesterday"): Promise<Totals | null> {
+  const admin = createAdminClient();
+  if (!admin) return null;
+  const window = reportWindow(Date.now(), which);
+  const { data, error } = await admin.rpc("telegram_owner_totals", { p_start: window.startIso, p_end: window.endIso });
+  if (error || !data || typeof data !== "object") return null;
+  return data as Totals;
+}
+
 async function reportText(which: "today" | "yesterday", focus?: "deposits" | "payouts"): Promise<string> {
   const window = reportWindow(Date.now(), which);
-  const deposits = await moneyRows("deposit_bonus_ledger", "wallet_credited", "final_credit", "created_at");
-  const payouts = await moneyRows("paydora_payout_requests", "status", "amount", "created_at");
-  const depositSummary = summarizeMoney(deposits, window.startIso, window.endIso);
-  const payoutSummary = summarizeMoney(payouts, window.startIso, window.endIso);
+  const totals = await ownerTotals(which);
   const lines = [`${window.label} (${window.timeZone})`];
-  if (!focus || focus === "deposits") lines.push(moneyLine("Deposits", depositSummary));
-  if (!focus || focus === "payouts") lines.push(moneyLine("Cash-outs", payoutSummary));
-  lines.push("Accepted by Telegram is not the same as paid or read.");
+  if (!focus || focus === "deposits") lines.push(moneyBlock("Deposits", totals?.deposits ?? null));
+  if (!focus || focus === "payouts") lines.push(moneyBlock("Cash-outs", totals?.payouts ?? null));
+  lines.push("These figures are full database totals for the window. Accepted by Telegram is not the same as paid or read.");
   return lines.join("\n");
 }
 
-function moneyLine(
-  label: string,
-  summary: ReturnType<typeof summarizeMoney>
-): string {
-  if (summary.state === "unavailable") return `${label}: unavailable`;
-  return `${label}: confirmed $${summary.confirmed.toFixed(2)} (${summary.confirmedCount}), pending $${summary.pending.toFixed(2)} (${summary.pendingCount}), failed $${summary.failed.toFixed(2)} (${summary.failedCount})`;
+function moneyBlock(label: string, block: MoneyBlock | null): string {
+  if (!block) return formatOwnerMoney(label, null);
+  return formatOwnerMoney(label, {
+    complete: block.complete,
+    confirmed: numberOrNull(block.confirmed),
+    confirmedCount: numberOrNull(block.confirmed_count),
+    pending: numberOrNull(block.pending),
+    pendingCount: numberOrNull(block.pending_count),
+    failed: numberOrNull(block.failed),
+    failedCount: numberOrNull(block.failed_count),
+    failedKnown: block.failed_known === true,
+  });
 }
 
-async function moneyRows(table: string, statusColumn: string, amountColumn: string, atColumn: string): Promise<MoneyRow[] | null> {
-  const admin = createAdminClient();
-  if (!admin) return null;
-  const { data, error } = await admin.from(table).select(`${statusColumn}, ${amountColumn}, ${atColumn}`).limit(500);
-  if (error) return null;
-  return ((data ?? []) as unknown as Array<Record<string, unknown>>).map((row) => ({
-    status: statusColumn === "wallet_credited" ? (row[statusColumn] ? "credited" : "pending") : String(row[statusColumn] ?? "pending"),
-    amount: Number(row[amountColumn]),
-    at: String(row[atColumn] ?? ""),
-  }));
+function numberOrNull(value: number | null | undefined): number | null {
+  if (value == null) return null;
+  const parsed = Number(value);
+  return Number.isFinite(parsed) ? parsed : null;
 }
 
-async function countText(table: string, status: string): Promise<string> {
-  const admin = createAdminClient();
-  if (!admin) return "Unavailable";
-  const { count, error } = await admin.from(table).select("id", { count: "exact", head: true }).eq("status", status);
-  if (error) return "Unavailable";
-  return `${status}: ${count ?? 0}. This is a count, not a player list.`;
-}
-
-async function signupText(scope: "today" | "all"): Promise<string> {
-  const admin = createAdminClient();
-  if (!admin) return "Signups: unavailable";
-  const window = reportWindow(Date.now(), "today");
-  let query = admin.from("profiles").select("id", { count: "exact", head: true });
-  if (scope === "today") query = query.gte("created_at", window.startIso).lt("created_at", window.endIso);
-  const { count, error } = await query;
-  if (error) return "Signups: unavailable";
-  return scope === "today"
-    ? `Signups today (${REPORT_TIMEZONE}): ${count ?? 0}`
-    : `Player profiles: ${count ?? 0}`;
+async function countFromReport(key: keyof Totals, label: string): Promise<string> {
+  const totals = await ownerTotals("today");
+  if (!totals) return formatOwnerCount(label, null);
+  const value = totals[key];
+  if (value == null || typeof value === "object") return formatOwnerCount(label, null);
+  return formatOwnerCount(label, numberOrNull(Number(value)));
 }

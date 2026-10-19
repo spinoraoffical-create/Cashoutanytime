@@ -3,7 +3,8 @@ import { SITE_URL } from "@/lib/constants";
 import type { GameLoadWalletType } from "@/lib/game-automation/types";
 import { escapeTelegramHtml, isTelegramConfigured, sendTelegramMessage } from "@/lib/telegram/client";
 import { isAnyAdminOnline } from "@/lib/telegram/admin-presence";
-import { safePaymentAlert } from "@/lib/telegram/control/safe-emit";
+import { recordLegacyOutcome } from "@/lib/telegram/control/delivery";
+import { noteLegacySend, safePaymentAlert } from "@/lib/telegram/control/safe-emit";
 
 export type WalletActivityKind = "create_account" | "load" | "reload" | "redeem";
 
@@ -34,29 +35,36 @@ export async function notifyAdminOfWalletActivity(input: {
     detail: `${input.kind} opened for ${input.gameName}. This is a request, not a finished provider result.`,
     adminPath: "/admin/game-loads",
   });
-  if (routed === "handled") return;
+  if (routed.disposition === "handled") return;
   if (!isTelegramConfigured()) {
     console.error("[telegram] wallet activity skipped: TELEGRAM_BOT_TOKEN or TELEGRAM_ADMIN_CHAT_ID not set");
+    await noteLegacySend(routed.eventKey, { configured: false, ok: null, thrown: false });
     return;
   }
 
   const admin = createAdminClient();
   if (!admin) {
     console.error("[telegram] wallet activity skipped: SUPABASE_SERVICE_ROLE_KEY not set on server");
+    await noteLegacySend(routed.eventKey, { configured: true, ok: null, thrown: true });
     return;
   }
 
-  const { data: sender } = await admin
+  const { data: sender, error: senderError } = await admin
     .from("profiles")
-    .select("full_name, email, role")
+    .select("full_name, role")
     .eq("id", input.userId)
     .single();
 
-  if (!sender || sender.role === "admin") return;
+  if (senderError || !sender) {
+    await noteLegacySend(routed.eventKey, { configured: true, ok: null, thrown: true });
+    return;
+  }
+  if (sender.role === "admin") {
+    await recordLegacyOutcome(routed.eventKey, "skipped");
+    return;
+  }
 
-  const displayName =
-    sender.full_name?.trim() || sender.email?.split("@")[0] || "Player";
-  const email = sender.email ?? "unknown";
+  const displayName = sender.full_name?.trim() || "Player";
   const { emoji, title } = KIND_LABELS[input.kind];
   const loadsUrl = `${SITE_URL}/admin/game-loads`;
 
@@ -64,7 +72,6 @@ export async function notifyAdminOfWalletActivity(input: {
     `${emoji} <b>${title}</b>`,
     "",
     `<b>From:</b> ${escapeTelegramHtml(displayName)}`,
-    `<b>Email:</b> ${escapeTelegramHtml(email)}`,
     `<b>Game:</b> ${escapeTelegramHtml(input.gameName)}`,
   ];
 
@@ -92,6 +99,7 @@ export async function notifyAdminOfWalletActivity(input: {
   const disableNotification = await isAnyAdminOnline();
 
   const result = await sendTelegramMessage(lines.join("\n"), { disableNotification });
+  await noteLegacySend(routed.eventKey, { configured: true, ok: result.ok, thrown: result.thrown });
   if (!result.ok) {
     console.error("[telegram] wallet activity notify failed:", result.error);
   }

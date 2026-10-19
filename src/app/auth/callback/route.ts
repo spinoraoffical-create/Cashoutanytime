@@ -150,6 +150,21 @@ export async function GET(request: NextRequest) {
     await assignPlayerToAgentByCode(signedIn.id, lockedCode);
   }
 
+  if (signedIn && (type === "signup" || searchParams.get("verified") === "1")) {
+    void import("@/lib/telegram/control/safe-emit")
+      .then(({ safePaymentAlert }) =>
+        safePaymentAlert({
+          category: "email_verified",
+          eventKey: `email-verified:${signedIn.id}`,
+          source: "ledger",
+          reference: signedIn.id,
+          detail: "The player confirmed the signup email.",
+          adminPath: "/admin/users",
+        })
+      )
+      .catch(() => undefined);
+  }
+
   if (type !== "recovery" && signedIn) {
     const nextPath = pickLoginDestination(redirect, await signedInUsesAdminHome(supabase, signedIn.id));
     if (nextPath !== destUrl.pathname) {

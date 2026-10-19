@@ -251,22 +251,13 @@ export async function recordCashoutPayoutAction(input: {
     after: { amount: parsed.data.amount, note: parsed.data.note ?? null },
   });
 
-  const { safePaymentAlert } = await import("@/lib/telegram/control/safe-emit");
-  const routed = await safePaymentAlert({
-    category: "payout_requested",
-    eventKey: `admin-cashout-user:${parsed.data.userId}:${parsed.data.amount}:${Date.now()}`,
-    source: "admin",
-    reference: parsed.data.userId,
-    amount: parsed.data.amount,
-    detail: "Staff recorded a cash-out in the admin panel.",
-    adminPath: "/admin/payouts",
-  });
-  if (routed !== "handled") {
-    await tgNotify(
-      "finance",
-      `💸 <b>Admin cash-out record</b>\n$${parsed.data.amount.toFixed(2)} · ${tgEsc(parsed.data.userId.slice(0, 8))}...${parsed.data.note ? `\n${tgEsc(parsed.data.note)}` : ""}\nThis is not a provider confirmation.\n${adminLink("/admin/payouts", "👉 View Payouts")}`
-    );
-  }
+  const { investigateRecordedCashout, noteLegacySend } = await import("@/lib/telegram/control/safe-emit");
+  const investigation = await investigateRecordedCashout(db, parsed.data.amount);
+  const legacy = await tgNotify(
+    "finance",
+    `💸 <b>Admin cash-out record</b>\n$${parsed.data.amount.toFixed(2)} · ${tgEsc(parsed.data.userId.slice(0, 8))}...${parsed.data.note ? `\n${tgEsc(parsed.data.note)}` : ""}\nThis is not a provider confirmation.\nThe ledger id was not returned, so this alert is not deduplicated.\n${adminLink("/admin/payouts", "👉 View Payouts")}`
+  );
+  if (investigation?.eventKey) await noteLegacySend(investigation.eventKey, legacy);
   revalidatePath(`/admin/users/${parsed.data.userId}`);
   revalidatePath("/admin/users");
   return { ok: true, message: "Cash-out payout recorded.", ...partialAuditResult(audited) };

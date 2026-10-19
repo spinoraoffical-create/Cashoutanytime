@@ -27,7 +27,7 @@ export async function notifyAdminOfCustomerMessage(input: {
 
   const { data: sender } = await admin
     .from("profiles")
-    .select("full_name, email, role")
+    .select("full_name, role")
     .eq("id", input.senderId)
     .single();
 
@@ -41,11 +41,7 @@ export async function notifyAdminOfCustomerMessage(input: {
 
   if (!conversation) return;
 
-  const displayName =
-    sender.full_name?.trim() ||
-    sender.email?.split("@")[0] ||
-    "Customer";
-  const email = sender.email ?? "unknown";
+  const displayName = sender.full_name?.trim() || "Player";
   const preview = messagePreview(input.content, input.attachmentType);
   const clippedPreview = preview.length > 200 ? `${preview.slice(0, 197)}...` : preview;
   const chatUrl = `${SITE_URL}/admin/chat?userId=${conversation.user_id}`;
@@ -54,7 +50,6 @@ export async function notifyAdminOfCustomerMessage(input: {
     "💬 <b>New customer message</b>",
     "",
     `<b>From:</b> ${escapeTelegramHtml(displayName)}`,
-    `<b>Email:</b> ${escapeTelegramHtml(email)}`,
     `<b>Message:</b> ${escapeTelegramHtml(clippedPreview)}`,
     "",
     `<a href="${chatUrl}">Open chat in Sweepstakes Hub</a>`,

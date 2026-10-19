@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { toast } from "sonner";
 
-import { createTelegramLinkAction, sendTelegramOwnerTestAction } from "@/lib/actions/admin/telegram-center";
+import { createTelegramLinkAction, recoverTelegramUpdateAction, sendTelegramOwnerTestAction } from "@/lib/actions/admin/telegram-center";
 import { Button } from "@/components/ui/button";
 
 export function TelegramCenterActions() {
@@ -48,6 +48,29 @@ export function TelegramCenterActions() {
         </Button>
       </div>
       {link ? <p className="break-all text-sm text-[#d7e3ff]">{link}</p> : null}
+    </div>
+  );
+}
+
+export function TelegramUpdateRecovery({ bot, updateId }: { bot: string; updateId: number }) {
+  const [busy, setBusy] = useState(false);
+  function run(action: "reopen" | "dismiss") {
+    const warning =
+      action === "reopen"
+        ? "Reopen this update so Telegram can deliver the same update id again? This does not run the command."
+        : "Dismiss this exhausted update? This does not run the command.";
+    if (!window.confirm(warning)) return;
+    setBusy(true);
+    void recoverTelegramUpdateAction(bot, updateId, action).then((result) => {
+      setBusy(false);
+      if (!result.ok) toast.error(result.error ?? "The update was not changed.");
+      else toast.success(action === "reopen" ? "Update reopened. The command was not run." : "Update dismissed. The command was not run.");
+    });
+  }
+  return (
+    <div className="flex gap-2">
+      <Button type="button" disabled={busy} onClick={() => run("reopen")}>Reopen</Button>
+      <Button type="button" variant="secondary" disabled={busy} onClick={() => run("dismiss")}>Dismiss</Button>
     </div>
   );
 }

@@ -26,7 +26,7 @@ async function tgPost(
   method: string,
   body: BodyInit,
   headers?: Record<string, string>
-): Promise<{ ok: boolean; description?: string }> {
+): Promise<{ ok: boolean; thrown: boolean; description?: string }> {
   try {
     const res = await fetch(`https://api.telegram.org/bot${TOKEN}/${method}`, {
       method: "POST",
@@ -35,17 +35,20 @@ async function tgPost(
     });
     const data = await res.json().catch(() => null);
     if (!res.ok || !data?.ok) {
-      return { ok: false, description: data?.description ?? `HTTP ${res.status}` };
+      return { ok: false, thrown: false, description: data?.description ?? `HTTP ${res.status}` };
     }
-    return { ok: true };
+    return { ok: true, thrown: false };
   } catch (err) {
-    return { ok: false, description: err instanceof Error ? err.message : "network error" };
+    return { ok: false, thrown: true, description: err instanceof Error ? err.message : "network error" };
   }
 }
 
-export async function tgNotify(channel: Channel, text: string): Promise<void> {
+export async function tgNotify(
+  channel: Channel,
+  text: string
+): Promise<{ configured: boolean; ok: boolean | null; thrown: boolean }> {
   const chatId = CHANNELS[channel];
-  if (!TOKEN || !chatId) return;
+  if (!TOKEN || !chatId) return { configured: false, ok: null, thrown: false };
   const result = await tgPost(
     "sendMessage",
     JSON.stringify({ chat_id: chatId, text, parse_mode: "HTML" }),
@@ -53,13 +56,14 @@ export async function tgNotify(channel: Channel, text: string): Promise<void> {
   );
   if (!result.ok) {
     console.error(`[telegram] tgNotify(${channel}) failed: ${result.description}`);
-    if (channel !== "errors") {
+    if (channel !== "errors" && !result.thrown) {
       await tgNotify(
         "errors",
         `🚨 <b>Telegram send failed</b> (channel: ${tgEsc(channel)})\n${tgEsc(result.description ?? "unknown error")}`
       );
     }
   }
+  return { configured: true, ok: result.ok, thrown: result.thrown };
 }
 
 export async function tgNotifyPhoto(

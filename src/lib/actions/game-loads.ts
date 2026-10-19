@@ -172,7 +172,7 @@ async function generatedLoginForUser(
 async function holdUnknownGameLoad(requestId: string, message: string) {
   const admin = createAdminClient();
   if (!admin) return;
-  const id = logIncident("game-load", "provider result unknown");
+  const id = logIncident("game-load", "provider result unknown", { telegram: false });
   await admin
     .from("game_load_requests")
     .update({
@@ -181,6 +181,24 @@ async function holdUnknownGameLoad(requestId: string, message: string) {
     })
     .eq("id", requestId)
     .in("status", ["pending", "processing"]);
+  void alertGameProvider(requestId, message, "unknown");
+}
+
+function alertGameProvider(requestId: string, message: string, outcome: "unknown" | "failed") {
+  return import("@/lib/telegram/control/rules")
+    .then(({ providerAlertCategory }) =>
+      import("@/lib/telegram/control/safe-emit").then(({ safePaymentAlert }) =>
+        safePaymentAlert({
+          category: providerAlertCategory(message, outcome),
+          eventKey: `game-provider:${requestId}`,
+          source: "provider",
+          reference: requestId,
+          detail: "A game provider request did not finish. This notice does not change a balance.",
+          adminPath: "/admin/game-loads",
+        })
+      )
+    )
+    .catch(() => undefined);
 }
 
 function playerGameError(message: string | null | undefined, loadType?: string | null): string {
@@ -336,12 +354,13 @@ async function fulfillOrFail(
         error: "The game did not confirm this request. It stays open until a person checks it.",
       };
     }
-    logIncident("game-load", message);
+    logIncident("game-load", message, { telegram: false });
     await finishGameLoad({
       requestId,
       success: false,
       errorMessage: message.slice(0, 400),
     });
+    void alertGameProvider(requestId, message, "failed");
     if (loadType === "load" || loadType === "reload") {
       const notice = await settleRejectedLoad(requestId, message.slice(0, 400), loadType);
       return { success: false as const, error: notice };

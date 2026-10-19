@@ -58,7 +58,7 @@ async function sendPhotoToChat(
   photoUrl: string,
   caption: string,
   disableNotification: boolean
-): Promise<{ ok: boolean; error?: string }> {
+): Promise<{ ok: boolean; thrown: boolean; error?: string }> {
   try {
     const response = await fetch(`${TELEGRAM_API}/bot${token}/sendPhoto`, {
       method: "POST",
@@ -76,13 +76,14 @@ async function sendPhotoToChat(
     const payload = (await response.json()) as { ok?: boolean; description?: string };
 
     if (!response.ok || !payload.ok) {
-      return { ok: false, error: payload.description ?? `HTTP ${response.status}` };
+      return { ok: false, thrown: false, error: payload.description ?? `HTTP ${response.status}` };
     }
 
-    return { ok: true };
+    return { ok: true, thrown: false };
   } catch (error) {
     return {
       ok: false,
+      thrown: true,
       error: error instanceof Error ? error.message : "Telegram photo request failed",
     };
   }
@@ -92,12 +93,12 @@ export async function sendTelegramPhoto(
   photoUrl: string,
   caption: string,
   options?: { disableNotification?: boolean; channel?: TelegramOutboundChannel }
-): Promise<{ ok: boolean; error?: string }> {
+): Promise<{ ok: boolean; thrown: boolean; error?: string }> {
   const token = getBotToken();
   const chatIds = getChatIds(options?.channel ?? "admin");
 
   if (!token || chatIds.length === 0) {
-    return { ok: false, error: "Telegram is not configured for this channel" };
+    return { ok: false, thrown: false, error: "Telegram is not configured for this channel" };
   }
 
   const disableNotification = options?.disableNotification ?? false;
@@ -106,10 +107,10 @@ export async function sendTelegramPhoto(
   );
 
   const ok = results.some((r) => r.ok);
-  if (ok) return { ok: true };
+  if (ok) return { ok: true, thrown: false };
 
   const errors = results.map((r) => r.error).filter(Boolean);
-  return { ok: false, error: errors.join("; ") || "All Telegram photo sends failed" };
+  return { ok: false, thrown: results.some((r) => r.thrown), error: errors.join("; ") || "All Telegram photo sends failed" };
 }
 
 async function sendToChat(
@@ -117,7 +118,7 @@ async function sendToChat(
   chatId: string,
   text: string,
   disableNotification: boolean
-): Promise<{ ok: boolean; error?: string }> {
+): Promise<{ ok: boolean; thrown: boolean; error?: string }> {
   try {
     const response = await fetch(`${TELEGRAM_API}/bot${token}/sendMessage`, {
       method: "POST",
@@ -135,13 +136,14 @@ async function sendToChat(
     const payload = (await response.json()) as { ok?: boolean; description?: string };
 
     if (!response.ok || !payload.ok) {
-      return { ok: false, error: payload.description ?? `HTTP ${response.status}` };
+      return { ok: false, thrown: false, error: payload.description ?? `HTTP ${response.status}` };
     }
 
-    return { ok: true };
+    return { ok: true, thrown: false };
   } catch (error) {
     return {
       ok: false,
+      thrown: true,
       error: error instanceof Error ? error.message : "Telegram request failed",
     };
   }
@@ -150,12 +152,12 @@ async function sendToChat(
 export async function sendTelegramMessage(
   text: string,
   options?: { disableNotification?: boolean; channel?: TelegramOutboundChannel }
-): Promise<{ ok: boolean; error?: string }> {
+): Promise<{ ok: boolean; thrown: boolean; error?: string }> {
   const token = getBotToken();
   const chatIds = getChatIds(options?.channel ?? "admin");
 
   if (!token || chatIds.length === 0) {
-    return { ok: false, error: "Telegram is not configured for this channel" };
+    return { ok: false, thrown: false, error: "Telegram is not configured for this channel" };
   }
 
   const disableNotification = options?.disableNotification ?? false;
@@ -164,8 +166,8 @@ export async function sendTelegramMessage(
   );
 
   const ok = results.some((r) => r.ok);
-  if (ok) return { ok: true };
+  if (ok) return { ok: true, thrown: false };
 
   const errors = results.map((r) => r.error).filter(Boolean);
-  return { ok: false, error: errors.join("; ") || "All Telegram sends failed" };
+  return { ok: false, thrown: results.some((r) => r.thrown), error: errors.join("; ") || "All Telegram sends failed" };
 }

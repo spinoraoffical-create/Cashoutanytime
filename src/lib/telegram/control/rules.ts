@@ -145,9 +145,303 @@ export function nextAttemptDecision(input: {
   return { status: "retry_pending", nextAttemptAt: new Date(input.nowMs + wait * 1000).toISOString() };
 }
 
-export function duplicateJobDecision(existing: { status: string } | null): "create" | "skip" {
-  if (!existing) return "create";
+export type DeliveryJobStatus =
+  | "queued"
+  | "sending"
+  | "accepted"
+  | "failed"
+  | "retry_pending"
+  | "uncertain"
+  | "unconfigured"
+  | "duplicate"
+  | "needs_investigation";
+
+export type LegacyOutcome = "not_used" | "attempt_started" | "accepted" | "uncertain" | "unavailable" | "skipped";
+
+/** Hobby cron is once a day. This sweep only recovers leftovers. */
+export const TELEGRAM_DELIVERY_CRON = "20 8 * * *";
+
+export const PRODUCTION_TELEGRAM_TARGETS = ["zecitlewsynyioemsqna", "sweeptakehub.com"] as const;
+
+/** Network budget for one Telegram HTTP call. A timeout is an uncertain outcome. */
+export const TELEGRAM_NETWORK_TIMEOUT_MS = 8_000;
+
+/** A send claim older than this is marked uncertain and is not sent again. */
+export const SENDING_STALE_MS = 120_000;
+
+export const WEBHOOK_PROCESS_ATTEMPTS = 5;
+
+export function duplicateJobDecision(
+  existing: { status: string; legacyOutcome?: LegacyOutcome | null } | null,
+  configured = false
+): "create" | "skip" | "promote" {
+  const disposition = enqueueDisposition({
+    existingStatus: (existing?.status as DeliveryJobStatus | undefined) ?? null,
+    configured,
+    legacyOutcome: existing?.legacyOutcome ?? null,
+  });
+  if (disposition.action === "insert_queued" || disposition.action === "insert_unconfigured") return "create";
+  if (disposition.action === "promote") return "promote";
   return "skip";
+}
+
+/**
+ * Promote an unconfigured job only when the legacy sender is known not to have sent it.
+ * accepted and uncertain stay put. attempt_started stays put until the outcome is recorded.
+ */
+export function enqueueDisposition(input: {
+  existingStatus: DeliveryJobStatus | null;
+  configured: boolean;
+  legacyOutcome?: LegacyOutcome | null;
+}): { action: "insert_queued" | "insert_unconfigured" | "promote" | "owned"; legacy: boolean } {
+  if (input.existingStatus == null) {
+    if (input.configured) return { action: "insert_queued", legacy: false };
+    return { action: "insert_unconfigured", legacy: true };
+  }
+  if (input.existingStatus === "needs_investigation") return { action: "owned", legacy: false };
+  if (
+    input.existingStatus === "unconfigured" &&
+    input.configured &&
+    input.legacyOutcome === "unavailable"
+  ) {
+    return { action: "promote", legacy: false };
+  }
+  return { action: "owned", legacy: false };
+}
+
+/** Legacy API acceptance is not a read receipt and must not be sent again on the new bot. */
+export function legacyOutcomeFromSend(input: {
+  configured: boolean;
+  ok: boolean | null;
+  thrown: boolean;
+}): LegacyOutcome {
+  if (!input.configured) return "unavailable";
+  if (input.ok === true) return "accepted";
+  if (input.thrown || input.ok == null) return "uncertain";
+  return "unavailable";
+}
+
+export function isDailyCron(schedule: string): boolean {
+  return /^\d{1,2} \d{1,2} \* \* \*$/.test(schedule);
+}
+
+export function isolatedTelegramTarget(url: string | null | undefined): "isolated" | "production" | "missing" {
+  const value = url?.trim().toLowerCase() ?? "";
+  if (!value) return "missing";
+  if (PRODUCTION_TELEGRAM_TARGETS.some((item) => value.includes(item))) return "production";
+  return "isolated";
+}
+
+/** Once a job row exists and the new system owns it, the old sender must not run. */
+export function fallbackAfterEnqueue(input: { persisted: boolean; legacy: boolean }): "handled" | "legacy" {
+  if (!input.persisted) return "legacy";
+  if (input.legacy) return "legacy";
+  return "handled";
+}
+
+export function staleSendingDecision(updatedAtMs: number, nowMs: number): "uncertain" | "leave" {
+  if (!Number.isFinite(updatedAtMs) || !Number.isFinite(nowMs)) return "leave";
+  if (nowMs - updatedAtMs >= SENDING_STALE_MS) return "uncertain";
+  return "leave";
+}
+
+export function webhookReplayDecision(input: {
+  status: "received" | "processed" | "failed" | "exhausted" | "reviewed" | null;
+  attempts: number;
+}): "start" | "retry" | "duplicate" | "stopped" {
+  if (input.status == null) return "start";
+  if (input.status === "processed" || input.status === "reviewed") return "duplicate";
+  if (input.status === "exhausted" || input.attempts >= WEBHOOK_PROCESS_ATTEMPTS) return "stopped";
+  return "retry";
+}
+
+/** Reopen does not run the command. It only allows Telegram to deliver that same update id again. */
+export function webhookRecoveryDecision(input: {
+  status: string;
+  action: "reopen" | "dismiss";
+}): "reopen" | "dismiss" | "refuse" {
+  if (input.status !== "exhausted") return "refuse";
+  return input.action;
+}
+
+export function isPrivateTelegramChat(chatType: string | null | undefined): boolean {
+  return chatType === "private";
+}
+
+export function groupCommandRefusal(): string {
+  return "Open a private chat with this bot. Linking, balances, and reports are not answered in a group.";
+}
+
+export function countReport(
+  count: number | null,
+  failed: boolean
+): { state: "unavailable" } | { state: "ready"; count: number } {
+  if (failed || count == null || !Number.isFinite(count)) return { state: "unavailable" };
+  return { state: "ready", count };
+}
+
+export function formatOwnerMoney(
+  label: string,
+  input: {
+    complete?: boolean;
+    confirmed: number | null;
+    confirmedCount: number | null;
+    pending: number | null;
+    pendingCount: number | null;
+    failed: number | null;
+    failedCount: number | null;
+    failedKnown: boolean;
+  } | null
+): string {
+  if (!input || input.complete === false) return `${label}: unavailable`;
+  const required = [input.confirmed, input.confirmedCount, input.pending, input.pendingCount];
+  if (required.some((value) => value == null || !Number.isFinite(value))) return `${label}: unavailable`;
+  const confirmed = `confirmed $${(input.confirmed as number).toFixed(2)} (${input.confirmedCount})`;
+  const pending = `pending $${(input.pending as number).toFixed(2)} (${input.pendingCount})`;
+  if (!input.failedKnown) return `${label}: ${confirmed}, ${pending}`;
+  if (input.failed == null || input.failedCount == null || !Number.isFinite(input.failed) || !Number.isFinite(input.failedCount)) {
+    return `${label}: unavailable`;
+  }
+  return `${label}: ${confirmed}, ${pending}, failed $${input.failed.toFixed(2)} (${input.failedCount})`;
+}
+
+export function formatOwnerCount(label: string, count: number | null): string {
+  const report = countReport(count, count == null);
+  if (report.state === "unavailable") return `${label}: unavailable`;
+  return `${label}: ${report.count}`;
+}
+
+export function moneyAggregateReport(input: {
+  ok: boolean;
+  confirmed: number | null;
+  confirmedCount: number | null;
+  pending: number | null;
+  pendingCount: number | null;
+  failed: number | null;
+  failedCount: number | null;
+} | null): { state: "unavailable" } | {
+  state: "ready";
+  confirmed: number;
+  confirmedCount: number;
+  pending: number;
+  pendingCount: number;
+  failed: number;
+  failedCount: number;
+} {
+  if (!input?.ok) return { state: "unavailable" };
+  const values = [input.confirmed, input.confirmedCount, input.pending, input.pendingCount, input.failed, input.failedCount];
+  if (values.some((value) => value == null || !Number.isFinite(value))) return { state: "unavailable" };
+  return {
+    state: "ready",
+    confirmed: input.confirmed as number,
+    confirmedCount: input.confirmedCount as number,
+    pending: input.pending as number,
+    pendingCount: input.pendingCount as number,
+    failed: input.failed as number,
+    failedCount: input.failedCount as number,
+  };
+}
+
+const TRANSACTION_ID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+/** A cash-out alert key exists only when the ledger row id is already known. */
+export function adminCashoutEventKey(transactionId: string | null | undefined): string | null {
+  const id = transactionId?.trim() ?? "";
+  if (!TRANSACTION_ID.test(id)) return null;
+  return `admin-cashout:${id}`;
+}
+
+export function cashoutAlertPlan(transactionId: string | null | undefined): { kind: "event"; eventKey: string } | { kind: "investigate" } {
+  const eventKey = adminCashoutEventKey(transactionId);
+  if (!eventKey) return { kind: "investigate" };
+  return { kind: "event", eventKey };
+}
+
+export function investigationEventKey(nonce: string | null | undefined): string | null {
+  const id = nonce?.trim() ?? "";
+  if (!TRANSACTION_ID.test(id)) return null;
+  return `investigate:${id}`;
+}
+
+const INCIDENT_AREAS = ["audit", "game-load", "rate-limit", "kyc", "telegram", "app"] as const;
+const INCIDENT_OUTCOMES = ["timeout", "unavailable", "rejected", "unknown", "failed", "audit"] as const;
+
+/** Telegram receives only these fields. The raw message is never copied. */
+export function sanitizeSecurityAlert(input: {
+  area?: string | null;
+  code?: string | null;
+  outcome?: string | null;
+  message?: string | null;
+}): { area: string; code: string | null; outcome: string; text: string } {
+  const area = (INCIDENT_AREAS as readonly string[]).includes(input.area ?? "") ? (input.area as string) : "app";
+  const code = /^inc_[a-z0-9_]{4,48}$/i.test(input.code ?? "") ? (input.code as string) : null;
+  const outcome = (INCIDENT_OUTCOMES as readonly string[]).includes(input.outcome ?? "") ? (input.outcome as string) : "failed";
+  const lines = [`Area: ${area}`, code ? `Code: ${code}` : "Code: unavailable", `Outcome: ${outcome}`];
+  return { area, code, outcome, text: lines.join("\n") };
+}
+
+export function linkRedeemPlan(input: {
+  found: boolean;
+  expired: boolean;
+  consumed: boolean;
+  replaced: boolean;
+  purpose: "owner" | "customer" | null;
+  expected: "owner" | "customer";
+  isSuperAdmin: boolean;
+  privateChat: boolean;
+  saveFailed: boolean;
+}): { consume: boolean; message: string } {
+  if (!input.privateChat) return { consume: false, message: groupCommandRefusal() };
+  if (!input.found || input.expired || input.consumed || input.replaced) {
+    return { consume: false, message: "That code is missing, expired, or already used." };
+  }
+  if (input.purpose !== input.expected) return { consume: false, message: "That code is for a different bot." };
+  if (input.expected === "owner" && !input.isSuperAdmin) {
+    return { consume: false, message: "That account is not an owner. The code was not used." };
+  }
+  if (input.saveFailed) return { consume: false, message: "The link was not saved. Use the same code again." };
+  return { consume: true, message: input.expected === "owner" ? "Owner chat linked." : "This chat is linked." };
+}
+
+export function providerAlertCategory(message: string, outcome: "unknown" | "failed"): AlertCategory {
+  if (/ECONNREFUSED|ENOTFOUND|EAI_AGAIN|service unavailable|bad gateway|gateway timeout/i.test(message)) {
+    return "provider_down";
+  }
+  if (outcome === "unknown") return "load_unknown";
+  return "load_failed";
+}
+
+export function incidentSeverity(area: string): Severity {
+  if (area === "rate-limit") return "WARNING";
+  return "ERROR";
+}
+
+export function workerSummary(input: {
+  attempted: number;
+  accepted: number;
+  failed: number;
+  uncertain: number;
+  retryPending: number;
+  recovered: number;
+  promoted: number;
+}): {
+  processed: number;
+  accepted: number;
+  failed: number;
+  uncertain: number;
+  retryPending: number;
+  recovered: number;
+  promoted: number;
+} {
+  return {
+    processed: input.attempted,
+    accepted: input.accepted,
+    failed: input.failed,
+    uncertain: input.uncertain,
+    retryPending: input.retryPending,
+    recovered: input.recovered,
+    promoted: input.promoted,
+  };
 }
 
 export type PaymentClaim = "requested" | "provider_confirmed" | "wallet_recorded" | "failed" | "unknown" | "admin_record";

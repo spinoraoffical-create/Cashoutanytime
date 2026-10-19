@@ -653,6 +653,19 @@ export async function finalizeRegistrationAfterSignUp(input: {
     await assignPlayerToAgentByCode(input.userId, input.agentCode);
   }
 
+  void import("@/lib/telegram/control/safe-emit")
+    .then(({ safePaymentAlert }) =>
+      safePaymentAlert({
+        category: "signup",
+        eventKey: `signup:${input.userId}`,
+        source: "ledger",
+        reference: input.userId,
+        detail: "A player finished registration.",
+        adminPath: "/admin/users",
+      })
+    )
+    .catch(() => undefined);
+
   return { ok: true };
 }
 

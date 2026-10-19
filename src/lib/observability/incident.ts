@@ -4,9 +4,21 @@ export function incidentCode(): string {
   return `inc_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 8)}`;
 }
 
-export function logIncident(area: string, message: string): string {
+export function logIncident(area: string, message: string, options?: { telegram?: boolean }): string {
   const id = incidentCode();
   const safe = message.replace(/\s+/g, " ").slice(0, 180);
   console.error(`[${area}] ${id} ${safe}`);
+  if (options?.telegram !== false) {
+    void import("@/lib/telegram/control/delivery")
+      .then(({ enqueueIncident }) =>
+        enqueueIncident({
+          source: area,
+          code: id,
+          outcome: area === "audit" ? "audit" : "failed",
+          adminPath: "/admin/telegram-center",
+        })
+      )
+      .catch(() => undefined);
+  }
   return id;
 }

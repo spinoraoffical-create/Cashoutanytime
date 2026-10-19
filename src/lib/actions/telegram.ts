@@ -63,12 +63,14 @@ export async function createCustomerTelegramLink(): Promise<TelegramLinkResult> 
   if (!user) return { ok: false, error: "Please sign in again." };
   const username = process.env.TELEGRAM_SUPPORT_BOT_USERNAME;
   if (!username) return { ok: false, error: "The support bot username is not set." };
-  const { hashLinkCode } = await import("@/lib/telegram/control/delivery");
+  const { expireOpenLinkCodes, hashLinkCode } = await import("@/lib/telegram/control/delivery");
   const { randomBytes } = await import("node:crypto");
   const code = randomBytes(24).toString("hex");
   const codeHash = hashLinkCode(code);
   if (!codeHash) return { ok: false, error: "Telegram linking is not configured yet." };
-  const { error } = await adminDb().from("telegram_link_challenges").insert({
+  const db = adminDb();
+  await expireOpenLinkCodes(db, user.id, "customer");
+  const { error } = await db.from("telegram_link_challenges").insert({
     code_hash: codeHash,
     purpose: "customer",
     user_id: user.id,

@@ -10,7 +10,7 @@
     },
     {
       "path": "/api/cron/telegram-delivery",
-      "schedule": "15 * * * *"
+      "schedule": "20 8 * * *"
     }
   ]
 }

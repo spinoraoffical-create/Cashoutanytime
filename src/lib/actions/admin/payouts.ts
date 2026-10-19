@@ -72,19 +72,10 @@ export async function payoutCashout(formData: FormData): Promise<AdminActionResu
     body: `$${amount.toFixed(2)} from your cash-out balance has been paid out${note ? ` — ${note}` : "."}`,
   });
 
-  const { safePaymentAlert } = await import("@/lib/telegram/control/safe-emit");
-  const routed = await safePaymentAlert({
-    category: "payout_requested",
-    eventKey: `admin-cashout:${userId}:${amount}:${Date.now()}`,
-    source: "admin",
-    reference: userId,
-    amount,
-    detail: "Staff recorded a cash-out in the admin panel.",
-    adminPath: "/admin/payouts",
-  });
-  if (routed !== "handled") {
-    await tgNotify("finance", `💸 <b>Admin cash-out record</b>\n$${amount.toFixed(2)} to ${tgEsc(userId)}${note ? `\n${tgEsc(note)}` : ""}\nThis is not a provider confirmation.\n${adminLink("/admin/payouts", "👉 View Payouts")}`);
-  }
+  const { investigateRecordedCashout, noteLegacySend } = await import("@/lib/telegram/control/safe-emit");
+  const investigation = await investigateRecordedCashout(db, amount);
+  const legacy = await tgNotify("finance", `💸 <b>Admin cash-out record</b>\n$${amount.toFixed(2)} to ${tgEsc(userId)}${note ? `\n${tgEsc(note)}` : ""}\nThis is not a provider confirmation.\nThe ledger id was not returned, so this alert is not deduplicated.\n${adminLink("/admin/payouts", "👉 View Payouts")}`);
+  if (investigation?.eventKey) await noteLegacySend(investigation.eventKey, legacy);
   revalidatePath("/admin/payouts");
   return {
     ok: true,

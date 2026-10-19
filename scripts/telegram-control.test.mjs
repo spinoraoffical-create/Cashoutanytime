@@ -107,4 +107,177 @@ assert.equal(customerWalletText({ linked: false, balance: 5 }).includes("not lin
 assert.equal(customerWalletText({ linked: true, balance: 12.5 }).includes("$12.50"), true);
 assert.equal(customerWalletText({ linked: true, balance: 12.5 }).includes("cannot deposit"), true);
 
+const {
+  TELEGRAM_NETWORK_TIMEOUT_MS,
+  SENDING_STALE_MS,
+  WEBHOOK_PROCESS_ATTEMPTS,
+  adminCashoutEventKey,
+  countReport,
+  TELEGRAM_DELIVERY_CRON,
+  cashoutAlertPlan,
+  enqueueDisposition,
+  fallbackAfterEnqueue,
+  investigationEventKey,
+  isDailyCron,
+  isolatedTelegramTarget,
+  legacyOutcomeFromSend,
+  sanitizeSecurityAlert,
+  webhookRecoveryDecision,
+  formatOwnerCount,
+  formatOwnerMoney,
+  groupCommandRefusal,
+  incidentSeverity,
+  isPrivateTelegramChat,
+  linkRedeemPlan,
+  moneyAggregateReport,
+  providerAlertCategory,
+  staleSendingDecision,
+  webhookReplayDecision,
+  workerSummary,
+} = await import("../src/lib/telegram/control/rules.ts");
+
+assert.equal(TELEGRAM_NETWORK_TIMEOUT_MS > 0 && TELEGRAM_NETWORK_TIMEOUT_MS < SENDING_STALE_MS, true);
+assert.equal(classifyTelegramResponse({ thrown: true }).outcome, "uncertain");
+assert.equal(nextAttemptDecision({ attempts: 1, outcome: "uncertain", retryAfterSeconds: null, nowMs: 1_000 }).status, "uncertain");
+
+assert.deepEqual(enqueueDisposition({ existingStatus: null, configured: false }), { action: "insert_unconfigured", legacy: true });
+assert.deepEqual(enqueueDisposition({ existingStatus: null, configured: true }), { action: "insert_queued", legacy: false });
+assert.deepEqual(enqueueDisposition({ existingStatus: "queued", configured: true }), { action: "owned", legacy: false });
+assert.deepEqual(enqueueDisposition({ existingStatus: "sending", configured: true }), { action: "owned", legacy: false });
+assert.deepEqual(enqueueDisposition({ existingStatus: "unconfigured", configured: false }), { action: "owned", legacy: false });
+assert.deepEqual(enqueueDisposition({ existingStatus: "unconfigured", configured: true, legacyOutcome: "accepted" }), { action: "owned", legacy: false });
+assert.deepEqual(enqueueDisposition({ existingStatus: "unconfigured", configured: true, legacyOutcome: "uncertain" }), { action: "owned", legacy: false });
+assert.deepEqual(enqueueDisposition({ existingStatus: "unconfigured", configured: true, legacyOutcome: "attempt_started" }), { action: "owned", legacy: false });
+assert.deepEqual(enqueueDisposition({ existingStatus: "unconfigured", configured: true, legacyOutcome: "unavailable" }), { action: "promote", legacy: false });
+assert.deepEqual(enqueueDisposition({ existingStatus: "needs_investigation", configured: true, legacyOutcome: "unavailable" }), { action: "owned", legacy: false });
+assert.equal(fallbackAfterEnqueue({ persisted: false, legacy: true }), "legacy");
+assert.equal(fallbackAfterEnqueue({ persisted: true, legacy: true }), "legacy");
+assert.equal(fallbackAfterEnqueue({ persisted: true, legacy: false }), "handled");
+assert.equal(duplicateJobDecision({ status: "unconfigured", legacyOutcome: "unavailable" }, true), "promote");
+assert.equal(duplicateJobDecision({ status: "unconfigured", legacyOutcome: "accepted" }, true), "skip");
+assert.equal(duplicateJobDecision({ status: "accepted" }, true), "skip");
+
+assert.equal(staleSendingDecision(0, SENDING_STALE_MS), "uncertain");
+assert.equal(staleSendingDecision(0, SENDING_STALE_MS - 1), "leave");
+assert.equal(nextAttemptDecision({ attempts: 1, outcome: "uncertain", retryAfterSeconds: 30, nowMs: 1_000 }).nextAttemptAt, null);
+
+assert.equal(isPrivateTelegramChat("private"), true);
+assert.equal(isPrivateTelegramChat("group"), false);
+assert.equal(isPrivateTelegramChat("supergroup"), false);
+assert.equal(isPrivateTelegramChat(undefined), false);
+assert.equal(groupCommandRefusal().includes("private chat"), true);
+
+assert.equal(webhookReplayDecision({ status: null, attempts: 0 }), "start");
+assert.equal(webhookReplayDecision({ status: "received", attempts: 1 }), "retry");
+assert.equal(webhookReplayDecision({ status: "failed", attempts: 2 }), "retry");
+assert.equal(webhookReplayDecision({ status: "processed", attempts: 1 }), "duplicate");
+assert.equal(webhookReplayDecision({ status: "failed", attempts: WEBHOOK_PROCESS_ATTEMPTS }), "stopped");
+
+assert.equal(countReport(null, false).state, "unavailable");
+assert.equal(countReport(0, false).state, "ready");
+assert.equal(formatOwnerCount("Open tickets", null).includes("unavailable"), true);
+assert.equal(formatOwnerCount("Open tickets", 0).includes("unavailable"), false);
+assert.equal(formatOwnerCount("Open tickets", 0).includes("0"), true);
+const partial = moneyAggregateReport({
+  ok: true,
+  confirmed: 10,
+  confirmedCount: 1,
+  pending: null,
+  pendingCount: 1,
+  failed: 0,
+  failedCount: 0,
+});
+assert.equal(partial.state, "unavailable");
+assert.equal(
+  formatOwnerMoney("Deposits", {
+    complete: true,
+    confirmed: 10,
+    confirmedCount: 1,
+    pending: 4,
+    pendingCount: 1,
+    failed: 0,
+    failedCount: 0,
+    failedKnown: false,
+  }).includes("failed"),
+  false
+);
+assert.equal(
+  formatOwnerMoney("Cash-outs", {
+    complete: true,
+    confirmed: 3,
+    confirmedCount: 1,
+    pending: 0,
+    pendingCount: 0,
+    failed: 2,
+    failedCount: 1,
+    failedKnown: true,
+  }).includes("failed $2.00"),
+  true
+);
+assert.equal(formatOwnerMoney("Deposits", null), "Deposits: unavailable");
+
+assert.equal(adminCashoutEventKey(null), null);
+assert.equal(adminCashoutEventKey(String(Date.now())), null);
+assert.equal(adminCashoutEventKey("11111111-1111-1111-1111-111111111111"), "admin-cashout:11111111-1111-1111-1111-111111111111");
+
+const ownerLink = { found: true, expired: false, consumed: false, replaced: false, purpose: "owner", expected: "owner", isSuperAdmin: false, privateChat: true, saveFailed: false };
+assert.equal(linkRedeemPlan(ownerLink).consume, false);
+assert.equal(linkRedeemPlan({ ...ownerLink, isSuperAdmin: true, saveFailed: true }).consume, false);
+assert.equal(linkRedeemPlan({ ...ownerLink, isSuperAdmin: true, privateChat: false }).consume, false);
+assert.equal(linkRedeemPlan({ ...ownerLink, isSuperAdmin: true }).consume, true);
+assert.equal(linkRedeemPlan({ ...ownerLink, purpose: "customer", expected: "customer", isSuperAdmin: false }).consume, true);
+
+assert.equal(providerAlertCategory("ECONNREFUSED", "unknown"), "provider_down");
+assert.equal(providerAlertCategory("outcome unknown", "unknown"), "load_unknown");
+assert.equal(providerAlertCategory("rejected", "failed"), "load_failed");
+assert.equal(incidentSeverity("rate-limit"), "WARNING");
+assert.equal(incidentSeverity("game-load"), "ERROR");
+
+const worker = workerSummary({ attempted: 2, accepted: 1, failed: 0, uncertain: 1, retryPending: 0, recovered: 1, promoted: 3 });
+assert.equal(worker.processed, 2);
+assert.equal(worker.processed === 8, false);
+assert.equal(worker.recovered, 1);
+assert.equal(worker.promoted, 3);
+
+assert.equal(legacyOutcomeFromSend({ configured: true, ok: true, thrown: false }), "accepted");
+assert.equal(legacyOutcomeFromSend({ configured: true, ok: null, thrown: true }), "uncertain");
+assert.equal(legacyOutcomeFromSend({ configured: false, ok: null, thrown: false }), "unavailable");
+assert.equal(legacyOutcomeFromSend({ configured: true, ok: false, thrown: false }), "unavailable");
+assert.equal(cashoutAlertPlan(null).kind, "investigate");
+assert.equal(cashoutAlertPlan("not-a-row").kind, "investigate");
+assert.equal(cashoutAlertPlan("11111111-1111-1111-1111-111111111111").kind, "event");
+const investigation = investigationEventKey("22222222-2222-2222-2222-222222222222");
+assert.equal(investigation, "investigate:22222222-2222-2222-2222-222222222222");
+assert.equal(investigation?.startsWith("admin-cashout:"), false);
+
+const leaked = sanitizeSecurityAlert({
+  area: "kyc",
+  code: "inc_abc1234",
+  outcome: "failed",
+  message: "upload failed bearer sk_live_secret user@example.com 4111111111111111",
+});
+assert.equal(leaked.text.includes("bearer"), false);
+assert.equal(leaked.text.includes("sk_live"), false);
+assert.equal(leaked.text.includes("@"), false);
+assert.equal(leaked.text.includes("4111"), false);
+assert.equal(leaked.text.includes("Area: kyc"), true);
+assert.equal(leaked.text.includes("inc_abc1234"), true);
+assert.equal(sanitizeSecurityAlert({ area: "passport-scan", code: "raw error", message: "token=abc" }).text.includes("token"), false);
+assert.equal(sanitizeSecurityAlert({ area: "passport-scan" }).area, "app");
+
+assert.equal(webhookReplayDecision({ status: "exhausted", attempts: 5 }), "stopped");
+assert.equal(webhookReplayDecision({ status: "reviewed", attempts: 1 }), "duplicate");
+assert.equal(webhookRecoveryDecision({ status: "exhausted", action: "reopen" }), "reopen");
+assert.equal(webhookRecoveryDecision({ status: "exhausted", action: "dismiss" }), "dismiss");
+assert.equal(webhookRecoveryDecision({ status: "processed", action: "reopen" }), "refuse");
+assert.equal(webhookRecoveryDecision({ status: "failed", action: "dismiss" }), "refuse");
+
+assert.equal(isDailyCron(TELEGRAM_DELIVERY_CRON), true);
+assert.equal(isDailyCron("15 * * * *"), false);
+assert.equal(isDailyCron("* * * * *"), false);
+assert.equal(isolatedTelegramTarget("https://zecitlewsynyioemsqna.supabase.co"), "production");
+assert.equal(isolatedTelegramTarget("https://www.sweeptakehub.com"), "production");
+assert.equal(isolatedTelegramTarget("http://127.0.0.1:54321"), "isolated");
+assert.equal(isolatedTelegramTarget(""), "missing");
+
 console.log("telegram-control.test.mjs passed");
