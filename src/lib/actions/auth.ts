@@ -653,18 +653,19 @@ export async function finalizeRegistrationAfterSignUp(input: {
     await assignPlayerToAgentByCode(input.userId, input.agentCode);
   }
 
-  void import("@/lib/telegram/control/safe-emit")
-    .then(({ safePaymentAlert }) =>
-      safePaymentAlert({
-        category: "signup",
-        eventKey: `signup:${input.userId}`,
-        source: "ledger",
-        reference: input.userId,
-        detail: "A player finished registration.",
-        adminPath: "/admin/users",
-      })
-    )
-    .catch(() => undefined);
+  try {
+    const { safePaymentAlert } = await import("@/lib/telegram/control/safe-emit");
+    await safePaymentAlert({
+      category: "signup",
+      eventKey: `signup:${input.userId}`,
+      source: "ledger",
+      reference: input.userId,
+      detail: "A player finished registration.",
+      adminPath: "/admin/users",
+    });
+  } catch {
+    /* The account is already saved. A queued alert stays for the daily cron. */
+  }
 
   return { ok: true };
 }

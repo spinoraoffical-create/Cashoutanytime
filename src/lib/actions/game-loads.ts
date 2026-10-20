@@ -181,7 +181,7 @@ async function holdUnknownGameLoad(requestId: string, message: string) {
     })
     .eq("id", requestId)
     .in("status", ["pending", "processing"]);
-  void alertGameProvider(requestId, message, "unknown");
+  await alertGameProvider(requestId, message, "unknown");
 }
 
 function alertGameProvider(requestId: string, message: string, outcome: "unknown" | "failed") {
@@ -360,7 +360,7 @@ async function fulfillOrFail(
       success: false,
       errorMessage: message.slice(0, 400),
     });
-    void alertGameProvider(requestId, message, "failed");
+    await alertGameProvider(requestId, message, "failed");
     if (loadType === "load" || loadType === "reload") {
       const notice = await settleRejectedLoad(requestId, message.slice(0, 400), loadType);
       return { success: false as const, error: notice };
@@ -665,7 +665,7 @@ export async function requestGameAccountCreate(input: {
   revalidatePath(`/games/${input.gameSlug}`);
   revalidatePath("/admin/game-loads");
 
-  void notifyAdminOfWalletActivity({
+  await notifyAdminOfWalletActivity({
     userId: user.id,
     gameName: input.gameName,
     gameSlug: input.gameSlug,
@@ -835,7 +835,7 @@ export async function requestGameLoad(input: {
   revalidatePath("/dashboard");
   revalidatePath("/admin/game-loads");
 
-  void notifyAdminOfWalletActivity({
+  await notifyAdminOfWalletActivity({
     userId: user.id,
     gameName: input.gameName,
     gameSlug: input.gameSlug,
@@ -967,7 +967,7 @@ export async function requestGameRedeem(input: {
   revalidatePath("/dashboard");
   revalidatePath("/admin/game-loads");
 
-  void notifyAdminOfWalletActivity({
+  await notifyAdminOfWalletActivity({
     userId: user.id,
     gameName: input.gameName,
     gameSlug: input.gameSlug,

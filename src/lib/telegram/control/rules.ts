@@ -604,6 +604,18 @@ export function alertTestCompletion(input: {
   return { status: "failed", nextAttemptAt: null, error: error ?? "Telegram refused the test." };
 }
 
+/**
+ * Next.js runs after() only when it is registered before the server action returns.
+ * A signup that returns first leaves the inserted job queued for the daily cron.
+ */
+export function promptLifecycleDecision(input: {
+  actionStillRunning: boolean;
+  jobId: string | null;
+}): "register" | "leave_queued" {
+  if (!input.actionStillRunning || !input.jobId) return "leave_queued";
+  return "register";
+}
+
 /** Schedule a send only for a job that was just queued. Anything else stays for the daily cron. */
 export function promptScheduleDecision(input: {
   inserted: boolean;

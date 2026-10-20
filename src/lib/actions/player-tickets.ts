@@ -72,18 +72,19 @@ export async function createPlayerTicket(input: { subject: string; body: string 
 
   const created = await createStoredTicket({ userId: user.id, subject, body });
   if (!created.ok) return { error: created.error };
-  void import("@/lib/telegram/control/safe-emit")
-    .then(({ safePaymentAlert }) =>
-      safePaymentAlert({
-        category: "ticket_opened",
-        eventKey: `ticket:${created.id}`,
-        source: "ledger",
-        reference: created.id,
-        detail: "A player opened a support ticket.",
-        adminPath: "/admin/support",
-      })
-    )
-    .catch(() => undefined);
+  try {
+    const { safePaymentAlert } = await import("@/lib/telegram/control/safe-emit");
+    await safePaymentAlert({
+      category: "ticket_opened",
+      eventKey: `ticket:${created.id}`,
+      source: "ledger",
+      reference: created.id,
+      detail: "A player opened a support ticket.",
+      adminPath: "/admin/support",
+    });
+  } catch {
+    /* The ticket is already saved. A queued alert stays for the daily cron. */
+  }
 
   revalidatePath("/help");
   revalidatePath("/support");

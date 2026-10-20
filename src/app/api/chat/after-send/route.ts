@@ -107,18 +107,19 @@ export async function POST(request: Request) {
             updated_at: new Date().toISOString(),
           })
           .eq("id", conversationId);
-        void import("@/lib/telegram/control/safe-emit")
-          .then(({ safePaymentAlert }) =>
-            safePaymentAlert({
-              category: "ticket_escalated",
-              eventKey: `escalation:${conversationId}`,
-              source: "ledger",
-              reference: conversationId,
-              detail: "A player asked for a person in chat.",
-              adminPath: "/admin/chat",
-            })
-          )
-          .catch(() => undefined);
+        try {
+          const { safePaymentAlert } = await import("@/lib/telegram/control/safe-emit");
+          await safePaymentAlert({
+            category: "ticket_escalated",
+            eventKey: `escalation:${conversationId}`,
+            source: "ledger",
+            reference: conversationId,
+            detail: "A player asked for a person in chat.",
+            adminPath: "/admin/chat",
+          });
+        } catch {
+          /* The chat request is already saved. A queued alert stays for the daily cron. */
+        }
       }
     }
   }

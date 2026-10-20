@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
 
 import {
   ALERT_TEST_BODY,
@@ -22,6 +23,7 @@ import {
   incidentFingerprint,
   keepBusinessResult,
   promptClaimAllowed,
+  promptLifecycleDecision,
   promptScheduleDecision,
   visibleDeliverySummary,
   incidentShouldSend,
@@ -394,6 +396,19 @@ assert.equal(formatDeliveryLatency(2000), "2 s");
 assert.equal(deliveryLatencyMs("bad", "bad"), null);
 assert.equal(panel?.problems[0]?.error?.includes("SECRETVALUE"), false);
 assert.equal(panel?.problems[0]?.error?.includes("chat not found"), true);
+assert.equal(promptLifecycleDecision({ actionStillRunning: false, jobId: "signup-job" }), "leave_queued");
+assert.equal(promptLifecycleDecision({ actionStillRunning: true, jobId: null }), "leave_queued");
+assert.equal(promptLifecycleDecision({ actionStillRunning: true, jobId: "signup-job" }), "register");
+assert.equal(alertTestIsQueueEligible("queued"), true);
+
+const signupSource = readFileSync(new URL("../src/lib/actions/auth.ts", import.meta.url), "utf8");
+const signupStart = signupSource.indexOf("export async function finalizeRegistrationAfterSignUp");
+const signupEnd = signupSource.indexOf("export async function saveUserContactInfo");
+const signupFn = signupSource.slice(signupStart, signupEnd);
+assert.equal(signupFn.includes("void import("), false);
+assert.equal(signupFn.includes("await safePaymentAlert("), true);
+assert.equal(signupFn.indexOf("await safePaymentAlert(") < signupFn.lastIndexOf("return { ok: true }"), true);
+
 assert.equal(ownerCommandAllowed({ linked: true, purpose: "owner", isSuperAdmin: true, userId: "owner-1" }), true);
 assert.equal(parseCommand("/help")?.name, "help");
 assert.equal(customerCommandAllowed({ linked: true, purpose: "customer", isSuperAdmin: false, userId: "p1" }, "p1"), true);

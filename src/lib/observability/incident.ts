@@ -1,3 +1,5 @@
+import { after } from "next/server";
+
 /** Short id for an admin log line. Do not pass secrets or document bytes. */
 
 export function incidentCode(): string {
@@ -9,16 +11,22 @@ export function logIncident(area: string, message: string, options?: { telegram?
   const safe = message.replace(/\s+/g, " ").slice(0, 180);
   console.error(`[${area}] ${id} ${safe}`);
   if (options?.telegram !== false) {
-    void import("@/lib/telegram/control/delivery")
-      .then(({ enqueueIncident }) =>
-        enqueueIncident({
-          source: area,
-          code: id,
-          outcome: area === "audit" ? "audit" : "failed",
-          adminPath: "/admin/telegram-center",
-        })
-      )
-      .catch(() => undefined);
+    const task = () =>
+      import("@/lib/telegram/control/delivery")
+        .then(({ enqueueIncident }) =>
+          enqueueIncident({
+            source: area,
+            code: id,
+            outcome: area === "audit" ? "audit" : "failed",
+            adminPath: "/admin/telegram-center",
+          })
+        )
+        .catch(() => undefined);
+    try {
+      after(task);
+    } catch {
+      void task();
+    }
   }
   return id;
 }

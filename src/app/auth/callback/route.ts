@@ -151,18 +151,19 @@ export async function GET(request: NextRequest) {
   }
 
   if (signedIn && (type === "signup" || searchParams.get("verified") === "1")) {
-    void import("@/lib/telegram/control/safe-emit")
-      .then(({ safePaymentAlert }) =>
-        safePaymentAlert({
-          category: "email_verified",
-          eventKey: `email-verified:${signedIn.id}`,
-          source: "ledger",
-          reference: signedIn.id,
-          detail: "The player confirmed the signup email.",
-          adminPath: "/admin/users",
-        })
-      )
-      .catch(() => undefined);
+    try {
+      const { safePaymentAlert } = await import("@/lib/telegram/control/safe-emit");
+      await safePaymentAlert({
+        category: "email_verified",
+        eventKey: `email-verified:${signedIn.id}`,
+        source: "ledger",
+        reference: signedIn.id,
+        detail: "The player confirmed the signup email.",
+        adminPath: "/admin/users",
+      });
+    } catch {
+      /* Sign-in already succeeded. A queued alert stays for the daily cron. */
+    }
   }
 
   if (type !== "recovery" && signedIn) {
