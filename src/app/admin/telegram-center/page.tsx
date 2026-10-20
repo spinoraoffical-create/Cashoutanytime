@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 
 import { AdminPageHeader } from "@/components/admin/admin-page-header";
-import { TelegramCenterActions, TelegramUpdateRecovery } from "@/components/admin/telegram-center-actions";
+import { TelegramCenterActions, TelegramMissingRecovery, TelegramUpdateRecovery, TelegramWaitingSend } from "@/components/admin/telegram-center-actions";
 import { AdminEmptyState } from "@/components/admin/ui/admin-empty-state";
 import { AdminSectionCard } from "@/components/admin/ui/admin-section-card";
 import { AdminStatusBadge } from "@/components/admin/ui/admin-status-badge";
@@ -189,7 +189,7 @@ export default async function TelegramCenterPage({
       ) : null}
 
       {section === "overview" || section === "missing" ? (
-        <AdminSectionCard title="Missing notifications" description="Read only, from 20 October 2026, 00:00 UTC. A job in any status, including uncertain or failed, is not missing. Nothing is inserted or sent.">
+        <AdminSectionCard title="Missing notifications" description="Compared from 20 October 2026, 00:00 UTC. A job in any status, including uncertain or failed, is not missing and cannot be sent again. An eligible row can be sent only after you confirm that one alert.">
           {coverage.kind === "hidden" ? (
             <AdminEmptyState title="Missing notifications hidden" body="Only a Super Admin can see this comparison." />
           ) : coverage.kind === "unavailable" ? (
@@ -206,12 +206,18 @@ export default async function TelegramCenterPage({
                 {coverage.confirmed.length === 0 ? <p>None.</p> : (
                   <ul className="space-y-2">
                     {coverage.confirmed.slice(0, 40).map((item) => (
-                      <li key={item.eventKey}>
-                        <span className="font-semibold text-white">{item.bot}</span> · {item.reference}
-                        <br />
-                        <span className="break-all text-[#9fb0d0]">{item.eventKey}</span>
-                        <br />
-                        {item.reason}
+                      <li key={item.eventKey} className="rounded-xl bg-white/5 p-3">
+                        <p><span className="font-semibold text-white">{item.bot}</span> · {item.eventType}</p>
+                        <p>Reference: {item.reference}</p>
+                        <p className="break-all text-[#9fb0d0]">{item.eventKey}</p>
+                        <p>When: {item.occurredAt}</p>
+                        <p>{item.reason}</p>
+                        <p>Recovery: {item.recovery === "eligible" ? "eligible" : "not eligible"} · Source scan: {item.scanComplete ? "complete" : "incomplete"}</p>
+                        {item.recovery === "eligible" && item.recoveryKind ? (
+                          <div className="mt-2">
+                            <TelegramMissingRecovery kind={item.recoveryKind} reference={item.reference} />
+                          </div>
+                        ) : null}
                       </li>
                     ))}
                   </ul>
@@ -224,12 +230,13 @@ export default async function TelegramCenterPage({
                 {coverage.unproven.length === 0 ? <p>None.</p> : (
                   <ul className="space-y-2">
                     {coverage.unproven.slice(0, 40).map((item) => (
-                      <li key={item.eventKey}>
-                        <span className="font-semibold text-white">{item.bot}</span> · {item.reference}
-                        <br />
-                        <span className="break-all text-[#9fb0d0]">{item.eventKey}</span>
-                        <br />
-                        {item.reason}
+                      <li key={item.eventKey} className="rounded-xl bg-white/5 p-3">
+                        <p><span className="font-semibold text-white">{item.bot}</span> · {item.eventType}</p>
+                        <p>Reference: {item.reference}</p>
+                        <p className="break-all text-[#9fb0d0]">{item.eventKey}</p>
+                        <p>When: {item.occurredAt}</p>
+                        <p>{item.reason}</p>
+                        <p>Recovery: not eligible · Source scan: {item.scanComplete ? "complete" : "incomplete"}</p>
                       </li>
                     ))}
                   </ul>
@@ -237,6 +244,26 @@ export default async function TelegramCenterPage({
                 {coverage.unproven.length > 40 ? <p className="mt-2">{coverage.unproven.length - 40} more unproven rows are not listed.</p> : null}
               </div>
             </div>
+          )}
+        </AdminSectionCard>
+      ) : null}
+
+      {section === "overview" || section === "missing" ? (
+        <AdminSectionCard title="Waiting jobs" description="One button sends one queued or retry-pending job through the existing claim. Accepted, uncertain, failed, sending, duplicate, and unconfigured jobs are not sent from here. Telegram acceptance does not mean a person read the message.">
+          {monitoring.waiting.length === 0 ? (
+            <AdminEmptyState title="No waiting jobs" body="Queued and retry-pending alerts appear here. Nothing is sent until you confirm one job." />
+          ) : (
+            <ul className="space-y-2 text-sm text-[#d7e3ff]">
+              {monitoring.waiting.map((job) => (
+                <li key={job.id} className="rounded-xl bg-white/5 p-3">
+                  <p className="font-semibold text-white">{job.bot} · {job.category}</p>
+                  <p>{job.status} · {job.createdAt}</p>
+                  <div className="mt-2">
+                    <TelegramWaitingSend jobId={job.id} />
+                  </div>
+                </li>
+              ))}
+            </ul>
           )}
         </AdminSectionCard>
       ) : null}

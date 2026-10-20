@@ -1101,23 +1101,43 @@ export function exactDeliveryCounts(input: {
 
 export type CoverageVerdict = "confirmed_missing" | "callback_not_observed";
 
+export type RecoveryKind =
+  | "signup"
+  | "ticket"
+  | "escalation"
+  | "game_request"
+  | "game_provider"
+  | "payout_paid"
+  | "payout_failed"
+  | "deposit_credited"
+  | "deposit_reversed"
+  | "incident";
+
 export type CoverageCandidate = {
   reference: string;
   bot: "payments" | "players" | "errors";
+  eventType: string;
   eventKey: string;
   occurredAt: string;
   eligible: boolean;
   suppressed: boolean;
   callbackRequired: boolean;
+  recoverable?: boolean;
+  scanComplete?: boolean;
   reason: string;
 };
 
 export type CoverageFinding = {
   reference: string;
   bot: CoverageCandidate["bot"];
+  eventType: string;
   eventKey: string;
+  occurredAt: string;
   reason: string;
   verdict: CoverageVerdict;
+  recovery: "eligible" | "not_eligible";
+  recoveryKind: RecoveryKind | null;
+  scanComplete: boolean;
 };
 
 function onOrAfterCutoff(occurredAt: string, cutoff: string): boolean | null {
@@ -1156,12 +1176,18 @@ export function coverageFindings(input: {
     if (!verdict) continue;
     const current = byKey.get(candidate.eventKey);
     if (current?.verdict === "confirmed_missing") continue;
+    const recoverable = verdict === "confirmed_missing" && candidate.recoverable !== false && !candidate.callbackRequired;
     byKey.set(candidate.eventKey, {
       reference: candidate.reference,
       bot: candidate.bot,
+      eventType: candidate.eventType,
       eventKey: candidate.eventKey,
+      occurredAt: candidate.occurredAt,
       reason: candidate.reason,
       verdict,
+      recovery: recoverable ? "eligible" : "not_eligible",
+      recoveryKind: recoverable ? recoveryKindFor(candidate.eventKey) : null,
+      scanComplete: candidate.scanComplete !== false,
     });
   }
   const confirmed: CoverageFinding[] = [];
@@ -1198,7 +1224,9 @@ export function signupCoverageCandidate(input: {
   return {
     reference: input.userId,
     bot: "players",
+    eventType: "Signup",
     eventKey: `signup:${input.userId}`,
+    recoverable: input.registrationCompleted,
     occurredAt: input.occurredAt,
     eligible: true,
     suppressed: false,
@@ -1213,7 +1241,9 @@ export function emailCoverageCandidate(input: { userId: string; occurredAt: stri
   return {
     reference: input.userId,
     bot: "players",
+    eventType: "Email confirmation",
     eventKey: `email-verified:${input.userId}`,
+    recoverable: false,
     occurredAt: input.occurredAt,
     eligible: true,
     suppressed: false,
@@ -1226,6 +1256,7 @@ export function ticketCoverageCandidate(input: { ticketId: string; occurredAt: s
   return {
     reference: input.ticketId,
     bot: "players",
+    eventType: "Support ticket",
     eventKey: `ticket:${input.ticketId}`,
     occurredAt: input.occurredAt,
     eligible: true,
@@ -1239,6 +1270,7 @@ export function escalationCoverageCandidate(input: { conversationId: string; occ
   return {
     reference: input.conversationId,
     bot: "players",
+    eventType: "Chat escalation",
     eventKey: `escalation:${input.conversationId}`,
     occurredAt: input.occurredAt,
     eligible: true,
@@ -1264,7 +1296,9 @@ export function gameRequestCandidate(input: {
   return {
     reference: input.id,
     bot: "players",
+    eventType: "Game request",
     eventKey: `game-request:${input.id}`,
+    recoverable: notified && type !== "new_account" && type !== "reload",
     occurredAt: input.occurredAt,
     eligible: true,
     suppressed: false,
@@ -1289,7 +1323,9 @@ export function gameProviderCandidate(input: {
   return {
     reference: input.id,
     bot: "errors",
+    eventType: "Game provider result",
     eventKey: `game-provider:${input.id}`,
+    recoverable: held,
     occurredAt: input.occurredAt,
     eligible: true,
     suppressed: false,
@@ -1312,6 +1348,7 @@ export function payoutCoverageCandidate(input: {
     return {
       reference: key,
       bot: "payments",
+      eventType: "Payout paid",
       eventKey: `payout:${key}:paid`,
       occurredAt: input.occurredAt,
       eligible: true,
@@ -1324,6 +1361,7 @@ export function payoutCoverageCandidate(input: {
     return {
       reference: key,
       bot: "payments",
+      eventType: "Payout failed",
       eventKey: `payout-failed:${key}`,
       occurredAt: input.occurredAt,
       eligible: true,
@@ -1336,7 +1374,9 @@ export function payoutCoverageCandidate(input: {
     return {
       reference: key,
       bot: "payments",
+      eventType: "Payout submitted",
       eventKey: `payout:${key}:submitted`,
+      recoverable: false,
       occurredAt: input.occurredAt,
       eligible: true,
       suppressed: false,
@@ -1357,6 +1397,7 @@ export function depositCreditCandidate(input: {
   return {
     reference: id,
     bot: "payments",
+    eventType: "Deposit credited",
     eventKey: `deposit-credited:${id}`,
     occurredAt: input.occurredAt,
     eligible: true,
@@ -1378,6 +1419,7 @@ export function depositReversalCandidate(input: {
   return {
     reference: depositId,
     bot: "payments",
+    eventType: "Deposit reversed",
     eventKey: `deposit-reversed:${depositId}`,
     occurredAt: input.occurredAt,
     eligible: true,
@@ -1405,8 +1447,55 @@ export function incidentCoverageMatch(input: {
   return {
     reference: fingerprint,
     bot: "errors",
+    eventType: "Application incident",
     eventKey: `incident:${fingerprint}:${bucket}`,
+    occurredAt: input.lastSentAt,
     reason: "An incident was eligible to send and no delivery job was stored. Later repeats inside the suppression window are not separate alerts.",
     verdict: "confirmed_missing",
+    recovery: "eligible",
+    recoveryKind: "incident",
+    scanComplete: true,
   };
+}
+
+export function recoveryKindFor(eventKey: string): RecoveryKind | null {
+  if (eventKey.startsWith("signup:")) return "signup";
+  if (eventKey.startsWith("ticket:")) return "ticket";
+  if (eventKey.startsWith("escalation:")) return "escalation";
+  if (eventKey.startsWith("game-request:")) return "game_request";
+  if (eventKey.startsWith("game-provider:")) return "game_provider";
+  if (eventKey.startsWith("payout-failed:")) return "payout_failed";
+  if (/^payout:[^:]+:paid$/.test(eventKey)) return "payout_paid";
+  if (eventKey.startsWith("deposit-credited:")) return "deposit_credited";
+  if (eventKey.startsWith("deposit-reversed:")) return "deposit_reversed";
+  if (eventKey.startsWith("incident:")) return "incident";
+  return null;
+}
+
+/** Any existing job, including uncertain or failed, blocks a new insert. */
+export function recoveryInsertDecision(existingStatus: string | null): "insert" | "refuse" {
+  if (existingStatus == null) return "insert";
+  return "refuse";
+}
+
+/** Only a waiting row may be claimed. Terminal and in-flight rows stay untouched. */
+export function waitingJobDecision(status: string | null): "send" | "refuse" {
+  if (status === "queued" || status === "retry_pending") return "send";
+  return "refuse";
+}
+
+export function recoveryDestinationDecision(input: { token: boolean; chat: boolean }): "ready" | "missing" {
+  if (!input.token || !input.chat) return "missing";
+  return "ready";
+}
+
+const RECOVERY_UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+const RECOVERY_TOKEN = /^[A-Za-z0-9_|:-]{1,120}$/;
+
+export function recoveryReferenceAllowed(kind: RecoveryKind, reference: string): boolean {
+  const value = reference.trim();
+  if (kind === "signup" || kind === "ticket" || kind === "escalation" || kind === "game_request" || kind === "game_provider") {
+    return RECOVERY_UUID.test(value);
+  }
+  return RECOVERY_TOKEN.test(value);
 }

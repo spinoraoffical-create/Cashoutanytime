@@ -23,6 +23,10 @@ import {
   coverageFindings,
   coverageMatch,
   coveragePanelState,
+  recoveryDestinationDecision,
+  recoveryInsertDecision,
+  recoveryReferenceAllowed,
+  waitingJobDecision,
   deliveryPanelState,
   deliveryStatusAccess,
   DELIVERY_COUNT_STATUSES,
@@ -753,5 +757,64 @@ const centerSource = readFileSync(new URL("../src/app/admin/telegram-center/page
 assert.equal(centerSource.includes("loadTelegramMonitoring"), true);
 assert.equal(centerSource.includes("Retry pending"), true);
 assert.equal(centerSource.includes(".limit(200)"), false);
+
+const eligibleSignup = coverageFindings({ cutoff, candidates: [signup], existingEventKeys: [] });
+assert.equal(eligibleSignup.confirmed[0].recovery, "eligible");
+assert.equal(eligibleSignup.confirmed[0].recoveryKind, "signup");
+assert.equal(eligibleSignup.confirmed[0].eventType, "Signup");
+const blockedSignup = coverageFindings({ cutoff, candidates: [signup], existingEventKeys: ["signup:user-1"] });
+assert.equal(blockedSignup.confirmed.length, 0);
+assert.equal(coverageFindings({
+  cutoff,
+  candidates: [email, signupCoverageCandidate({ userId: "user-2", occurredAt: after, registrationCompleted: false })],
+  existingEventKeys: [],
+}).confirmed.length, 0);
+assert.equal(coverageFindings({ cutoff, candidates: [paid], existingEventKeys: [] }).confirmed[0].recovery, "eligible");
+assert.equal(coverageFindings({ cutoff, candidates: [submitted], existingEventKeys: [] }).unproven[0].recovery, "not_eligible");
+assert.equal(recoveryInsertDecision(null), "insert");
+assert.equal(recoveryInsertDecision("accepted"), "refuse");
+assert.equal(recoveryInsertDecision("uncertain"), "refuse");
+assert.equal(recoveryInsertDecision("failed"), "refuse");
+assert.equal(recoveryInsertDecision("queued"), "refuse");
+assert.equal(recoveryInsertDecision("retry_pending"), "refuse");
+assert.equal(waitingJobDecision("queued"), "send");
+assert.equal(waitingJobDecision("retry_pending"), "send");
+assert.equal(waitingJobDecision("sending"), "refuse");
+assert.equal(waitingJobDecision("accepted"), "refuse");
+assert.equal(waitingJobDecision("uncertain"), "refuse");
+assert.equal(waitingJobDecision("failed"), "refuse");
+assert.equal(waitingJobDecision("duplicate"), "refuse");
+assert.equal(waitingJobDecision("unconfigured"), "refuse");
+assert.equal(waitingJobDecision("needs_investigation"), "refuse");
+assert.equal(recoveryDestinationDecision({ token: true, chat: false }), "missing");
+assert.equal(recoveryReferenceAllowed("signup", "not a uuid"), false);
+assert.equal(recoveryReferenceAllowed("signup", "signup:user-1"), false);
+const escaped = alertText({
+  category: "load_requested",
+  source: "ledger",
+  reference: "load-1",
+  detail: "load opened for <script>alert(1)</script>. This is a request, not a finished provider result.",
+  siteUrl: "https://www.sweeptakehub.com",
+  adminPath: "/admin/game-loads",
+});
+assert.equal(escaped.includes("<script>"), false);
+assert.equal(escaped.includes("&lt;script&gt;"), true);
+assert.equal(contactDisclosure({ destinationChatId: "123", ownerPrivateChatId: "" }), "masked");
+
+const recoverSource = readFileSync(new URL("../src/lib/telegram/control/recover.ts", import.meta.url), "utf8");
+const recoverFn = recoverSource.slice(recoverSource.indexOf("export async function recoverMissingNotification"));
+assert.equal(recoverSource.includes("credit_paydora_deposit"), false);
+assert.equal(recoverSource.includes("fail_paydora_payout"), false);
+assert.equal(recoverFn.includes("writeAudit"), true);
+assert.equal(recoverFn.includes("enqueueAlert"), true);
+assert.equal(recoverFn.indexOf("await writeAudit") < recoverFn.indexOf("await enqueueAlert"), true);
+const waitingSource = readFileSync(new URL("../src/lib/telegram/control/delivery.ts", import.meta.url), "utf8");
+const waitingFn = waitingSource.slice(waitingSource.indexOf("export async function deliverWaitingJob"), waitingSource.indexOf("async function promoteJob"));
+assert.equal(waitingFn.includes("promptClaimAllowed"), true);
+assert.equal(waitingFn.includes("sendJob"), true);
+const actionRecovery = readFileSync(new URL("../src/lib/actions/admin/telegram-center.ts", import.meta.url), "utf8");
+assert.equal(actionRecovery.includes("isSuperAdmin"), true);
+assert.equal(actionRecovery.includes("telegramRecovery"), true);
+assert.equal(actionRecovery.includes("processTelegramDeliveryQueue"), false);
 
 console.log("telegram-control.test.mjs passed");

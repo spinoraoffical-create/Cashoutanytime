@@ -20,6 +20,7 @@ const ACTION_ENUM: Record<string, SecurityAction> = {
   broadcast: "login",
   pushSubscribe: "login",
   telegramAdmin: "login",
+  telegramRecovery: "login",
   telegramCustomer: "login",
   paydoraCreate: "deposit",
   paydoraPayout: "withdraw",

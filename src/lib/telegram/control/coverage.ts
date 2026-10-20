@@ -36,11 +36,20 @@ export type DeliveryProblem = {
   updatedAt: string;
 };
 
+export type WaitingJob = {
+  id: string;
+  bot: string;
+  category: string;
+  status: string;
+  createdAt: string;
+};
+
 export type TelegramMonitoring = {
   access: "hidden" | "ready";
   counts: { kind: "hidden" } | { kind: "unavailable" } | { kind: "ready"; summary: ExactDeliveryCounts };
   lastSuccess: { bot: string; category: string; createdAt: string; updatedAt: string } | null;
   problems: DeliveryProblem[];
+  waiting: WaitingJob[];
   coverage:
     | { kind: "hidden" }
     | { kind: "unavailable" }
@@ -58,6 +67,10 @@ type Row = Record<string, unknown>;
 
 function text(value: unknown): string {
   return typeof value === "string" ? value : "";
+}
+
+function markIncomplete(candidates: CoverageCandidate[], start: number) {
+  for (let index = start; index < candidates.length; index += 1) candidates[index].scanComplete = false;
 }
 
 function rowsOf(data: unknown): Row[] {
@@ -147,6 +160,7 @@ async function loadCoverage(admin: Admin, isSuperAdmin: boolean): Promise<Telegr
     if (unread.length === tableSources.length + 1) return { kind: "unavailable" };
 
     const candidates: CoverageCandidate[] = [];
+    const signupStart = candidates.length;
     if (!authFacts.failed) {
       for (const user of authFacts.rows) {
         if (!user.id || !user.createdAt) continue;
@@ -159,19 +173,25 @@ async function loadCoverage(admin: Admin, isSuperAdmin: boolean): Promise<Telegr
           candidates.push(emailCoverageCandidate({ userId: user.id, occurredAt: user.emailConfirmedAt }));
         }
       }
+      if (authFacts.truncated) markIncomplete(candidates, signupStart);
     }
+    const ticketStart = candidates.length;
     for (const row of rowsOf(tickets.error ? [] : tickets.data)) {
       const ticketId = text(row.id);
       const occurredAt = text(row.created_at);
       if (!ticketId || !occurredAt) continue;
       candidates.push(ticketCoverageCandidate({ ticketId, occurredAt }));
     }
+    if (!tickets.error && rowsOf(tickets.data).length >= SCAN) markIncomplete(candidates, ticketStart);
+    const escalationStart = candidates.length;
     for (const row of rowsOf(conversations.error ? [] : conversations.data)) {
       const conversationId = text(row.id);
       const occurredAt = text(row.human_requested_at);
       if (!conversationId || !occurredAt) continue;
       candidates.push(escalationCoverageCandidate({ conversationId, occurredAt }));
     }
+    if (!conversations.error && rowsOf(conversations.data).length >= SCAN) markIncomplete(candidates, escalationStart);
+    const loadStart = candidates.length;
     for (const row of rowsOf(loads.error ? [] : loads.data)) {
       const id = text(row.id);
       const occurredAt = text(row.updated_at);
@@ -192,6 +212,8 @@ async function loadCoverage(admin: Admin, isSuperAdmin: boolean): Promise<Telegr
       });
       if (provider) candidates.push(provider);
     }
+    if (!loads.error && rowsOf(loads.data).length >= SCAN) markIncomplete(candidates, loadStart);
+    const payoutStart = candidates.length;
     for (const row of rowsOf(payouts.error ? [] : payouts.data)) {
       const payout = payoutCoverageCandidate({
         status: text(row.status),
@@ -200,6 +222,8 @@ async function loadCoverage(admin: Admin, isSuperAdmin: boolean): Promise<Telegr
       });
       if (payout) candidates.push(payout);
     }
+    if (!payouts.error && rowsOf(payouts.data).length >= SCAN) markIncomplete(candidates, payoutStart);
+    const eventStart = candidates.length;
     for (const row of rowsOf(events.error ? [] : events.data)) {
       const paymentId = text(row.payment_id);
       const direction = text(row.direction);
@@ -209,6 +233,7 @@ async function loadCoverage(admin: Admin, isSuperAdmin: boolean): Promise<Telegr
       const reversal = depositReversalCandidate({ paymentId, direction, occurredAt });
       if (reversal) candidates.push(reversal);
     }
+    if (!events.error && rowsOf(events.data).length >= SCAN) markIncomplete(candidates, eventStart);
 
     const incidentKeys = rowsOf(incidentJobs.error ? [] : incidentJobs.data).map((row) => text(row.event_key)).filter(Boolean);
     const incidentFindings: CoverageFinding[] = [];
@@ -222,6 +247,9 @@ async function loadCoverage(admin: Admin, isSuperAdmin: boolean): Promise<Telegr
         eventKeys: incidentKeys,
       });
       if (finding) incidentFindings.push(finding);
+    }
+    if (!incidents.error && !incidentJobs.error && (rowsOf(incidents.data).length >= SCAN || rowsOf(incidentJobs.data).length >= SCAN)) {
+      for (const finding of incidentFindings) finding.scanComplete = false;
     }
 
     const keys = await existingKeys(admin, candidates.map((candidate) => candidate.eventKey));
@@ -250,7 +278,7 @@ async function loadCoverage(admin: Admin, isSuperAdmin: boolean): Promise<Telegr
 /** Read-only delivery totals and missing-alert comparison. Does not insert, update, or send. */
 export async function loadTelegramMonitoring(admin: Admin, isSuperAdmin: boolean): Promise<TelegramMonitoring> {
   if (!isSuperAdmin) {
-    return { access: "hidden", counts: { kind: "hidden" }, lastSuccess: null, problems: [], coverage: { kind: "hidden" } };
+    return { access: "hidden", counts: { kind: "hidden" }, lastSuccess: null, problems: [], waiting: [], coverage: { kind: "hidden" } };
   }
   const countResults = await Promise.all([
     statusCount(admin),
@@ -261,7 +289,7 @@ export async function loadTelegramMonitoring(admin: Admin, isSuperAdmin: boolean
   DELIVERY_COUNT_STATUSES.forEach((status, index) => {
     counts[status] = statusValues[index] ?? null;
   });
-  const [successQuery, problemQuery, coverage] = await Promise.all([
+  const [successQuery, problemQuery, waitingQuery, coverage] = await Promise.all([
     admin
       .from("telegram_delivery_jobs")
       .select("bot_key, category, created_at, updated_at")
@@ -274,6 +302,12 @@ export async function loadTelegramMonitoring(admin: Admin, isSuperAdmin: boolean
       .in("status", ["failed", "uncertain"])
       .order("updated_at", { ascending: false })
       .limit(5),
+    admin
+      .from("telegram_delivery_jobs")
+      .select("id, bot_key, category, status, created_at")
+      .in("status", ["queued", "retry_pending"])
+      .order("created_at", { ascending: true })
+      .limit(20),
     loadCoverage(admin, true),
   ]);
   const success = rowsOf(successQuery.data)[0];
@@ -308,6 +342,15 @@ export async function loadTelegramMonitoring(admin: Admin, isSuperAdmin: boolean
         }
       : null,
     problems,
+    waiting: waitingQuery.error
+      ? []
+      : rowsOf(waitingQuery.data).map((row) => ({
+          id: text(row.id),
+          bot: text(row.bot_key),
+          category: text(row.category),
+          status: text(row.status),
+          createdAt: text(row.created_at),
+        })),
     coverage,
   };
 }

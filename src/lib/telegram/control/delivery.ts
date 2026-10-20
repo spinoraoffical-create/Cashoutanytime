@@ -338,6 +338,31 @@ async function deliverQueuedJobById(jobId: string): Promise<void> {
   await sendJob(admin, job);
 }
 
+/** Claims one queued or retry-pending job. Any other status is left unchanged. */
+export async function deliverWaitingJob(jobId: string): Promise<{ outcome: "sent" | "refused" | "missing"; status: string | null }> {
+  if (!jobId) return { outcome: "missing", status: null };
+  const admin = createAdminClient();
+  if (!admin) return { outcome: "missing", status: null };
+  const { data } = await admin
+    .from("telegram_delivery_jobs")
+    .select("id, bot_key, chat_id, body, attempt_count, status")
+    .eq("id", jobId)
+    .maybeSingle();
+  const job = data as {
+    id: string;
+    bot_key: TelegramBotKey;
+    chat_id: string | null;
+    body: string;
+    attempt_count: number;
+    status: string;
+  } | null;
+  if (!job) return { outcome: "missing", status: null };
+  if (!promptClaimAllowed(job.status)) return { outcome: "refused", status: job.status };
+  const status = await sendJob(admin, job);
+  if (!status) return { outcome: "refused", status: job.status };
+  return { outcome: "sent", status };
+}
+
 async function promoteJob(admin: Admin, jobId: string, chatId: string): Promise<boolean> {
   const { data } = await admin
     .from("telegram_delivery_jobs")

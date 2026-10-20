@@ -4,7 +4,8 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 
-import { createTelegramLinkAction, recoverTelegramUpdateAction, sendPlayersDeliveryCheckAction, sendTelegramAlertTestAction, sendTelegramOwnerTestAction } from "@/lib/actions/admin/telegram-center";
+import { createTelegramLinkAction, recoverMissingAlertAction, recoverTelegramUpdateAction, sendPlayersDeliveryCheckAction, sendTelegramAlertTestAction, sendTelegramOwnerTestAction, sendWaitingJobAction } from "@/lib/actions/admin/telegram-center";
+import type { RecoveryKind } from "@/lib/telegram/control/rules";
 import { Button } from "@/components/ui/button";
 
 export type PlayersDeliveryCheckView = {
@@ -135,6 +136,59 @@ export function TelegramCenterActions({
         ) : null
       )}
     </div>
+  );
+}
+
+export function TelegramMissingRecovery({
+  kind,
+  reference,
+}: {
+  kind: RecoveryKind;
+  reference: string;
+}) {
+  const router = useRouter();
+  const [busy, setBusy] = useState(false);
+  return (
+    <Button
+      type="button"
+      disabled={busy}
+      onClick={() => {
+        if (!window.confirm("Create and send this one missing alert? Telegram acceptance does not mean a person read it. A second click will not send another message.")) return;
+        setBusy(true);
+        void recoverMissingAlertAction(kind, reference).then((result) => {
+          setBusy(false);
+          router.refresh();
+          if (!result.ok) toast.error(result.error);
+          else toast.success(result.message);
+        });
+      }}
+    >
+      Send this missing alert
+    </Button>
+  );
+}
+
+export function TelegramWaitingSend({ jobId }: { jobId: string }) {
+  const router = useRouter();
+  const [busy, setBusy] = useState(false);
+  return (
+    <Button
+      type="button"
+      variant="secondary"
+      disabled={busy}
+      onClick={() => {
+        if (!window.confirm("Send this one waiting alert now? Telegram acceptance does not mean a person read it.")) return;
+        setBusy(true);
+        void sendWaitingJobAction(jobId).then((result) => {
+          setBusy(false);
+          router.refresh();
+          if (!result.ok) toast.error(result.error);
+          else toast.success(result.message);
+        });
+      }}
+    >
+      Send this waiting alert
+    </Button>
   );
 }
 
