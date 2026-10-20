@@ -1,10 +1,18 @@
 "use client";
 
 import { useState } from "react";
+import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 
-import { createTelegramLinkAction, recoverTelegramUpdateAction, sendTelegramAlertTestAction, sendTelegramOwnerTestAction } from "@/lib/actions/admin/telegram-center";
+import { createTelegramLinkAction, recoverTelegramUpdateAction, sendPlayersDeliveryCheckAction, sendTelegramAlertTestAction, sendTelegramOwnerTestAction } from "@/lib/actions/admin/telegram-center";
 import { Button } from "@/components/ui/button";
+
+export type PlayersDeliveryCheckView = {
+  status: string;
+  attemptCount: number;
+  latency: string | null;
+  error: string | null;
+};
 
 const ALERT_TESTS = [
   ["payments", "Test Payments Bot"],
@@ -12,7 +20,14 @@ const ALERT_TESTS = [
   ["errors", "Test Errors Bot"],
 ] as const;
 
-export function TelegramCenterActions() {
+export function TelegramCenterActions({
+  deliveryCheck,
+  deliveryCheckUnavailable,
+}: {
+  deliveryCheck: PlayersDeliveryCheckView | null;
+  deliveryCheckUnavailable: boolean;
+}) {
+  const router = useRouter();
   const [link, setLink] = useState("");
   const [busy, setBusy] = useState(false);
   const [tests, setTests] = useState<Record<string, string>>({});
@@ -53,6 +68,27 @@ export function TelegramCenterActions() {
         >
           Send owner test
         </Button>
+        <Button
+          type="button"
+          variant="secondary"
+          disabled={busy}
+          onClick={() => {
+            if (!window.confirm("Send one real-time Players delivery check to the owner private chat? A second click will not send again.")) return;
+            setBusy(true);
+            void sendPlayersDeliveryCheckAction().then((result) => {
+              setBusy(false);
+              router.refresh();
+              if (!result.ok) toast.error(result.error ?? "The delivery check was not queued.");
+              else if (result.repeated) toast.success("Already recorded. No second message was sent.");
+              else toast.success("Check queued. Refresh the status after Telegram answers.");
+            });
+          }}
+        >
+          Test Real-Time Players Delivery
+        </Button>
+        <Button type="button" variant="secondary" disabled={busy} onClick={() => router.refresh()}>
+          Refresh status
+        </Button>
         {ALERT_TESTS.map(([bot, label]) => (
           <Button
             key={bot}
@@ -76,6 +112,19 @@ export function TelegramCenterActions() {
             {label}
           </Button>
         ))}
+      </div>
+      <div className="text-sm text-[#d7e3ff]">
+        {deliveryCheckUnavailable ? (
+          <p>Delivery check status unavailable.</p>
+        ) : deliveryCheck ? (
+          <p>
+            Players delivery check: {deliveryCheck.status} · attempts {deliveryCheck.attemptCount}
+            {deliveryCheck.latency ? ` · ${deliveryCheck.latency}` : ""}
+            {deliveryCheck.error ? ` · ${deliveryCheck.error}` : ""}
+          </p>
+        ) : (
+          <p>Players delivery check: not sent.</p>
+        )}
       </div>
       {link ? <p className="break-all text-sm text-[#d7e3ff]">{link}</p> : null}
       {ALERT_TESTS.map(([bot, label]) =>

@@ -5,8 +5,8 @@ import { randomBytes } from "node:crypto";
 import { revalidatePath } from "next/cache";
 
 import { authorize, adminDb } from "@/lib/actions/admin/core";
-import { expireOpenLinkCodes, hashLinkCode, sendAlertBotTest, sendOwnerTest } from "@/lib/telegram/control/delivery";
-import { alertTestAccess, isTelegramBotKey, webhookRecoveryDecision } from "@/lib/telegram/control/rules";
+import { expireOpenLinkCodes, hashLinkCode, sendAlertBotTest, sendOwnerTest, sendPlayersDeliveryCheck } from "@/lib/telegram/control/delivery";
+import { alertTestAccess, deliveryCheckAccess, isTelegramBotKey, webhookRecoveryDecision } from "@/lib/telegram/control/rules";
 
 export async function createTelegramLinkAction(purpose: "owner" | "customer"): Promise<{ ok: true; deepLink: string } | { ok: false; error: string }> {
   const auth = await authorize("settings.manage");
@@ -54,6 +54,33 @@ export async function sendTelegramOwnerTestAction(): Promise<{ ok: boolean; erro
       detail: "Queued a test to the saved owner chat.",
     });
   }
+  return result;
+}
+
+export async function sendPlayersDeliveryCheckAction(): Promise<{
+  ok: boolean;
+  repeated?: boolean;
+  status?: string;
+  error?: string;
+}> {
+  const auth = await authorize("settings.manage");
+  if ("error" in auth) return { ok: false, error: auth.error };
+  const { data: roles } = await adminDb()
+    .from("user_roles")
+    .select("roles(key)")
+    .eq("user_id", auth.staff.userId);
+  const isOwner = ((roles ?? []) as unknown as Array<{ roles?: { key?: string } | null }>).some((item) => item.roles?.key === "super_admin");
+  const access = deliveryCheckAccess(isOwner);
+  if (!access.ok) return access;
+  const result = await sendPlayersDeliveryCheck();
+  if (result.ok && !result.repeated) {
+    await adminDb().from("telegram_control_audit").insert({
+      actor_id: auth.staff.userId,
+      action: "telegram.delivery_check",
+      detail: "players delivery-check queued",
+    });
+  }
+  revalidatePath("/admin/telegram-center");
   return result;
 }
 

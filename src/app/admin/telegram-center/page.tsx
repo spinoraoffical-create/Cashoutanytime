@@ -8,7 +8,7 @@ import { AdminStatusBadge } from "@/components/admin/ui/admin-status-badge";
 import { requireSuperAdmin } from "@/lib/data/admin";
 import { adminDb } from "@/lib/actions/admin/core";
 import { botStatus } from "@/lib/telegram/control/delivery";
-import { TELEGRAM_BOTS, TELEGRAM_DELIVERY_CRON, deliveryPanelState, formatDeliveryLatency, safeTelegramTestError, webhookPath } from "@/lib/telegram/control/rules";
+import { PLAYERS_DELIVERY_CHECK_EVENT, TELEGRAM_BOTS, TELEGRAM_DELIVERY_CRON, deliveryLatencyMs, deliveryPanelState, formatDeliveryLatency, safeTelegramTestError, webhookPath } from "@/lib/telegram/control/rules";
 import { SITE_URL } from "@/lib/constants";
 
 export const metadata: Metadata = { title: "Telegram Control Center" };
@@ -38,6 +38,27 @@ export default async function TelegramCenterPage({
     created_at: string;
   }>;
   const failed = jobs.filter((job) => job.status === "failed" || job.status === "uncertain" || job.status === "retry_pending" || job.status === "needs_investigation");
+  const checkQuery = await db
+    .from("telegram_delivery_jobs")
+    .select("status, attempt_count, created_at, updated_at, last_error")
+    .eq("event_key", PLAYERS_DELIVERY_CHECK_EVENT)
+    .maybeSingle();
+  const deliveryCheckUnavailable = Boolean(checkQuery.error);
+  const checkRow = checkQuery.data as {
+    status: string;
+    attempt_count: number;
+    created_at: string;
+    updated_at: string;
+    last_error: string | null;
+  } | null;
+  const deliveryCheck = checkRow
+    ? {
+        status: checkRow.status,
+        attemptCount: checkRow.attempt_count,
+        latency: formatDeliveryLatency(deliveryLatencyMs(checkRow.created_at, checkRow.updated_at)),
+        error: safeTelegramTestError(checkRow.last_error),
+      }
+    : null;
   let summaryFailed = false;
   let summaryRows: Array<{
     status: string;
@@ -221,8 +242,8 @@ export default async function TelegramCenterPage({
       ) : null}
 
       {section === "overview" || section === "settings" ? (
-        <AdminSectionCard title="Owner tools" description="Owner test goes only to the saved owner chat. Payments, Players, and Errors each send one labeled test to that bot's saved chat. A second click does not send again. You cannot type a chat id here.">
-          <TelegramCenterActions />
+        <AdminSectionCard title="Owner tools" description="Owner test goes only to the saved owner chat. Payments, Players, and Errors each send one labeled test to that bot's saved chat. The real-time Players check sends one diagnostic message through the live queue. A second click does not send again. You cannot type a chat id here.">
+          <TelegramCenterActions deliveryCheck={deliveryCheck} deliveryCheckUnavailable={deliveryCheckUnavailable} />
         </AdminSectionCard>
       ) : null}
     </div>

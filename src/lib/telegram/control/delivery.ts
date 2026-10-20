@@ -20,6 +20,8 @@ import {
   botForCategory,
   classifyTelegramResponse,
   contactDisclosure,
+  deliveryCheckDuplicateDecision,
+  deliveryCheckScheduleDecision,
   enqueueDisposition,
   incidentFingerprint,
   incidentSeverity,
@@ -28,6 +30,8 @@ import {
   keptPromptTask,
   nextAttemptDecision,
   parseRetryAfter,
+  PLAYERS_DELIVERY_CHECK_BODY,
+  PLAYERS_DELIVERY_CHECK_EVENT,
   promptClaimAllowed,
   promptScheduleDecision,
   sanitizeSecurityAlert,
@@ -596,6 +600,64 @@ async function sendJob(
     })
     .eq("id", job.id);
   return decision.status;
+}
+
+export async function sendPlayersDeliveryCheck(): Promise<{
+  ok: boolean;
+  repeated?: boolean;
+  status?: string;
+  error?: string;
+}> {
+  const env = botEnv("players");
+  if (!env.token || !env.chatId) return { ok: false, error: "That bot token or chat is not set." };
+  const admin = createAdminClient();
+  if (!admin) return { ok: false, error: "Database is unavailable." };
+  const ownerChat = await ownerPrivateChatId(admin);
+  if (contactDisclosure({ destinationChatId: env.chatId, ownerPrivateChatId: ownerChat }) !== "full") {
+    return { ok: false, error: "The Players destination is not the owner's private chat." };
+  }
+  const existing = await admin
+    .from("telegram_delivery_jobs")
+    .select("status")
+    .eq("event_key", PLAYERS_DELIVERY_CHECK_EVENT)
+    .maybeSingle();
+  if (existing.error) return { ok: false, error: "The check record could not be read." };
+  if (deliveryCheckDuplicateDecision(existing.data as { status: string } | null) === "keep") {
+    return { ok: true, repeated: true, status: (existing.data as { status: string }).status };
+  }
+  const inserted = await admin
+    .from("telegram_delivery_jobs")
+    .insert({
+      event_key: PLAYERS_DELIVERY_CHECK_EVENT,
+      bot_key: "players",
+      category: "control_test",
+      chat_id: env.chatId,
+      body: PLAYERS_DELIVERY_CHECK_BODY,
+      status: "queued",
+      attempt_count: 0,
+      legacy_outcome: "not_used",
+      next_attempt_at: new Date().toISOString(),
+    })
+    .select("id")
+    .maybeSingle();
+  if (inserted.error || !inserted.data) {
+    const raced = await admin
+      .from("telegram_delivery_jobs")
+      .select("status")
+      .eq("event_key", PLAYERS_DELIVERY_CHECK_EVENT)
+      .maybeSingle();
+    if (raced.data) return { ok: true, repeated: true, status: (raced.data as { status: string }).status };
+    return { ok: false, error: "The check was not recorded." };
+  }
+  const jobId = (inserted.data as { id: string }).id;
+  const plan = deliveryCheckScheduleDecision({
+    inserted: true,
+    status: "queued",
+    jobId,
+    eventKey: PLAYERS_DELIVERY_CHECK_EVENT,
+  });
+  if (plan.schedule && plan.jobId) schedulePromptDelivery(plan.jobId);
+  return { ok: true, status: "queued" };
 }
 
 export async function sendOwnerTest(): Promise<{ ok: boolean; error?: string }> {

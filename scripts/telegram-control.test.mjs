@@ -14,6 +14,10 @@ import {
   classifyTelegramResponse,
   contactDisclosure,
   customerCommandAllowed,
+  deliveryCheckAccess,
+  deliveryCheckDuplicateDecision,
+  deliveryCheckLeavesExistingJob,
+  deliveryCheckScheduleDecision,
   customerWalletText,
   deliveryLatencyMs,
   deliveryPanelState,
@@ -38,6 +42,8 @@ import {
   parseCommand,
   paymentClaim,
   paymentTitle,
+  PLAYERS_DELIVERY_CHECK_BODY,
+  PLAYERS_DELIVERY_CHECK_EVENT,
   reportWindow,
   secretsMatch,
   signupAlertText,
@@ -541,6 +547,54 @@ assert.equal(paymentTitle("deposit_credited", "wallet_recorded"), "Wallet credit
 assert.equal(botForCategory("signup"), "players");
 assert.equal(botForCategory("deposit_credited"), "payments");
 assert.equal(botForCategory("load_failed"), "errors");
+
+assert.equal(deliveryCheckAccess(false).ok, false);
+assert.equal(deliveryCheckAccess(true).ok, true);
+assert.equal(contactDisclosure({ destinationChatId: "100", ownerPrivateChatId: "100" }), "full");
+assert.equal(contactDisclosure({ destinationChatId: "-100123", ownerPrivateChatId: "100" }), "masked");
+assert.equal(contactDisclosure({ destinationChatId: "200", ownerPrivateChatId: "100" }), "masked");
+assert.equal(deliveryCheckDuplicateDecision(null), "create");
+assert.equal(deliveryCheckDuplicateDecision({ status: "queued" }), "keep");
+assert.equal(deliveryCheckDuplicateDecision({ status: "accepted" }), "keep");
+assert.equal(deliveryCheckScheduleDecision({
+  inserted: true,
+  status: "queued",
+  jobId: "check-1",
+  eventKey: PLAYERS_DELIVERY_CHECK_EVENT,
+}).jobId, "check-1");
+assert.equal(deliveryCheckScheduleDecision({
+  inserted: true,
+  status: "queued",
+  jobId: "signup-queued",
+  eventKey: "signup:existing-queued",
+}).schedule, false);
+assert.equal(deliveryCheckScheduleDecision({
+  inserted: true,
+  status: "uncertain",
+  jobId: "signup-uncertain",
+  eventKey: "signup:existing-uncertain",
+}).schedule, false);
+assert.equal(deliveryCheckLeavesExistingJob("signup:existing-queued"), true);
+assert.equal(deliveryCheckLeavesExistingJob("signup:existing-uncertain"), true);
+assert.equal(deliveryCheckLeavesExistingJob(PLAYERS_DELIVERY_CHECK_EVENT), false);
+assert.equal(PLAYERS_DELIVERY_CHECK_BODY, "Players delivery check. This is not a signup and contains no player information.");
+assert.equal(classifyTelegramResponse({ httpStatus: 200, ok: true }).outcome, "accepted");
+assert.equal(nextAttemptDecision({ attempts: 1, outcome: "accepted", retryAfterSeconds: null, nowMs: 1_000 }).status, "accepted");
+assert.equal(classifyTelegramResponse({ thrown: true }).outcome, "uncertain");
+assert.equal(nextAttemptDecision({ attempts: 1, outcome: "uncertain", retryAfterSeconds: null, nowMs: 1_000 }).nextAttemptAt, null);
+const checkSource = readFileSync(new URL("../src/lib/telegram/control/delivery.ts", import.meta.url), "utf8");
+const checkStart = checkSource.indexOf("export async function sendPlayersDeliveryCheck");
+const checkFn = checkSource.slice(checkStart, checkSource.indexOf("export async function sendOwnerTest"));
+assert.equal(checkFn.includes("schedulePromptDelivery(plan.jobId)"), true);
+assert.equal(checkFn.includes("processTelegramDeliveryQueue"), false);
+assert.equal(checkFn.includes('status: "queued"'), true);
+assert.equal(checkFn.includes("attempt_count: 0"), true);
+assert.equal(checkFn.includes("PLAYERS_DELIVERY_CHECK_EVENT"), true);
+const actionSource = readFileSync(new URL("../src/lib/actions/admin/telegram-center.ts", import.meta.url), "utf8");
+const actionStart = actionSource.indexOf("export async function sendPlayersDeliveryCheckAction");
+const actionFn = actionSource.slice(actionStart, actionSource.indexOf("export async function sendTelegramAlertTestAction"));
+assert.equal(actionFn.includes("deliveryCheckAccess"), true);
+assert.equal(actionFn.includes("processTelegramDeliveryQueue"), false);
 
 assert.equal(ownerCommandAllowed({ linked: true, purpose: "owner", isSuperAdmin: true, userId: "owner-1" }), true);
 assert.equal(parseCommand("/help")?.name, "help");

@@ -646,6 +646,38 @@ export function isAlertTestBot(value: string): value is AlertTestBot {
   return (ALERT_TEST_BOTS as readonly string[]).includes(value);
 }
 
+export const PLAYERS_DELIVERY_CHECK_EVENT = "delivery-check:players";
+export const PLAYERS_DELIVERY_CHECK_BODY =
+  "Players delivery check. This is not a signup and contains no player information.";
+
+export function deliveryCheckAccess(isSuperAdmin: boolean): { ok: true } | { ok: false; error: string } {
+  if (!isSuperAdmin) return { ok: false, error: "Only an owner can run this check." };
+  return { ok: true };
+}
+
+/** Any existing diagnostic row is kept. A second click must not insert or send. */
+export function deliveryCheckDuplicateDecision(existing: { status: string } | null): "create" | "keep" {
+  if (!existing) return "create";
+  return "keep";
+}
+
+/** Schedule only the new diagnostic job. Every other event key stays untouched. */
+export function deliveryCheckScheduleDecision(input: {
+  inserted: boolean;
+  status: string | null;
+  jobId: string | null;
+  eventKey: string;
+}): { schedule: boolean; jobId: string | null } {
+  if (input.eventKey !== PLAYERS_DELIVERY_CHECK_EVENT) return { schedule: false, jobId: null };
+  if (!input.inserted || input.status !== "queued" || !input.jobId) return { schedule: false, jobId: null };
+  return { schedule: true, jobId: input.jobId };
+}
+
+/** Existing signup and other jobs are outside this check. */
+export function deliveryCheckLeavesExistingJob(eventKey: string): boolean {
+  return eventKey !== PLAYERS_DELIVERY_CHECK_EVENT;
+}
+
 export function alertTestAccess(input: { isSuperAdmin: boolean; bot: string }): { ok: true; bot: AlertTestBot } | { ok: false; error: string } {
   if (!input.isSuperAdmin) return { ok: false, error: "Only an owner can send a bot test." };
   if (!isAlertTestBot(input.bot)) return { ok: false, error: "That bot cannot be tested from here." };
