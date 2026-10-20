@@ -1048,3 +1048,365 @@ export function boundedList<T>(rows: T[] | null, limit: number): { state: "unava
   const cap = Math.max(1, Math.min(limit, 20));
   return { state: "ready", shown: rows.slice(0, cap), truncated: rows.length > cap };
 }
+
+/** Business rows before this instant are not compared with delivery jobs. */
+export const TELEGRAM_COVERAGE_CUTOFF = "2026-10-20T00:00:00.000Z";
+
+export const DELIVERY_COUNT_STATUSES = [
+  "queued",
+  "retry_pending",
+  "sending",
+  "accepted",
+  "failed",
+  "uncertain",
+  "unconfigured",
+  "duplicate",
+  "needs_investigation",
+] as const;
+
+export type DeliveryCountStatus = (typeof DELIVERY_COUNT_STATUSES)[number];
+
+export type ExactDeliveryCounts = {
+  counts: Record<DeliveryCountStatus, number>;
+  other: number;
+  total: number;
+};
+
+/**
+ * Counts are database totals. Retry pending stays separate from queued.
+ * A non-admin receives nothing, including when totals were already loaded.
+ */
+export function exactDeliveryCounts(input: {
+  isSuperAdmin: boolean;
+  queryFailed: boolean;
+  counts: Partial<Record<DeliveryCountStatus, number | null>>;
+  total: number | null;
+}): { kind: "hidden" } | { kind: "unavailable" } | { kind: "ready"; summary: ExactDeliveryCounts } {
+  if (!deliveryStatusAccess(input.isSuperAdmin)) return { kind: "hidden" };
+  if (input.queryFailed || input.total == null || !Number.isFinite(input.total) || input.total < 0) {
+    return { kind: "unavailable" };
+  }
+  const counts = {} as Record<DeliveryCountStatus, number>;
+  let known = 0;
+  for (const status of DELIVERY_COUNT_STATUSES) {
+    const value = input.counts[status];
+    if (value == null || !Number.isFinite(value) || value < 0) return { kind: "unavailable" };
+    counts[status] = value;
+    known += value;
+  }
+  const other = input.total - known;
+  if (other < 0) return { kind: "unavailable" };
+  return { kind: "ready", summary: { counts, other, total: input.total } };
+}
+
+export type CoverageVerdict = "confirmed_missing" | "callback_not_observed";
+
+export type CoverageCandidate = {
+  reference: string;
+  bot: "payments" | "players" | "errors";
+  eventKey: string;
+  occurredAt: string;
+  eligible: boolean;
+  suppressed: boolean;
+  callbackRequired: boolean;
+  reason: string;
+};
+
+export type CoverageFinding = {
+  reference: string;
+  bot: CoverageCandidate["bot"];
+  eventKey: string;
+  reason: string;
+  verdict: CoverageVerdict;
+};
+
+function onOrAfterCutoff(occurredAt: string, cutoff: string): boolean | null {
+  const at = Date.parse(occurredAt);
+  const cut = Date.parse(cutoff);
+  if (!Number.isFinite(at) || !Number.isFinite(cut)) return null;
+  return at >= cut;
+}
+
+/** A stored job of any status, including uncertain or failed, means the alert is not missing. */
+export function coverageMatch(input: {
+  candidate: CoverageCandidate;
+  cutoff: string;
+  existingEventKeys: readonly string[];
+}): CoverageVerdict | null {
+  const candidate = input.candidate;
+  if (!candidate.eligible || candidate.suppressed) return null;
+  if (!candidate.reference.trim() || !candidate.eventKey.trim()) return null;
+  const included = onOrAfterCutoff(candidate.occurredAt, input.cutoff);
+  if (included !== true) return null;
+  if (input.existingEventKeys.includes(candidate.eventKey)) return null;
+  if (candidate.callbackRequired) return "callback_not_observed";
+  return "confirmed_missing";
+}
+
+export function coverageFindings(input: {
+  cutoff: string;
+  candidates: readonly CoverageCandidate[];
+  existingEventKeys: readonly string[];
+}): { confirmed: CoverageFinding[]; unproven: CoverageFinding[] } {
+  const present = new Set(input.existingEventKeys);
+  const byKey = new Map<string, CoverageFinding>();
+  for (const candidate of input.candidates) {
+    if (present.has(candidate.eventKey)) continue;
+    const verdict = coverageMatch({ candidate, cutoff: input.cutoff, existingEventKeys: input.existingEventKeys });
+    if (!verdict) continue;
+    const current = byKey.get(candidate.eventKey);
+    if (current?.verdict === "confirmed_missing") continue;
+    byKey.set(candidate.eventKey, {
+      reference: candidate.reference,
+      bot: candidate.bot,
+      eventKey: candidate.eventKey,
+      reason: candidate.reason,
+      verdict,
+    });
+  }
+  const confirmed: CoverageFinding[] = [];
+  const unproven: CoverageFinding[] = [];
+  for (const finding of byKey.values()) {
+    if (finding.verdict === "confirmed_missing") confirmed.push(finding);
+    else unproven.push(finding);
+  }
+  return { confirmed, unproven };
+}
+
+export function coveragePanelState(input: {
+  isSuperAdmin: boolean;
+  queryFailed: boolean;
+  truncated: boolean;
+  cutoff: string;
+  candidates: readonly CoverageCandidate[];
+  existingEventKeys: readonly string[];
+}):
+  | { kind: "hidden" }
+  | { kind: "unavailable" }
+  | { kind: "ready"; cutoff: string; truncated: boolean; confirmed: CoverageFinding[]; unproven: CoverageFinding[] } {
+  if (!deliveryStatusAccess(input.isSuperAdmin)) return { kind: "hidden" };
+  if (input.queryFailed) return { kind: "unavailable" };
+  const findings = coverageFindings(input);
+  return { kind: "ready", cutoff: input.cutoff, truncated: input.truncated, ...findings };
+}
+
+export function signupCoverageCandidate(input: {
+  userId: string;
+  occurredAt: string;
+  registrationCompleted: boolean;
+}): CoverageCandidate {
+  return {
+    reference: input.userId,
+    bot: "players",
+    eventKey: `signup:${input.userId}`,
+    occurredAt: input.occurredAt,
+    eligible: true,
+    suppressed: false,
+    callbackRequired: !input.registrationCompleted,
+    reason: input.registrationCompleted
+      ? "Registration completed far enough to store the signup alert, and no job exists."
+      : "A profile exists, but this account does not show the registration completion that stores the signup alert.",
+  };
+}
+
+export function emailCoverageCandidate(input: { userId: string; occurredAt: string }): CoverageCandidate {
+  return {
+    reference: input.userId,
+    bot: "players",
+    eventKey: `email-verified:${input.userId}`,
+    occurredAt: input.occurredAt,
+    eligible: true,
+    suppressed: false,
+    callbackRequired: true,
+    reason: "Email is confirmed, but this alert is stored only when the confirmation callback runs. This record does not prove that callback ran.",
+  };
+}
+
+export function ticketCoverageCandidate(input: { ticketId: string; occurredAt: string }): CoverageCandidate {
+  return {
+    reference: input.ticketId,
+    bot: "players",
+    eventKey: `ticket:${input.ticketId}`,
+    occurredAt: input.occurredAt,
+    eligible: true,
+    suppressed: false,
+    callbackRequired: false,
+    reason: "A player ticket was saved and the ticket alert is stored in that same action, but no job exists.",
+  };
+}
+
+export function escalationCoverageCandidate(input: { conversationId: string; occurredAt: string }): CoverageCandidate {
+  return {
+    reference: input.conversationId,
+    bot: "players",
+    eventKey: `escalation:${input.conversationId}`,
+    occurredAt: input.occurredAt,
+    eligible: true,
+    suppressed: false,
+    callbackRequired: false,
+    reason: "A player asked for a person and that chat update stores an alert, but no job exists.",
+  };
+}
+
+const NOTIFY_LOAD_TYPES = new Set(["create_account", "new_account", "load", "redeem"]);
+
+export function gameRequestCandidate(input: {
+  id: string;
+  loadType: string;
+  status: string;
+  occurredAt: string;
+}): CoverageCandidate | null {
+  if (input.status.trim().toLowerCase() !== "completed") return null;
+  const type = input.loadType.trim().toLowerCase();
+  if (type === "check_balance") return null;
+  const notified = NOTIFY_LOAD_TYPES.has(type);
+  if (!notified && type !== "reload") return null;
+  return {
+    reference: input.id,
+    bot: "players",
+    eventKey: `game-request:${input.id}`,
+    occurredAt: input.occurredAt,
+    eligible: true,
+    suppressed: false,
+    callbackRequired: !notified,
+    reason: notified
+      ? "A completed game request of this type stores a Players alert after the result, and no job exists."
+      : "A completed reload is not always sent through the player action that stores this alert.",
+  };
+}
+
+export function gameProviderCandidate(input: {
+  id: string;
+  status: string;
+  errorMessage: string | null;
+  sourceKey: string | null;
+  occurredAt: string;
+}): CoverageCandidate | null {
+  if ((input.sourceKey ?? "").startsWith("auto:") || (input.sourceKey ?? "").startsWith("auto-account:")) return null;
+  const held = (input.errorMessage ?? "").startsWith("Needs review");
+  const failed = input.status.trim().toLowerCase() === "failed";
+  if (!held && !failed) return null;
+  return {
+    reference: input.id,
+    bot: "errors",
+    eventKey: `game-provider:${input.id}`,
+    occurredAt: input.occurredAt,
+    eligible: true,
+    suppressed: false,
+    callbackRequired: !held,
+    reason: held
+      ? "An unknown game result stores an Errors alert while the request stays open, and no job exists."
+      : "A failed game load is alerted from the player fulfillment path. This row does not prove that path ran.",
+  };
+}
+
+export function payoutCoverageCandidate(input: {
+  status: string;
+  idempotencyKey: string;
+  occurredAt: string;
+}): CoverageCandidate | null {
+  const status = input.status.trim().toLowerCase();
+  const key = input.idempotencyKey.trim();
+  if (!key) return null;
+  if (status === "paid") {
+    return {
+      reference: key,
+      bot: "payments",
+      eventKey: `payout:${key}:paid`,
+      occurredAt: input.occurredAt,
+      eligible: true,
+      suppressed: false,
+      callbackRequired: false,
+      reason: "A payout that reached paid stores a Payments alert for that transition, and no job exists.",
+    };
+  }
+  if (status === "failed") {
+    return {
+      reference: key,
+      bot: "payments",
+      eventKey: `payout-failed:${key}`,
+      occurredAt: input.occurredAt,
+      eligible: true,
+      suppressed: false,
+      callbackRequired: false,
+      reason: "A payout that reached failed stores a Payments alert for that transition, and no job exists.",
+    };
+  }
+  if (status === "submitted") {
+    return {
+      reference: key,
+      bot: "payments",
+      eventKey: `payout:${key}:submitted`,
+      occurredAt: input.occurredAt,
+      eligible: true,
+      suppressed: false,
+      callbackRequired: true,
+      reason: "A submitted payout is notified on the original success response. A duplicate provider response can record submitted without an alert, and this row does not show which one it was.",
+    };
+  }
+  return null;
+}
+
+export function depositCreditCandidate(input: {
+  paymentId: string;
+  direction: string;
+  occurredAt: string;
+}): CoverageCandidate | null {
+  const id = input.paymentId.trim();
+  if (!id || id.startsWith("refund:") || input.direction.trim().toLowerCase() !== "credit") return null;
+  return {
+    reference: id,
+    bot: "payments",
+    eventKey: `deposit-credited:${id}`,
+    occurredAt: input.occurredAt,
+    eligible: true,
+    suppressed: false,
+    callbackRequired: false,
+    reason: "A recorded Paydora credit stores a Payments alert after the credit, and no job exists.",
+  };
+}
+
+export function depositReversalCandidate(input: {
+  paymentId: string;
+  direction: string;
+  occurredAt: string;
+}): CoverageCandidate | null {
+  const id = input.paymentId.trim();
+  if (input.direction.trim().toLowerCase() !== "debit" || !id.startsWith("refund:")) return null;
+  const depositId = id.slice("refund:".length).trim();
+  if (!depositId) return null;
+  return {
+    reference: depositId,
+    bot: "payments",
+    eventKey: `deposit-reversed:${depositId}`,
+    occurredAt: input.occurredAt,
+    eligible: true,
+    suppressed: false,
+    callbackRequired: false,
+    reason: "A recorded Paydora refund stores a Payments alert after the reversal, and no job exists.",
+  };
+}
+
+/** One incident row can authorize one send. Repeats inside the suppression window are not extra gaps. */
+export function incidentCoverageMatch(input: {
+  fingerprint: string;
+  lastSentAt: string | null;
+  seenCount: number;
+  cutoff: string;
+  eventKeys: readonly string[];
+}): CoverageFinding | null {
+  const fingerprint = input.fingerprint.trim();
+  if (!fingerprint || input.seenCount < 1 || !input.lastSentAt) return null;
+  const included = onOrAfterCutoff(input.lastSentAt, input.cutoff);
+  if (included !== true) return null;
+  const prefix = `incident:${fingerprint}:`;
+  if (input.eventKeys.some((key) => key.startsWith(prefix))) return null;
+  const bucket = Math.floor(Date.parse(input.lastSentAt) / 60000);
+  return {
+    reference: fingerprint,
+    bot: "errors",
+    eventKey: `incident:${fingerprint}:${bucket}`,
+    reason: "An incident was eligible to send and no delivery job was stored. Later repeats inside the suppression window are not separate alerts.",
+    verdict: "confirmed_missing",
+  };
+}

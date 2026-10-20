@@ -8,8 +8,21 @@ import { AdminStatusBadge } from "@/components/admin/ui/admin-status-badge";
 import { requireSuperAdmin } from "@/lib/data/admin";
 import { adminDb } from "@/lib/actions/admin/core";
 import { botStatus } from "@/lib/telegram/control/delivery";
-import { PLAYERS_DELIVERY_CHECK_EVENT, TELEGRAM_BOTS, TELEGRAM_DELIVERY_CRON, deliveryLatencyMs, deliveryPanelState, formatDeliveryLatency, safeTelegramTestError, webhookPath } from "@/lib/telegram/control/rules";
+import { loadTelegramMonitoring } from "@/lib/telegram/control/coverage";
+import { PLAYERS_DELIVERY_CHECK_EVENT, TELEGRAM_BOTS, TELEGRAM_DELIVERY_CRON, deliveryLatencyMs, formatDeliveryLatency, safeTelegramTestError, webhookPath } from "@/lib/telegram/control/rules";
 import { SITE_URL } from "@/lib/constants";
+
+const STATUS_LABELS = [
+  ["queued", "Queued"],
+  ["retry_pending", "Retry pending"],
+  ["sending", "Sending"],
+  ["accepted", "Accepted"],
+  ["failed", "Failed"],
+  ["uncertain", "Uncertain"],
+  ["unconfigured", "Unconfigured"],
+  ["duplicate", "Duplicate"],
+  ["needs_investigation", "Needs investigation"],
+] as const;
 
 export const metadata: Metadata = { title: "Telegram Control Center" };
 
@@ -59,38 +72,9 @@ export default async function TelegramCenterPage({
         error: safeTelegramTestError(checkRow.last_error),
       }
     : null;
-  let summaryFailed = false;
-  let summaryRows: Array<{
-    status: string;
-    bot_key: string;
-    category: string;
-    created_at: string;
-    updated_at: string;
-    last_error: string | null;
-  }> = [];
-  try {
-    const summaryQuery = await db
-      .from("telegram_delivery_jobs")
-      .select("status, bot_key, category, created_at, updated_at, last_error")
-      .order("updated_at", { ascending: false })
-      .limit(200);
-    summaryFailed = Boolean(summaryQuery.error);
-    summaryRows = (summaryQuery.data ?? []) as typeof summaryRows;
-  } catch {
-    summaryFailed = true;
-  }
-  const panel = deliveryPanelState({
-    queryFailed: summaryFailed,
-    isSuperAdmin: true,
-    rows: summaryRows.map((row) => ({
-      status: row.status,
-      bot: row.bot_key,
-      category: row.category,
-      createdAt: row.created_at,
-      updatedAt: row.updated_at,
-      lastError: row.last_error,
-    })),
-  });
+  const monitoring = await loadTelegramMonitoring(db, true);
+  const counts = monitoring.counts;
+  const coverage = monitoring.coverage;
   const updatesQuery = await db
     .from("telegram_webhook_updates")
     .select("bot_key, update_id, status, attempts, command_name, last_error")
@@ -110,13 +94,14 @@ export default async function TelegramCenterPage({
     <div className="mx-auto max-w-6xl space-y-4 px-1">
       <AdminPageHeader
         title="Telegram Control Center"
-        description={`A new alert is sent after the website finishes the operation. The daily cron at ${TELEGRAM_DELIVERY_CRON} UTC sends anything still waiting. Queued includes jobs waiting for a retry. Telegram acceptance is not a read receipt.`}
+        description={`A new alert is sent after the website finishes the operation. The daily cron at ${TELEGRAM_DELIVERY_CRON} UTC sends queued and retry-pending jobs that are still waiting. Uncertain and failed jobs are not retried. Telegram acceptance is not a read receipt.`}
       />
       <nav className="flex gap-2 overflow-x-auto pb-1 text-sm">
         {[
           ["overview", "Overview"],
           ["bots", "Bots"],
           ["delivery", "Delivery"],
+          ["missing", "Missing"],
           ["failed", "Failed"],
           ["updates", "Updates"],
           ["settings", "Settings"],
@@ -146,32 +131,31 @@ export default async function TelegramCenterPage({
       ) : null}
 
       {section === "overview" || section === "delivery" ? (
-        <AdminSectionCard title="Delivery status" description="Counts come from the latest 200 jobs. Errors are shortened and do not include message text.">
-          {panel.kind === "hidden" ? (
+        <AdminSectionCard title="Delivery status" description="Each count includes every job in that status. Retry pending is not added to queued. The recent list below is not the count.">
+          {counts.kind === "hidden" ? (
             <AdminEmptyState title="Delivery status hidden" body="Only a Super Admin can see delivery status." />
-          ) : panel.kind === "unavailable" ? (
+          ) : counts.kind === "unavailable" ? (
             <AdminEmptyState title="Delivery status unavailable" body="The delivery counts could not be read. No alert was sent or changed." />
           ) : (
             <div className="space-y-3 text-sm text-[#d7e3ff]">
               <div className="flex flex-wrap gap-2">
-                <AdminStatusBadge status={`Queued ${panel.summary.counts.queued}`} />
-                <AdminStatusBadge status={`Sending ${panel.summary.counts.sending}`} />
-                <AdminStatusBadge status={`Accepted ${panel.summary.counts.accepted}`} />
-                <AdminStatusBadge status={`Failed ${panel.summary.counts.failed}`} />
-                <AdminStatusBadge status={`Uncertain ${panel.summary.counts.uncertain}`} />
+                {STATUS_LABELS.map(([status, label]) => (
+                  <AdminStatusBadge key={status} status={`${label} ${counts.summary.counts[status]}`} />
+                ))}
+                {counts.summary.other > 0 ? <AdminStatusBadge status={`Other ${counts.summary.other}`} /> : null}
               </div>
               <p>
-                {panel.summary.lastSuccess
-                  ? `Last success: ${panel.summary.lastSuccess.category} on ${panel.summary.lastSuccess.bot}${formatDeliveryLatency(panel.summary.lastSuccess.latencyMs) ? ` in ${formatDeliveryLatency(panel.summary.lastSuccess.latencyMs)}` : ""}.`
-                  : "No accepted delivery in the latest 200 jobs."}
+                {monitoring.lastSuccess
+                  ? `Last success: ${monitoring.lastSuccess.category} on ${monitoring.lastSuccess.bot}${formatDeliveryLatency(deliveryLatencyMs(monitoring.lastSuccess.createdAt, monitoring.lastSuccess.updatedAt)) ? ` in ${formatDeliveryLatency(deliveryLatencyMs(monitoring.lastSuccess.createdAt, monitoring.lastSuccess.updatedAt))}` : ""}.`
+                  : "No accepted delivery is stored."}
               </p>
-              {panel.summary.problems.length > 0 ? (
+              {monitoring.problems.length > 0 ? (
                 <ul className="space-y-1">
-                  {panel.summary.problems.map((problem, index) => (
+                  {monitoring.problems.map((problem, index) => (
                     <li key={`${problem.bot}-${problem.category}-${index}`}>
                       {problem.status}: {problem.category} on {problem.bot}
-                      {problem.error ? ` — ${problem.error}` : ""}
-                      {formatDeliveryLatency(problem.latencyMs) ? ` (${formatDeliveryLatency(problem.latencyMs)})` : ""}
+                      {problem.error ? ` — ${safeTelegramTestError(problem.error)}` : ""}
+                      {formatDeliveryLatency(deliveryLatencyMs(problem.createdAt, problem.updatedAt)) ? ` (${formatDeliveryLatency(deliveryLatencyMs(problem.createdAt, problem.updatedAt))})` : ""}
                     </li>
                   ))}
                 </ul>
@@ -200,6 +184,59 @@ export default async function TelegramCenterPage({
                 </li>
               ))}
             </ul>
+          )}
+        </AdminSectionCard>
+      ) : null}
+
+      {section === "overview" || section === "missing" ? (
+        <AdminSectionCard title="Missing notifications" description="Read only, from 20 October 2026, 00:00 UTC. A job in any status, including uncertain or failed, is not missing. Nothing is inserted or sent.">
+          {coverage.kind === "hidden" ? (
+            <AdminEmptyState title="Missing notifications hidden" body="Only a Super Admin can see this comparison." />
+          ) : coverage.kind === "unavailable" ? (
+            <AdminEmptyState title="Missing notifications unavailable" body="The comparison could not be read. No alert was sent or changed." />
+          ) : coverage.confirmed.length === 0 && coverage.unproven.length === 0 && coverage.unread.length === 0 && !coverage.truncated ? (
+            <AdminEmptyState title="No missing notifications" body="Every checked business event in this window has a delivery job, or it is not eligible for an alert." />
+          ) : (
+            <div className="space-y-4 text-sm text-[#d7e3ff]">
+              {coverage.truncated ? <p>The comparison reached its row limit. Older rows in this window were not checked.</p> : null}
+              {coverage.unread.length > 0 ? <p>These sources could not be read, so they are not included: {coverage.unread.join(", ")}.</p> : null}
+              <div>
+                <p className="font-semibold text-white">Confirmed missing ({coverage.confirmed.length})</p>
+                <p className="mb-2 text-[#9fb0d0]">The path that stores this alert ran, and no delivery job exists.</p>
+                {coverage.confirmed.length === 0 ? <p>None.</p> : (
+                  <ul className="space-y-2">
+                    {coverage.confirmed.slice(0, 40).map((item) => (
+                      <li key={item.eventKey}>
+                        <span className="font-semibold text-white">{item.bot}</span> · {item.reference}
+                        <br />
+                        <span className="break-all text-[#9fb0d0]">{item.eventKey}</span>
+                        <br />
+                        {item.reason}
+                      </li>
+                    ))}
+                  </ul>
+                )}
+                {coverage.confirmed.length > 40 ? <p className="mt-2">{coverage.confirmed.length - 40} more confirmed gaps are not listed.</p> : null}
+              </div>
+              <div>
+                <p className="font-semibold text-white">Callback not proven ({coverage.unproven.length})</p>
+                <p className="mb-2 text-[#9fb0d0]">The business record exists, but the alert is stored only on a callback or branch this record does not prove.</p>
+                {coverage.unproven.length === 0 ? <p>None.</p> : (
+                  <ul className="space-y-2">
+                    {coverage.unproven.slice(0, 40).map((item) => (
+                      <li key={item.eventKey}>
+                        <span className="font-semibold text-white">{item.bot}</span> · {item.reference}
+                        <br />
+                        <span className="break-all text-[#9fb0d0]">{item.eventKey}</span>
+                        <br />
+                        {item.reason}
+                      </li>
+                    ))}
+                  </ul>
+                )}
+                {coverage.unproven.length > 40 ? <p className="mt-2">{coverage.unproven.length - 40} more unproven rows are not listed.</p> : null}
+              </div>
+            </div>
           )}
         </AdminSectionCard>
       ) : null}

@@ -20,8 +20,22 @@ import {
   deliveryCheckScheduleDecision,
   customerWalletText,
   deliveryLatencyMs,
+  coverageFindings,
+  coverageMatch,
+  coveragePanelState,
   deliveryPanelState,
   deliveryStatusAccess,
+  DELIVERY_COUNT_STATUSES,
+  depositCreditCandidate,
+  depositReversalCandidate,
+  emailCoverageCandidate,
+  exactDeliveryCounts,
+  gameProviderCandidate,
+  gameRequestCandidate,
+  incidentCoverageMatch,
+  payoutCoverageCandidate,
+  signupCoverageCandidate,
+  TELEGRAM_COVERAGE_CUTOFF,
   duplicateJobDecision,
   enqueueDisposition,
   formatDeliveryLatency,
@@ -637,5 +651,107 @@ assert.equal(actionFn.includes("processTelegramDeliveryQueue"), false);
 assert.equal(ownerCommandAllowed({ linked: true, purpose: "owner", isSuperAdmin: true, userId: "owner-1" }), true);
 assert.equal(parseCommand("/help")?.name, "help");
 assert.equal(customerCommandAllowed({ linked: true, purpose: "customer", isSuperAdmin: false, userId: "p1" }, "p1"), true);
+
+const cutoff = TELEGRAM_COVERAGE_CUTOFF;
+const after = "2026-10-20T04:00:00.000Z";
+const before = "2026-10-19T23:59:00.000Z";
+const zeroCounts = Object.fromEntries(DELIVERY_COUNT_STATUSES.map((status) => [status, 0]));
+assert.equal(exactDeliveryCounts({ isSuperAdmin: false, queryFailed: false, counts: zeroCounts, total: 0 }).kind, "hidden");
+assert.equal(exactDeliveryCounts({ isSuperAdmin: true, queryFailed: true, counts: zeroCounts, total: 0 }).kind, "unavailable");
+const separated = exactDeliveryCounts({
+  isSuperAdmin: true,
+  queryFailed: false,
+  counts: { ...zeroCounts, queued: 2, retry_pending: 3, sending: 1, accepted: 7, failed: 4, uncertain: 1 },
+  total: 20,
+});
+assert.equal(separated.kind, "ready");
+if (separated.kind === "ready") {
+  assert.equal(separated.summary.counts.queued, 2);
+  assert.equal(separated.summary.counts.retry_pending, 3);
+  assert.equal(separated.summary.other, 2);
+  assert.equal(separated.summary.total, 20);
+}
+assert.equal(exactDeliveryCounts({ isSuperAdmin: true, queryFailed: false, counts: { ...zeroCounts, queued: 5 }, total: 1 }).kind, "unavailable");
+
+const signup = signupCoverageCandidate({ userId: "user-1", occurredAt: after, registrationCompleted: true });
+assert.equal(coverageMatch({ candidate: signup, cutoff, existingEventKeys: [`signup:user-1`] }), null);
+assert.equal(coverageMatch({ candidate: signup, cutoff, existingEventKeys: [] }), "confirmed_missing");
+assert.equal(coverageMatch({ candidate: { ...signup, occurredAt: before }, cutoff, existingEventKeys: [] }), null);
+const email = emailCoverageCandidate({ userId: "user-1", occurredAt: after });
+assert.equal(coverageMatch({ candidate: email, cutoff, existingEventKeys: [] }), "callback_not_observed");
+assert.equal(coveragePanelState({ isSuperAdmin: false, queryFailed: false, truncated: false, cutoff, candidates: [signup], existingEventKeys: [] }).kind, "hidden");
+assert.equal(coveragePanelState({ isSuperAdmin: true, queryFailed: true, truncated: false, cutoff, candidates: [], existingEventKeys: [] }).kind, "unavailable");
+
+const duplicate = coverageFindings({
+  cutoff,
+  candidates: [signup, { ...signup, reason: "repeat" }, email],
+  existingEventKeys: ["signup:user-1"],
+});
+assert.equal(duplicate.confirmed.length, 0);
+assert.equal(duplicate.unproven.length, 1);
+assert.equal(duplicate.unproven[0].eventKey, "email-verified:user-1");
+
+const paid = payoutCoverageCandidate({ status: "paid", idempotencyKey: "pay-1", occurredAt: after });
+const submitted = payoutCoverageCandidate({ status: "submitted", idempotencyKey: "pay-1", occurredAt: after });
+const reserved = payoutCoverageCandidate({ status: "reserved", idempotencyKey: "pay-1", occurredAt: after });
+assert.equal(paid?.eventKey, "payout:pay-1:paid");
+assert.equal(coverageMatch({ candidate: paid, cutoff, existingEventKeys: [] }), "confirmed_missing");
+assert.equal(coverageMatch({ candidate: submitted, cutoff, existingEventKeys: [] }), "callback_not_observed");
+assert.equal(reserved, null);
+assert.equal(depositCreditCandidate({ paymentId: "dep-1", direction: "credit", occurredAt: after })?.eventKey, "deposit-credited:dep-1");
+assert.equal(depositReversalCandidate({ paymentId: "refund:dep-1", direction: "debit", occurredAt: after })?.eventKey, "deposit-reversed:dep-1");
+assert.equal(depositCreditCandidate({ paymentId: "refund:dep-1", direction: "debit", occurredAt: after }), null);
+assert.equal(gameRequestCandidate({ id: "load-1", loadType: "check_balance", status: "completed", occurredAt: after }), null);
+assert.equal(coverageMatch({
+  candidate: gameRequestCandidate({ id: "load-1", loadType: "load", status: "completed", occurredAt: after }),
+  cutoff,
+  existingEventKeys: [],
+}), "confirmed_missing");
+assert.equal(gameProviderCandidate({ id: "load-2", status: "failed", errorMessage: null, sourceKey: "auto:dep", occurredAt: after }), null);
+const held = gameProviderCandidate({ id: "load-3", status: "pending", errorMessage: "Needs review inc_1", sourceKey: null, occurredAt: after });
+assert.equal(coverageMatch({ candidate: held, cutoff, existingEventKeys: [] }), "confirmed_missing");
+assert.equal(coverageMatch({ candidate: held, cutoff, existingEventKeys: ["game-provider:load-3"] }), null);
+
+assert.equal(incidentCoverageMatch({
+  fingerprint: "rate-limit|failed",
+  lastSentAt: null,
+  seenCount: 4,
+  cutoff,
+  eventKeys: [],
+}), null);
+assert.equal(incidentCoverageMatch({
+  fingerprint: "audit|audit",
+  lastSentAt: after,
+  seenCount: 2,
+  cutoff,
+  eventKeys: ["incident:audit|audit:123"],
+}), null);
+const incidentGap = incidentCoverageMatch({
+  fingerprint: "audit|audit",
+  lastSentAt: after,
+  seenCount: 1,
+  cutoff,
+  eventKeys: [],
+});
+assert.equal(incidentGap?.verdict, "confirmed_missing");
+assert.equal(incidentGap?.bot, "errors");
+assert.equal(incidentCoverageMatch({
+  fingerprint: "audit|audit",
+  lastSentAt: before,
+  seenCount: 1,
+  cutoff,
+  eventKeys: [],
+}), null);
+
+const coverageSource = readFileSync(new URL("../src/lib/telegram/control/coverage.ts", import.meta.url), "utf8");
+assert.equal(coverageSource.includes(".insert("), false);
+assert.equal(coverageSource.includes(".update("), false);
+assert.equal(coverageSource.includes(".delete("), false);
+assert.equal(coverageSource.includes("enqueueAlert"), false);
+assert.equal(coverageSource.includes("schedulePromptDelivery"), false);
+const centerSource = readFileSync(new URL("../src/app/admin/telegram-center/page.tsx", import.meta.url), "utf8");
+assert.equal(centerSource.includes("loadTelegramMonitoring"), true);
+assert.equal(centerSource.includes("Retry pending"), true);
+assert.equal(centerSource.includes(".limit(200)"), false);
 
 console.log("telegram-control.test.mjs passed");
