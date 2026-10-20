@@ -44,6 +44,23 @@ export async function POST(req: Request) {
       referenceId: payload.data?.referenceId,
     });
     if (!withdrawal.ok) return new NextResponse("RETRY", { status: 500 });
+    if (withdrawal.notify) {
+      try {
+        const { safePaymentAlert } = await import("@/lib/telegram/control/safe-emit");
+        const paid = withdrawal.notify === "paid";
+        await safePaymentAlert({
+          category: paid ? "payout_provider_paid" : "payout_failed",
+          eventKey: paid ? `payout:${withdrawal.idempotencyKey}:paid` : `payout-failed:${withdrawal.idempotencyKey}`,
+          source: "provider",
+          reference: withdrawal.reference,
+          amount: withdrawal.amount,
+          detail: paid ? "The provider status was paid." : "The provider rejected this cash-out.",
+          adminPath: "/admin/payouts",
+        });
+      } catch {
+        // A Telegram failure must not change the payout result.
+      }
+    }
     return new NextResponse("OK", { status: 200 });
   }
   let previouslyHeld = false;

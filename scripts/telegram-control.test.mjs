@@ -42,6 +42,7 @@ import {
   parseCommand,
   paymentClaim,
   paymentTitle,
+  payoutWebhookAlert,
   PLAYERS_DELIVERY_CHECK_BODY,
   PLAYERS_DELIVERY_CHECK_EVENT,
   reportWindow,
@@ -547,6 +548,43 @@ assert.equal(paymentTitle("deposit_credited", "wallet_recorded"), "Wallet credit
 assert.equal(botForCategory("signup"), "players");
 assert.equal(botForCategory("deposit_credited"), "payments");
 assert.equal(botForCategory("load_failed"), "errors");
+
+assert.equal(payoutWebhookAlert({ kind: "paid", rpc: { updated: true, status: "paid" } }).notify, "paid");
+assert.equal(payoutWebhookAlert({ kind: "failed", rpc: { status: "failed", duplicate: false } }).notify, "failed");
+assert.equal(payoutWebhookAlert({ kind: "paid", rpc: { updated: false, status: "paid" } }).notify, null);
+assert.equal(payoutWebhookAlert({ kind: "failed", rpc: { status: "failed", duplicate: true } }).notify, null);
+assert.equal(payoutWebhookAlert({
+  kind: "failed",
+  priorStatus: "submitted",
+  rpc: { status: "failed", duplicate: true },
+}).notify, "failed");
+assert.equal(payoutWebhookAlert({
+  kind: "failed",
+  priorStatus: "reserved",
+  rpc: { status: "failed", duplicate: true },
+}).notify, "failed");
+assert.equal(payoutWebhookAlert({
+  kind: "failed",
+  priorStatus: "failed",
+  rpc: { status: "failed", duplicate: true },
+}).notify, null);
+assert.equal(payoutWebhookAlert({ kind: "paid", rpc: { updated: false, status: "submitted" } }).notify, null);
+assert.equal(payoutWebhookAlert({ kind: "failed", rpc: { status: "paid", duplicate: true } }).notify, null);
+assert.equal(payoutWebhookAlert({ kind: "ignored", rpc: null }).notify, null);
+assert.equal(payoutWebhookAlert({ kind: "paid", rpc: null }).notify, null);
+assert.equal(classifyTelegramResponse({ thrown: true }).outcome, "uncertain");
+const webhookSource = readFileSync(new URL("../src/app/api/payments/paydora/webhook/route.ts", import.meta.url), "utf8");
+const withdrawalStart = webhookSource.indexOf("if (isPaydoraWithdrawalEvent");
+const withdrawalFn = webhookSource.slice(withdrawalStart, webhookSource.indexOf("let previouslyHeld"));
+assert.equal(withdrawalFn.includes("await safePaymentAlert("), true);
+assert.equal(withdrawalFn.includes("payout:${withdrawal.idempotencyKey}:paid"), true);
+assert.equal(withdrawalFn.includes("payout-failed:${withdrawal.idempotencyKey}"), true);
+assert.equal(withdrawalFn.indexOf("await safePaymentAlert(") < withdrawalFn.lastIndexOf('return new NextResponse("OK"'), true);
+assert.equal(withdrawalFn.indexOf("} catch {") < withdrawalFn.lastIndexOf('return new NextResponse("OK"'), true);
+const reconcileSource = readFileSync(new URL("../src/lib/payments/paydora-payout-reconcile.ts", import.meta.url), "utf8");
+assert.equal(reconcileSource.includes('p_provider_status: "paid"'), true);
+assert.equal(reconcileSource.includes("fail_paydora_payout"), true);
+assert.equal(reconcileSource.includes("payoutWebhookAlert"), true);
 
 assert.equal(deliveryCheckAccess(false).ok, false);
 assert.equal(deliveryCheckAccess(true).ok, true);

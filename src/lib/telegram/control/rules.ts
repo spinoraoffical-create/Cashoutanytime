@@ -403,6 +403,27 @@ export function linkRedeemPlan(input: {
   return { consume: true, message: input.expected === "owner" ? "Owner chat linked." : "This chat is linked." };
 }
 
+/**
+ * A later payout webhook may notify only when the payout row actually changed.
+ * A failed refund can be duplicate while reserved or submitted still becomes failed.
+ * A row that was already failed stays silent.
+ */
+export function payoutWebhookAlert(input: {
+  kind: "paid" | "failed" | "ignored";
+  priorStatus?: string | null;
+  rpc: { updated?: boolean; status?: string; duplicate?: boolean } | null;
+}): { notify: "paid" | "failed" } | { notify: null } {
+  if (input.kind === "paid" && input.rpc?.updated === true && input.rpc.status === "paid") {
+    return { notify: "paid" };
+  }
+  if (input.kind === "failed" && input.rpc?.status === "failed") {
+    const prior = input.priorStatus?.trim().toLowerCase() ?? "";
+    const opened = prior === "reserved" || prior === "submitted";
+    if (input.rpc.duplicate !== true || opened) return { notify: "failed" };
+  }
+  return { notify: null };
+}
+
 export function providerAlertCategory(message: string, outcome: "unknown" | "failed"): AlertCategory {
   if (/ECONNREFUSED|ENOTFOUND|EAI_AGAIN|service unavailable|bad gateway|gateway timeout/i.test(message)) {
     return "provider_down";
