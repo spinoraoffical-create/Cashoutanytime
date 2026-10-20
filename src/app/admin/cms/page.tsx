@@ -14,6 +14,7 @@ import {
   type FieldValue,
 } from "@/components/admin/entity-edit-dialog";
 import { AdminStatusBadge } from "@/components/admin/ui/admin-status-badge";
+import { formatNepalInputValue } from "@/lib/admin/nepal-time";
 import { adminDb } from "@/lib/actions/admin/core";
 import {
   deleteCmsEntityAction,
@@ -173,7 +174,7 @@ async function BannersSection({ db }: { db: DB }) {
     { value: "home_popup", label: "Home popup" },
   ];
 
-  const toLocalInput = (v: string | null) => (v ? v.slice(0, 16) : "");
+  const toLocalInput = (v: string | null) => formatNepalInputValue(v);
 
   return (
     <div className="space-y-4">
@@ -189,8 +190,8 @@ async function BannersSection({ db }: { db: DB }) {
             { name: "placement", label: "Placement", type: "select", defaultValue: "home_strip", options: placementOptions },
             { name: "priority", label: "Priority", type: "number", defaultValue: 100, min: 0 },
             { name: "is_active", label: "Active", type: "switch", defaultValue: false },
-            { name: "starts_at", label: "Starts at", type: "datetime-local", defaultValue: "" },
-            { name: "ends_at", label: "Ends at", type: "datetime-local", defaultValue: "" },
+            { name: "starts_at", label: "Starts at (Nepal time)", type: "datetime-local", defaultValue: "" },
+            { name: "ends_at", label: "Ends at (Nepal time)", type: "datetime-local", defaultValue: "" },
           ]}
           action={async (v: Record<string, FieldValue>) => {
             "use server";
@@ -233,8 +234,8 @@ async function BannersSection({ db }: { db: DB }) {
                     { name: "placement", label: "Placement", type: "select", defaultValue: b.placement, options: placementOptions },
                     { name: "priority", label: "Priority", type: "number", defaultValue: b.priority, min: 0 },
                     { name: "is_active", label: "Active", type: "switch", defaultValue: b.is_active },
-                    { name: "starts_at", label: "Starts at", type: "datetime-local", defaultValue: toLocalInput(b.starts_at) },
-                    { name: "ends_at", label: "Ends at", type: "datetime-local", defaultValue: toLocalInput(b.ends_at) },
+                    { name: "starts_at", label: "Starts at (Nepal time)", type: "datetime-local", defaultValue: toLocalInput(b.starts_at) },
+                    { name: "ends_at", label: "Ends at (Nepal time)", type: "datetime-local", defaultValue: toLocalInput(b.ends_at) },
                   ]}
                   action={async (v: Record<string, FieldValue>) => {
                     "use server";

@@ -31,7 +31,7 @@ export default async function CreateCampaignPage({
     <div className="mx-auto max-w-3xl">
       <AdminPageHeader
         title="Create campaign"
-        description="This saves an email through the existing campaign system. It does not text anyone and it does not change a wallet. Scheduling sends only after you check the confirmation and the daily 09:00 UTC job reaches that time."
+        description="This saves an email through the existing campaign system. It does not text anyone and it does not change a wallet. The schedule box is Nepal time. A future time is saved once, as the matching universal time, and is sent on the daily check at 2:45 PM Nepal time after that time has passed. Leave the time blank, or leave the box unchecked, to save a draft. Opening this page does not send."
       />
       {params.error ? <p className="mb-4 rounded-xl border border-amber-300/40 bg-amber-300/10 p-3 text-sm text-amber-100">{params.error}</p> : null}
       {countError ? <p className="mb-4 text-sm text-amber-100">Eligible counts: Unavailable</p> : null}
@@ -62,8 +62,8 @@ export default async function CreateCampaignPage({
           <textarea name="message" rows={6} className="mt-1 w-full rounded-xl border border-white/10 bg-[#0d1428] px-3 py-2 text-white" placeholder="Leave blank to use the objective template" />
         </label>
         <p className="text-sm text-[#9fb0d0]">Preview: the email uses the existing template, an unsubscribe link, and the subject above. Cost: Not tracked. Delivery confirmation: Not tracked.</p>
-        <label className="block text-sm text-[#9fb0d0]">Schedule time
-          <input name="scheduled_at" type="datetime-local" className="mt-1 w-full min-h-11 rounded-xl border border-white/10 bg-[#0d1428] px-3 text-white" />
+        <label className="block text-sm text-[#9fb0d0]">Schedule time (Nepal time, UTC+05:45)
+          <input name="scheduled_at" type="datetime-local" aria-label="Schedule time in Nepal time" className="mt-1 w-full min-h-11 rounded-xl border border-white/10 bg-[#0d1428] px-3 text-white" />
         </label>
         <label className="flex min-h-11 items-start gap-2 text-sm text-white">
           <input name="confirm" type="checkbox" value="yes" className="mt-1" />

@@ -85,7 +85,7 @@ export async function loadMarketingCenter(range: { since: string; until: string;
       failedCount: Number(row.failed_count ?? 0),
     }));
     metrics.push(metric("Campaigns created", `${range.label}. Capped at 500 rows. An empty list is not a failed query.`, String(rows.length), null));
-    metrics.push(metric("Campaigns scheduled", "Saved status is scheduled. The daily 09:00 UTC job sends them after that time.", String(owner.filter((item) => item === "Scheduled").length), null));
+    metrics.push(metric("Campaigns scheduled", "Saved status is scheduled. The daily check sends them after the saved Nepal time.", String(owner.filter((item) => item === "Scheduled").length), null));
     metrics.push(metric("Campaigns processing", "Saved status is sending.", String(owner.filter((item) => item === "Processing").length), null));
   }
 

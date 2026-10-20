@@ -17,6 +17,7 @@ import {
   Banknote,
 } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
+import { staffCanOpenAdmin } from "@/lib/actions/admin/open-admin";
 import { logoutUser } from "@/lib/auth/logout";
 import { cn } from "@/lib/utils";
 import { useUnreadMessages } from "@/hooks/use-unread-messages";
@@ -39,8 +40,19 @@ export function UserAccountMenu({ compact = false }: { compact?: boolean }) {
   const [loggingOut, setLoggingOut] = useState(false);
   const [name, setName] = useState("Account");
   const [email, setEmail] = useState("");
+  const [showAdmin, setShowAdmin] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
   const { count: unreadMessages } = useUnreadMessages();
+
+  useEffect(() => {
+    let cancelled = false;
+    void staffCanOpenAdmin().then((allowed) => {
+      if (!cancelled) setShowAdmin(allowed);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   useEffect(() => {
     if (!open) return;
@@ -152,6 +164,16 @@ export function UserAccountMenu({ compact = false }: { compact?: boolean }) {
             {email && <p className="text-xs text-muted-foreground truncate">{email}</p>}
           </div>
           <nav className="py-1">
+            {showAdmin ? (
+              <Link
+                href="/admin"
+                onClick={() => setOpen(false)}
+                className="flex items-center gap-3 px-4 py-2.5 text-sm font-semibold text-cyan-200 hover:bg-white/5 hover:text-white"
+              >
+                <LayoutDashboard className="h-4 w-4" />
+                Open Admin
+              </Link>
+            ) : null}
             {MENU_LINKS.map(({ href, label, icon: Icon }) => (
               <Link
                 key={href}

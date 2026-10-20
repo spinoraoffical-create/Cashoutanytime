@@ -8,6 +8,7 @@ import { AdminEmptyState } from "@/components/admin/ui/admin-empty-state";
 import { requirePermission } from "@/lib/data/admin";
 import { adminDb } from "@/lib/actions/admin/core";
 import { AIBlogGeneratorCard } from "@/components/admin/ai-blog-generator-card";
+import { formatNepalTime } from "@/lib/admin/nepal-time";
 import { blogStatusHelp } from "@/lib/admin/marketing-status";
 
 export const metadata: Metadata = { title: "AI Auto Blog" };
@@ -57,7 +58,7 @@ export default async function AdminAIBlogPage() {
                   <AdminStatusBadge status={post.status} />
                   <p className="mt-1 text-xs text-[#9fb0d0]">{blogStatusHelp(post.status)}</p>
                   <p className="text-xs text-[#8ea0c3]">
-                    {post.published_at ? new Date(post.published_at).toLocaleDateString() : "No publish date"}
+                    {post.published_at ? formatNepalTime(post.published_at) : "No publish date"}
                   </p>
                 </div>
               </div>

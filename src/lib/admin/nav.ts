@@ -135,11 +135,11 @@ export const ADMIN_NAV: AdminNavSection[] = [
     anyPermissions: ["newsletters.manage", "cms.manage", "notifications.broadcast", "promotions.manage"],
     children: [
       { href: "/admin/marketing-center", label: "Overview", permission: null },
-      { href: "/admin/marketing-center/create", label: "Create campaign", permission: "newsletters.manage" },
-      { href: "/admin/newsletters", label: "Email campaigns", permission: "newsletters.manage" },
+      { href: "/admin/newsletters", label: "Email and newsletters", permission: "newsletters.manage" },
+      { href: "/admin/marketing-center/create", label: "Write an email", permission: "newsletters.manage" },
       { href: "/admin/marketing", label: "Text one player", permission: "cms.manage" },
-      { href: "/admin/telegram", label: "Telegram channel", permission: "cms.manage" },
-      { href: "/admin/notifications", label: "In-app notices", permission: "notifications.broadcast" },
+      { href: "/admin/telegram", label: "Telegram posts", permission: "cms.manage" },
+      { href: "/admin/notifications", label: "Site notices", permission: "notifications.broadcast" },
       { href: "/admin/promotions", label: "Promotions", permission: "promotions.manage" },
       {
         href: "/admin/offers",

@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { format } from "date-fns";
+import { formatNepalTime } from "@/lib/admin/nepal-time";
 import { Search } from "lucide-react";
 
 import { AdminPageHeader } from "@/components/admin/admin-page-header";
@@ -171,7 +171,7 @@ export default async function AdminUsersPage({
               coins: profileNum(u.coins_balance).toLocaleString(),
               wallet: `$${profileNum(u.wallet_balance).toFixed(2)}`,
               cashout: `$${profileNum(u.cashout_wallet).toFixed(2)}`,
-              joined: u.created_at ? format(new Date(u.created_at), "MMM d, yyyy") : "—",
+              joined: u.created_at ? formatNepalTime(u.created_at) : "—",
               status: <AdminStatusBadge status={profileIsBanned(u) ? "Suspended" : "Active"} />,
             }))}
             emptyTitle={q ? "No matching players" : "No players yet"}

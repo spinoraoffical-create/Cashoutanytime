@@ -10,7 +10,7 @@ import {
   promoUnsubscribeUrl,
   PROMO_REPLY_TO,
 } from "@/lib/email/deliverability";
-import { promoEmailBlockReason } from "@/lib/email/newsletter-consent";
+import { accountStateFromProfileRead, promoEmailBlockReason } from "@/lib/email/newsletter-consent";
 import { customCampaignEmail } from "@/lib/email/newsletter-templates";
 import { FROM, getResend } from "@/lib/email/resend";
 
@@ -78,44 +78,17 @@ async function blockReasonNow(db: SupabaseClient, userId: string): Promise<strin
     .eq("user_id", userId)
     .maybeSingle();
 
-  let accountError = false;
-  let hasAccount = false;
-  let suspended: boolean | null = null;
-  let banned: boolean | null = null;
-
-  const profile = await db
-    .from("profiles")
-    .select("is_suspended, is_banned")
-    .eq("id", userId)
-    .maybeSingle();
-
-  if (profile.error) {
-    const bannedOnly = await db.from("profiles").select("is_banned").eq("id", userId).maybeSingle();
-    if (bannedOnly.error) {
-      accountError = true;
-    } else if (!bannedOnly.data) {
-      hasAccount = false;
-    } else {
-      hasAccount = true;
-      banned = bannedOnly.data.is_banned === true;
-      suspended = false;
-    }
-  } else if (!profile.data) {
-    hasAccount = false;
-  } else {
-    hasAccount = true;
-    suspended = profile.data.is_suspended === true;
-    banned = profile.data.is_banned === true;
-  }
+  const profile = await db.from("profiles").select("is_suspended").eq("id", userId).maybeSingle();
+  const account = accountStateFromProfileRead({
+    error: Boolean(profile.error),
+    row: profile.data,
+  });
 
   return promoEmailBlockReason({
     prefsError: Boolean(prefs.error),
     hasPrefs: Boolean(prefs.data),
     emailPromotions: prefs.data?.email_promotions,
-    accountError,
-    hasAccount,
-    suspended,
-    banned,
+    ...account,
   });
 }
 

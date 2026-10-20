@@ -8,7 +8,9 @@ import {
   PROMO_SKIP_SUSPENDED,
   PROMO_SKIP_UNKNOWN_ACCOUNT,
   PROMO_SKIP_UNKNOWN_PREFS,
+  accountStateFromProfileRead,
   promoEmailBlockReason,
+  recipientOutcome,
 } from "../src/lib/email/newsletter-consent.ts";
 
 const allowed = {
@@ -31,6 +33,26 @@ assert.equal(promoEmailBlockReason({ ...allowed, suspended: true }), PROMO_SKIP_
 assert.equal(promoEmailBlockReason({ ...allowed, hasAccount: false }), PROMO_SKIP_MISSING_ACCOUNT);
 assert.equal(promoEmailBlockReason({ ...allowed, accountError: true }), PROMO_SKIP_UNKNOWN_ACCOUNT);
 
+const eligibleAccount = accountStateFromProfileRead({ error: false, row: { is_suspended: false } });
+assert.deepEqual(eligibleAccount, { accountError: false, hasAccount: true, suspended: false, banned: null });
+assert.equal(promoEmailBlockReason({ ...allowed, ...eligibleAccount }), null);
+
+const suspendedAccount = accountStateFromProfileRead({ error: false, row: { is_suspended: true } });
+assert.equal(promoEmailBlockReason({ ...allowed, ...suspendedAccount }), PROMO_SKIP_SUSPENDED);
+
+assert.equal(
+  promoEmailBlockReason({ ...allowed, ...accountStateFromProfileRead({ error: false, row: null }) }),
+  PROMO_SKIP_MISSING_ACCOUNT,
+);
+assert.equal(
+  promoEmailBlockReason({ ...allowed, ...accountStateFromProfileRead({ error: true, row: null }) }),
+  PROMO_SKIP_UNKNOWN_ACCOUNT,
+);
+assert.equal(recipientOutcome("sent", null), "accepted");
+assert.equal(recipientOutcome("failed", PROMO_SKIP_UNKNOWN_ACCOUNT), "skipped");
+assert.equal(recipientOutcome("failed", "Mailbox rejected the message."), "failed");
+assert.notEqual(recipientOutcome("failed", PROMO_SKIP_OFF), "accepted");
+
 assert.equal(resolveSiteUrl(undefined), "https://www.sweeptakehub.com");
 assert.equal(resolveSiteUrl(""), "https://www.sweeptakehub.com");
 assert.equal(resolveSiteUrl("not a url"), "https://www.sweeptakehub.com");
@@ -49,6 +71,8 @@ const cron = await import("node:fs/promises").then((fs) =>
   fs.readFile(new URL("../src/app/api/cron/newsletter-send/route.ts", import.meta.url), "utf8")
 );
 
+assert.match(batch, /select\("is_suspended"\)/);
+assert.doesNotMatch(batch, /is_banned/);
 assert.match(batch, /email_promotions/);
 assert.match(batch, /status: "failed", error: block/);
 assert.doesNotMatch(batch, /status: "pending"/);

@@ -34,6 +34,8 @@ const TONE: Record<string, string> = {
   scheduled: "bg-sky-400/15 text-sky-100",
   sending: "bg-sky-400/15 text-sky-100",
   sent: "bg-emerald-400/15 text-emerald-200",
+  skipped: "bg-amber-300/15 text-amber-100",
+  "not sent": "bg-rose-400/15 text-rose-100",
   published: "bg-emerald-400/15 text-emerald-200",
   expired: "bg-white/10 text-[#d5def2]",
   archived: "bg-white/10 text-[#d5def2]",

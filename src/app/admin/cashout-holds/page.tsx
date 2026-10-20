@@ -7,6 +7,7 @@ import { AdminEmptyState } from "@/components/admin/ui/admin-empty-state";
 import { AdminErrorState } from "@/components/admin/ui/admin-error-state";
 import { AdminSectionCard } from "@/components/admin/ui/admin-section-card";
 import { AdminStatusBadge } from "@/components/admin/ui/admin-status-badge";
+import { formatNepalTime } from "@/lib/admin/nepal-time";
 import { adminDb } from "@/lib/actions/admin/core";
 import { requirePermission } from "@/lib/data/admin";
 
@@ -46,7 +47,7 @@ export default async function CashoutHoldsPage() {
                 </div>
                 <div className="text-right">
                   <AdminStatusBadge status="held" />
-                  <p className="mt-1 text-xs text-[#8ea0c3]">{new Date(row.created_at).toLocaleString()}</p>
+                  <p className="mt-1 text-xs text-[#8ea0c3]">{formatNepalTime(row.created_at)}</p>
                   <CashoutHoldActions holdId={row.id} />
                 </div>
               </li>

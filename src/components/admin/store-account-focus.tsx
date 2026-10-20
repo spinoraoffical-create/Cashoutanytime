@@ -2,6 +2,7 @@ import Link from "next/link";
 
 import { AdminSectionCard } from "@/components/admin/ui/admin-section-card";
 import { AdminStatusBadge } from "@/components/admin/ui/admin-status-badge";
+import { formatNepalTime } from "@/lib/admin/nepal-time";
 import type { AgentRow } from "@/lib/actions/agents";
 
 function roleName(label: string) {
@@ -20,7 +21,7 @@ export function StoreAccountFocus({ row, rows }: { row: AgentRow; rows: AgentRow
     ["Kind", roleName(row.roleLabel)],
     ["Signup code", row.promoCode],
     ["Managed by", row.managerName],
-    ["Opened", row.createdAt ? new Date(row.createdAt).toLocaleDateString() : "Unavailable"],
+    ["Opened", row.createdAt ? formatNepalTime(row.createdAt) : "Unavailable"],
     ["Deposit approval limit", row.approveLimit == null ? "Not set" : `$${row.approveLimit.toFixed(2)}`],
   ];
 

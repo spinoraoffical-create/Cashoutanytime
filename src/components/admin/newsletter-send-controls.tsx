@@ -27,13 +27,18 @@ import {
   NEWSLETTER_SEGMENT_META,
   isNewsletterSegment,
 } from "@/lib/email/newsletter-segments";
+import { formatNepalTime, parseNepalLocalToUtc } from "@/lib/admin/nepal-time";
 
 export function NewsletterSendControls({
   campaignId,
   segment,
+  name,
+  subject,
 }: {
   campaignId: string;
   segment: string;
+  name: string;
+  subject: string;
 }) {
   const router = useRouter();
   const [pending, startTransition] = React.useTransition();
@@ -58,20 +63,25 @@ export function NewsletterSendControls({
     });
   }
 
+  const scheduledAt = when ? parseNepalLocalToUtc(when) : null;
+
   function schedule() {
     if (!when) {
-      toast.error("Pick a date and time first.");
+      toast.error("Pick a Nepal date and time first.");
       return;
     }
-    const parsed = new Date(when);
-    if (Number.isNaN(parsed.getTime())) {
+    if (!scheduledAt) {
       toast.error("That date is not valid.");
       return;
     }
-    run(() => scheduleNewsletterCampaignAction(campaignId, parsed.toISOString()));
+    if (scheduledAt.getTime() <= Date.now()) {
+      toast.error("That Nepal time has already passed. Pick a future time, or use Send now.");
+      return;
+    }
+    run(() => scheduleNewsletterCampaignAction(campaignId, scheduledAt.toISOString()));
   }
 
-  const scheduleIsPast = when ? new Date(when).getTime() <= Date.now() : false;
+  const scheduleIsPast = Boolean(scheduledAt && scheduledAt.getTime() <= Date.now());
 
   return (
     <div className="flex flex-col items-end gap-2">
@@ -109,7 +119,9 @@ export function NewsletterSendControls({
           <AlertDialogContent>
             <AlertDialogHeader>
               <AlertDialogTitle>Send this email now?</AlertDialogTitle>
-              <AlertDialogDescription>{sendNowCopy}</AlertDialogDescription>
+              <AlertDialogDescription>
+                {sendNowCopy} Name: {name}. Subject: {subject}. Time: now, shown in Nepal time after it is saved. People who are left out are counted when the send runs. Delivered is not tracked.
+              </AlertDialogDescription>
             </AlertDialogHeader>
             <AlertDialogFooter>
               <AlertDialogCancel>Cancel</AlertDialogCancel>
@@ -127,7 +139,7 @@ export function NewsletterSendControls({
           type="datetime-local"
           value={when}
           onChange={(event) => setWhen(event.target.value)}
-          aria-label="Schedule time"
+          aria-label="Schedule time in Nepal time"
           className="h-8 w-[190px] text-xs"
         />
         <AlertDialog>
@@ -141,9 +153,9 @@ export function NewsletterSendControls({
             <AlertDialogHeader>
               <AlertDialogTitle>Schedule this email?</AlertDialogTitle>
               <AlertDialogDescription>
-                {when
-                  ? `Queues “${label}” for ${new Date(when).toLocaleString()}. ${cadence} Suspended players and promo opt-outs are left out.`
-                  : "Pick a date and time first."}
+                {scheduledAt
+                  ? `Name: ${name}. Subject: ${subject}. Sends at ${formatNepalTime(scheduledAt)}. The time you entered is Nepal time. ${cadence} Suspended players and people who turned email off are left out. Cancel keeps this as a draft.`
+                  : "Pick a future Nepal date and time first."}
               </AlertDialogDescription>
             </AlertDialogHeader>
             <AlertDialogFooter>
@@ -154,10 +166,10 @@ export function NewsletterSendControls({
         </AlertDialog>
       </div>
       {scheduleIsPast ? (
-        <p className="text-[11px] text-muted-foreground">That time has passed, so this sends immediately.</p>
+        <p className="text-[11px] text-amber-200">That Nepal time has already passed. Pick a future time, or use Send now.</p>
       ) : (
         <p className="max-w-[240px] text-right text-[11px] text-muted-foreground">
-          Test send stays a draft. Schedule uses the saved audience.
+          The time box is Nepal time. Test send stays a draft. Nothing sends until you confirm.
         </p>
       )}
     </div>

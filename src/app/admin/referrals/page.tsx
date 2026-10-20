@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { format } from "date-fns";
+import { formatNepalTime } from "@/lib/admin/nepal-time";
 import { UserPlus } from "lucide-react";
 
 import { AdminPageHeader } from "@/components/admin/admin-page-header";
@@ -95,7 +95,7 @@ export default async function AdminReferralsPage() {
                         {r.reward_points ?? 0}
                       </TableCell>
                       <TableCell className="tnum text-right text-xs text-muted-foreground">
-                        {format(new Date(r.created_at), "MMM d, HH:mm")}
+                        {formatNepalTime(r.created_at)}
                       </TableCell>
                     </TableRow>
                   );

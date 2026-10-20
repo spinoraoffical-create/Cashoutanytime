@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { format } from "date-fns";
+import { formatNepalTime } from "@/lib/admin/nepal-time";
 
 import { AdminPageHeader } from "@/components/admin/admin-page-header";
 import { ConfirmActionButton } from "@/components/admin/confirm-action-button";
@@ -66,9 +66,9 @@ export default async function AdminPromotionsPage() {
                       {p.coins_bonus <= 0 && p.xp_bonus <= 0 ? "—" : null}
                     </td>
                     <td className="px-2 py-3 text-right text-xs tabular-nums text-[#9fb0d0]">
-                      {p.starts_at ? format(new Date(p.starts_at), "MMM d") : "—"}
+                      {p.starts_at ? formatNepalTime(p.starts_at) : "—"}
                       {" → "}
-                      {p.ends_at ? format(new Date(p.ends_at), "MMM d") : "∞"}
+                      {p.ends_at ? formatNepalTime(p.ends_at) : "∞"}
                     </td>
                     <td className="px-2 py-3 text-right">
                       <AdminStatusBadge status={p.status} />

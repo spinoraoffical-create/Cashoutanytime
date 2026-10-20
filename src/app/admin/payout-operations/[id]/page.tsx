@@ -8,6 +8,7 @@ import { AdminErrorState } from "@/components/admin/ui/admin-error-state";
 import { AdminSectionCard } from "@/components/admin/ui/admin-section-card";
 import { AdminStatusBadge } from "@/components/admin/ui/admin-status-badge";
 import { loadPayoutOperation, payoutStatusHelp, resolvePayoutReadPlan } from "@/lib/admin/payout-operations";
+import { formatNepalTime } from "@/lib/admin/nepal-time";
 import { shownText } from "@/lib/admin/payout-operations-guard";
 
 export const metadata: Metadata = { title: "Payout record" };
@@ -45,8 +46,8 @@ export default async function PayoutOperationDetailPage({
     ["Player", row.playerEmail ? `${row.playerName} (${row.playerEmail})` : row.playerName],
     ["Amount", `$${row.amount.toFixed(2)}`],
     ["Method", shownText(row.method, "Not on file")],
-    ["Created", row.createdAt ? new Date(row.createdAt).toLocaleString() : "Unavailable"],
-    ["Last update", row.updatedAt ? new Date(row.updatedAt).toLocaleString() : "Unavailable"],
+    ["Created", row.createdAt ? formatNepalTime(row.createdAt) : "Unavailable"],
+    ["Last update", row.updatedAt ? formatNepalTime(row.updatedAt) : "Unavailable"],
     ["Provider reference", "Not shown"],
     ["Provider status", shownText(row.providerStatus, "Not on file")],
     ["Note", shownText(row.note, "None")],

@@ -10,6 +10,7 @@ import { AdminEmptyState } from "@/components/admin/ui/admin-empty-state";
 import { AdminStatusBadge } from "@/components/admin/ui/admin-status-badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { formatNepalTime } from "@/lib/admin/nepal-time";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 
 export function NetworkPlayers({
@@ -139,7 +140,7 @@ export function NetworkPlayers({
                   <TableCell>${row.cashout.toFixed(2)}</TableCell>
                   <TableCell>{row.coins}</TableCell>
                   <TableCell>{row.level ?? "—"}</TableCell>
-                  <TableCell>{row.createdAt ? new Date(row.createdAt).toLocaleDateString() : "—"}</TableCell>
+                  <TableCell>{row.createdAt ? formatNepalTime(row.createdAt) : "—"}</TableCell>
                   <TableCell><AdminStatusBadge status={row.status} /></TableCell>
                   {showIp ? (
                     <TableCell className="text-xs">

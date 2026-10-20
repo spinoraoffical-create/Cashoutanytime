@@ -5,6 +5,7 @@ import { AdminPageHeader } from "@/components/admin/admin-page-header";
 import { AdminSectionCard } from "@/components/admin/ui/admin-section-card";
 import { AdminStatusBadge } from "@/components/admin/ui/admin-status-badge";
 import { Button } from "@/components/ui/button";
+import { formatNepalTime } from "@/lib/admin/nepal-time";
 import { coinText } from "@/lib/admin/live-game-balances";
 import { loadLiveGameBalances } from "@/lib/admin/live-game-balances-data";
 import { requireSuperAdmin } from "@/lib/data/admin";
@@ -23,7 +24,7 @@ function statusLabel(status: string, detail: string | null) {
 export default async function LiveGameBalancesPage() {
   await requireSuperAdmin();
   const rows = await loadLiveGameBalances();
-  const checkedAt = new Date().toLocaleString("en-US", { dateStyle: "medium", timeStyle: "short" });
+  const checkedAt = formatNepalTime(new Date());
 
   return (
     <div className="mx-auto max-w-6xl space-y-6">

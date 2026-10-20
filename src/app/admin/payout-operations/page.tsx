@@ -15,6 +15,7 @@ import {
   payoutStatusHelp,
   resolvePayoutReadPlan,
 } from "@/lib/admin/payout-operations";
+import { formatNepalTime } from "@/lib/admin/nepal-time";
 import { cn } from "@/lib/utils";
 
 export const metadata: Metadata = { title: "Payout activity" };
@@ -118,7 +119,7 @@ export default async function PayoutOperationsPage({
               ),
               amount: `$${row.amount.toFixed(2)}`,
               status: <AdminStatusBadge status={row.status.replaceAll("_", " ")} />,
-              updated: row.updatedAt ? new Date(row.updatedAt).toLocaleString() : "Unavailable",
+              updated: row.updatedAt ? formatNepalTime(row.updatedAt) : "Unavailable",
               open: (
                 <Link href={`/admin/payout-operations/${row.id}`} className="font-semibold text-cyan-200">
                   Details

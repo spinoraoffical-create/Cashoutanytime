@@ -2,7 +2,7 @@
 
 import * as React from "react";
 import Link from "next/link";
-import { ExternalLink, Menu } from "lucide-react";
+import { ArrowLeft, Menu } from "lucide-react";
 
 import {
   AdminSidebar,
@@ -66,16 +66,17 @@ export function AdminTopbar({
           <Badge className="border border-cyan-300/30 bg-cyan-400/10 text-cyan-100 uppercase">Admin</Badge>
         </div>
 
-        <div className="ml-auto flex items-center gap-3">
+        <div className="ml-auto flex items-center gap-2 sm:gap-3">
+          <Button asChild variant="outline" className="min-h-10 border-cyan-300/40 bg-cyan-400/10 text-cyan-50 hover:bg-cyan-400/20">
+            <Link href="/dashboard">
+              <ArrowLeft className="size-4" aria-hidden />
+              Exit Admin
+            </Link>
+          </Button>
           <div className="hidden min-w-0 text-right sm:block">
             <p className="truncate text-sm font-medium text-white">{email ?? "Account email is not on file"}</p>
             <p className="text-xs text-[#9fb0d0]">{topRole}</p>
           </div>
-          <Button asChild variant="ghost" size="icon" title="Visit website">
-            <Link href="/" aria-label="Visit website">
-              <ExternalLink className="size-5" aria-hidden />
-            </Link>
-          </Button>
           <ThemeToggle />
           <Avatar className="size-9">
             <AvatarFallback className="bg-ws-surface-3 text-xs font-bold">

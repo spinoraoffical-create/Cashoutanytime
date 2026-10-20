@@ -9,6 +9,7 @@ import {
   authorize,
   writeAudit,
 } from "@/lib/actions/admin/core";
+import { parseNepalLocalToUtc } from "@/lib/admin/nepal-time";
 
 const promoSchema = z.object({
   slug: z
@@ -35,6 +36,13 @@ const promoSchema = z.object({
 
 export type PromoFormInput = z.infer<typeof promoSchema>;
 
+function ownerSchedule(raw: string | null | undefined): { ok: true; value: string | null } | { ok: false } {
+  if (!raw) return { ok: true, value: null };
+  const parsed = parseNepalLocalToUtc(raw);
+  if (!parsed) return { ok: false };
+  return { ok: true, value: parsed.toISOString() };
+}
+
 export async function upsertPromotionAction(
   input: PromoFormInput & { id?: string }
 ): Promise<AdminActionResult> {
@@ -46,13 +54,19 @@ export async function upsertPromotionAction(
     return { ok: false, error: parsed.error.issues[0]?.message ?? "Invalid input" };
   }
 
+  const startsAt = ownerSchedule(parsed.data.starts_at);
+  const endsAt = ownerSchedule(parsed.data.ends_at);
+  if (!startsAt.ok || !endsAt.ok) {
+    return { ok: false, error: "Enter a valid Nepal date and time, or leave the time blank." };
+  }
+
   const db = adminDb();
   const payload = {
     ...parsed.data,
     badge_text: parsed.data.badge_text || null,
     code: parsed.data.code ? parsed.data.code.toUpperCase() : null,
-    starts_at: parsed.data.starts_at || null,
-    ends_at: parsed.data.ends_at || null,
+    starts_at: startsAt.value,
+    ends_at: endsAt.value,
     max_claims: parsed.data.max_claims ?? null,
   };
 

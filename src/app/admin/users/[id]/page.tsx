@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { format } from "date-fns";
+import { formatNepalTime } from "@/lib/admin/nepal-time";
 import { ArrowLeft } from "lucide-react";
 
 import { AdminPageHeader } from "@/components/admin/admin-page-header";
@@ -120,7 +120,7 @@ export default async function AdminUserDetailPage({
 
       <AdminPageHeader
         title={profileDisplayName(p)}
-        description={`${profileHandle(p)}${email ? ` · ${email}` : ""} · Assigned store or sub-creator: ${parentName} · Joined ${format(new Date(p.created_at!), "MMMM d, yyyy")}`}
+        description={`${profileHandle(p)}${email ? ` · ${email}` : ""} · Assigned store or sub-creator: ${parentName} · Joined ${formatNepalTime(p.created_at)}`}
         action={
           <div className="flex flex-wrap gap-2">
             <AdminStatusBadge status={profileIsBanned(p) ? "Banned" : "Active"} />
@@ -224,7 +224,7 @@ export default async function AdminUserDetailPage({
                         <div className="min-w-0">
                           <p className="truncate text-sm text-white">{e.description || e.entry_type}</p>
                           <p className="text-xs text-[#9fb0d0]">
-                            {format(new Date(e.created_at), "MMM d, HH:mm")}
+                            {formatNepalTime(e.created_at)}
                           </p>
                         </div>
                         <span className={`shrink-0 text-sm font-semibold tabular-nums ${e.amount >= 0 ? "text-emerald-200" : "text-rose-200"}`}>
@@ -280,7 +280,7 @@ export default async function AdminUserDetailPage({
                     {ledger.map((e) => (
                       <tr key={e.id} className="border-b border-white/5 last:border-0">
                         <td className="whitespace-nowrap px-2 py-3 text-xs text-[#9fb0d0]">
-                          {format(new Date(e.created_at), "MMM d, yyyy HH:mm")}
+                          {formatNepalTime(e.created_at)}
                         </td>
                         <td className="max-w-xs truncate px-2 py-3 text-[#e8eefc]">
                           {e.description || e.entry_type}
@@ -327,7 +327,7 @@ export default async function AdminUserDetailPage({
                         <span className="capitalize">{dep.payment_method}</span>
                       </div>
                     </div>
-                    <p className="text-right text-xs text-[#9fb0d0]">{format(new Date(dep.created_at), "MMM d, yyyy")}</p>
+                    <p className="text-right text-xs text-[#9fb0d0]">{formatNepalTime(dep.created_at)}</p>
                   </div>
                 </div>
               ))}
@@ -347,8 +347,8 @@ export default async function AdminUserDetailPage({
                       </div>
                     </div>
                     <div className="text-right text-xs text-[#9fb0d0]">
-                      <p>{format(new Date(dep.created_at), "MMM d, yyyy")}</p>
-                      {dep.resolved_at ? <p className="text-emerald-200">Fulfilled {format(new Date(dep.resolved_at), "MMM d")}</p> : null}
+                      <p>{formatNepalTime(dep.created_at)}</p>
+                      {dep.resolved_at ? <p className="text-emerald-200">Fulfilled {formatNepalTime(dep.resolved_at)}</p> : null}
                     </div>
                   </div>
                 </div>
@@ -377,7 +377,7 @@ export default async function AdminUserDetailPage({
                         <span>{CATEGORY_LABEL[t.category] ?? t.category}</span>
                       </div>
                       <p className="mt-0.5 truncate text-sm font-semibold text-white">{t.subject}</p>
-                      <p className="text-xs text-[#8ea0c3]">{format(new Date(t.last_message_at), "MMM d, yyyy HH:mm")}</p>
+                      <p className="text-xs text-[#8ea0c3]">{formatNepalTime(t.last_message_at)}</p>
                     </div>
                     <AdminStatusBadge status={t.status.replaceAll("_", " ")} />
                   </Link>

@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { format } from "date-fns";
+import { formatNepalTime } from "@/lib/admin/nepal-time";
 
 import { AdminPageHeader } from "@/components/admin/admin-page-header";
 import { BroadcastComposer } from "@/components/admin/broadcast-composer";
@@ -94,7 +94,7 @@ export default async function AdminBroadcastsPage() {
                     <p className="text-xs tabular-nums text-[#9fb0d0]">{b.recipient_count.toLocaleString()} sent</p>
                   </div>
                 </div>
-                <p className="mt-2 text-xs tabular-nums text-[#8ea0c3]">{format(new Date(b.sent_at), "MMM d, yyyy · HH:mm")}</p>
+                <p className="mt-2 text-xs tabular-nums text-[#8ea0c3]">{formatNepalTime(b.sent_at)}</p>
               </article>
             ))}
           </div>

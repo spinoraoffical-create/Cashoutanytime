@@ -23,17 +23,13 @@ import {
   type ProfileRow,
 } from "@/lib/admin/spinora-profile";
 import { readAgentScope } from "@/lib/agents/scope";
+import { formatNepalTime } from "@/lib/admin/nepal-time";
 import { can, getStaffContext } from "@/lib/data/admin";
 
 export const metadata: Metadata = { title: "Cash-out Payouts" };
 
 function formatDate(iso: string) {
-  return new Date(iso).toLocaleDateString("en-US", {
-    month: "short",
-    day: "numeric",
-    hour: "2-digit",
-    minute: "2-digit",
-  });
+  return formatNepalTime(iso);
 }
 
 export default async function AdminPayoutsPage() {

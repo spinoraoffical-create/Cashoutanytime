@@ -2,6 +2,7 @@
 
 import * as React from "react";
 
+import { NEPAL_TIME_NOTE } from "@/lib/admin/nepal-time";
 import { AdminBreadcrumbs } from "@/components/admin/admin-breadcrumbs";
 import { AdminSectionTabs } from "@/components/admin/admin-section-tabs";
 import { AdminSidebar, type AdminNavItem } from "@/components/admin/admin-sidebar";
@@ -59,6 +60,7 @@ export function AdminShell({
       <div className="flex min-w-0 flex-1 flex-col overflow-hidden">
         <AdminTopbar items={items} email={email} topRole={topRole} badges={badges} hints={SIDEBAR_BADGE_HINTS} />
         <main id="admin-content" className="flex-1 overflow-y-auto bg-[radial-gradient(ellipse_at_top,rgba(109,40,217,0.18),transparent_42%),#070b18] px-3 py-4 pb-[max(1rem,env(safe-area-inset-bottom))] sm:px-6 sm:py-6 lg:px-8">
+          <p className="mb-3 text-xs text-[#9fb0d0]">{NEPAL_TIME_NOTE}</p>
           <AdminBreadcrumbs items={items} />
           <AdminSectionTabs items={items} badges={badges} hints={SIDEBAR_BADGE_HINTS} />
           {children}

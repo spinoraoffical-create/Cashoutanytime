@@ -72,6 +72,14 @@ export function AdminSidebar({
   return (
     <div className="flex h-full flex-col">
       <div className="px-3 pt-3">
+        <Link
+          href="/dashboard"
+          onClick={onNavigate}
+          className="mb-2 flex min-h-11 items-center gap-3 rounded-xl border border-cyan-300/30 bg-cyan-400/10 px-3 text-sm font-semibold text-cyan-100 hover:bg-cyan-400/20"
+        >
+          <ArrowLeft className="size-4.5" aria-hidden />
+          Exit Admin
+        </Link>
         <label className="flex items-center gap-2 rounded-xl border border-[#7c3aed]/30 bg-[#0b1224] px-3 text-sm text-[#9fb0d0]">
           <Search className="size-4 shrink-0" aria-hidden />
           <input
@@ -172,7 +180,7 @@ export function AdminSidebar({
           className="flex min-h-10 items-center gap-3 rounded-lg px-3 text-sm font-medium text-[#9fb0d0] hover:bg-white/5 hover:text-white"
         >
           <ArrowLeft className="size-4.5" aria-hidden />
-          Exit to player app
+          Exit Admin
         </Link>
         <form action={logoutAction}>
           <button

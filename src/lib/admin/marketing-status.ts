@@ -8,11 +8,15 @@ export function newsletterStatusHelp(status: string) {
     case "draft":
       return "Saved. It has not been sent to players.";
     case "scheduled":
-      return "Queued for a later time. It has not finished sending.";
+      return "Waiting for the chosen Nepal time. It has not finished sending.";
     case "sending":
       return "A send is in progress. This is not the same as finished.";
     case "sent":
-      return "The send is marked finished.";
+      return "The send is marked finished. Accepted by the email service is not the same as delivered to an inbox.";
+    case "skipped":
+      return "Nobody was emailed. People were left out before the email service was contacted.";
+    case "not sent":
+      return "No email was accepted. The counts below separate people who were left out from real send failures.";
     case "failed":
       return "The campaign is marked failed. That stored mark is not a new send.";
     default:

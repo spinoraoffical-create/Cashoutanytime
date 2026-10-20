@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { format } from "date-fns";
+import { formatNepalTime } from "@/lib/admin/nepal-time";
 
 import { AdminPageHeader } from "@/components/admin/admin-page-header";
 import { AdminEmptyState } from "@/components/admin/ui/admin-empty-state";
@@ -96,7 +96,7 @@ export default async function AdminAuditPage({
                         ) || "system"}
                       </TableCell>
                       <TableCell className="text-right text-xs tabular-nums text-[#9fb0d0]">
-                        {format(new Date(log.created_at), "MMM d, yyyy HH:mm")}
+                        {formatNepalTime(log.created_at)}
                       </TableCell>
                     </TableRow>
                   ))}

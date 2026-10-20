@@ -6,6 +6,7 @@ import { AdminSectionCard } from "@/components/admin/ui/admin-section-card";
 import { AdminStatusBadge } from "@/components/admin/ui/admin-status-badge";
 import { AdminErrorState } from "@/components/admin/ui/admin-error-state";
 import { AdminEmptyState } from "@/components/admin/ui/admin-empty-state";
+import { formatNepalTime } from "@/lib/admin/nepal-time";
 import { requirePermission } from "@/lib/data/admin";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { getChatbotSettings } from "@/lib/ai/settings";
@@ -87,7 +88,7 @@ export default async function AdminAIChatbotPage() {
             {logs.map((log) => (
               <article key={log.id} className="space-y-2 rounded-xl border border-white/10 bg-[#0c1224] p-4">
                 <div className="flex flex-wrap items-center justify-between gap-2 text-xs text-[#9fb0d0]">
-                  <span>{new Date(log.created_at).toLocaleString()}</span>
+                  <span>{formatNepalTime(log.created_at)}</span>
                   <div className="flex items-center gap-2">
                     <AdminStatusBadge status={`${Math.round(log.confidence_score * 100)}% confidence`} />
                     {log.escalated_to_human ? <AdminStatusBadge status="Escalated" /> : null}

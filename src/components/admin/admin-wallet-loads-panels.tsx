@@ -10,6 +10,7 @@ import { AdminStatusBadge } from "@/components/admin/ui/admin-status-badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { createClient } from "@/lib/supabase/client";
+import { formatNepalTime } from "@/lib/admin/nepal-time";
 import { cn, formatDate, formatRelativeTime } from "@/lib/utils";
 import { gameLoadStatusHelp } from "@/lib/admin/game-load-status";
 import type { GameLoadRequest } from "@/lib/game-automation/types";
@@ -72,7 +73,7 @@ function relativeTime(iso: string) {
   if (hours < 48) return `${hours}h ago`;
   const days = Math.floor(hours / 24);
   if (days < 14) return `${days}d ago`;
-  return new Date(iso).toLocaleDateString();
+  return formatNepalTime(iso);
 }
 
 function playerHref(href: string, showAllPlayers: boolean) {

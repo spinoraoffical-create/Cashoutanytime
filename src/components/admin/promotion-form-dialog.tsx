@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { Loader2, Pencil, Plus } from "lucide-react";
 import { toast } from "sonner";
 
+import { formatNepalInputValue } from "@/lib/admin/nepal-time";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import {
@@ -199,7 +200,7 @@ export function PromotionFormDialog({ promotion }: Props) {
               />
             </div>
             <div className="space-y-2">
-              <Label htmlFor="p-starts">Starts at</Label>
+              <Label htmlFor="p-starts">Starts at (Nepal time)</Label>
               <Input
                 id="p-starts"
                 name="starts_at"
@@ -208,7 +209,7 @@ export function PromotionFormDialog({ promotion }: Props) {
               />
             </div>
             <div className="space-y-2">
-              <Label htmlFor="p-ends">Ends at</Label>
+              <Label htmlFor="p-ends">Ends at (Nepal time)</Label>
               <Input
                 id="p-ends"
                 name="ends_at"
@@ -239,9 +240,5 @@ export function PromotionFormDialog({ promotion }: Props) {
 }
 
 function toLocalInput(iso?: string | null): string {
-  if (!iso) return "";
-  const d = new Date(iso);
-  if (Number.isNaN(d.getTime())) return "";
-  const pad = (n: number) => String(n).padStart(2, "0");
-  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+  return formatNepalInputValue(iso);
 }

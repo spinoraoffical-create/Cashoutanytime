@@ -1,7 +1,6 @@
 "use client";
 
 import * as React from "react";
-import { format } from "date-fns";
 import { Loader2, Pencil } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
@@ -18,6 +17,7 @@ import {
   uploadBlogImageAction,
   upsertBlogPostAction,
 } from "@/lib/actions/admin/cms";
+import { formatNepalInputValue } from "@/lib/admin/nepal-time";
 import { Button } from "@/components/ui/button";
 
 const BLOG_STATUS_OPTIONS = [
@@ -50,9 +50,9 @@ function blogStatusFields(p?: {
     },
     {
       name: "published_at",
-      label: "Publish date/time (Scheduled only)",
+      label: "Publish date/time (Nepal time, scheduled only)",
       type: "datetime-local",
-      defaultValue: p?.published_at ? format(new Date(p.published_at), "yyyy-MM-dd'T'HH:mm") : "",
+      defaultValue: formatNepalInputValue(p?.published_at),
     },
   ];
 }

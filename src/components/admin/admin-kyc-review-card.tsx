@@ -6,6 +6,7 @@ import { toast } from "sonner";
 import { CheckCircle2, Eye, FileText, X, XCircle } from "lucide-react";
 import { KYCSubmissionRecord, updateKYCStatus } from "@/lib/actions/kyc-actions";
 import { applyReviewDecision, reviewCounts } from "@/lib/kyc/decision";
+import { formatNepalTime } from "@/lib/admin/nepal-time";
 import { AdminEmptyState } from "@/components/admin/ui/admin-empty-state";
 import { AdminSectionCard } from "@/components/admin/ui/admin-section-card";
 import { AdminStatusBadge } from "@/components/admin/ui/admin-status-badge";
@@ -108,7 +109,7 @@ export function AdminKYCReviewCard({
                 </div>
                 <p className="mt-1 break-all text-xs text-[#9fb0d0]">{s.user_email}</p>
                 <p className="mt-1 text-xs text-[#8ea0c3]">
-                  {s.document_name} · {new Date(s.created_at).toLocaleString()}
+                  {s.document_name} · {formatNepalTime(s.created_at)}
                 </p>
               </div>
 
@@ -186,7 +187,7 @@ export function AdminKYCReviewCard({
             </div>
 
             <div className="flex flex-col gap-3 border-t border-white/10 pt-4 sm:flex-row sm:items-center sm:justify-between">
-              <span className="text-xs text-[#8ea0c3]">Uploaded {new Date(previewDoc.created_at).toLocaleString()}</span>
+              <span className="text-xs text-[#8ea0c3]">Uploaded {formatNepalTime(previewDoc.created_at)}</span>
               <div className="flex flex-wrap items-center gap-2">
                 <Button variant="outline" onClick={() => setPreviewDoc(null)} className="border-white/15 text-[#e8eefc]">
                   Close

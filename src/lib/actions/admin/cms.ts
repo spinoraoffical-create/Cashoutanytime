@@ -10,6 +10,7 @@ import {
   authorize,
   writeAudit,
 } from "@/lib/actions/admin/core";
+import { parseNepalLocalToUtc } from "@/lib/admin/nepal-time";
 
 const PERMISSION = "cms.manage";
 
@@ -65,6 +66,13 @@ export async function upsertFaqAction(
 
 // ── Banners ──────────────────────────────────────────────────────────────────
 
+function nepalInstant(raw: string | null | undefined): { ok: true; value: string | null } | { ok: false } {
+  if (!raw) return { ok: true, value: null };
+  const parsed = parseNepalLocalToUtc(raw);
+  if (!parsed) return { ok: false };
+  return { ok: true, value: parsed.toISOString() };
+}
+
 const bannerSchema = z.object({
   title: z.string().trim().min(3).max(120),
   subtitle: z.string().trim().max(200).optional().default(""),
@@ -86,13 +94,19 @@ export async function upsertBannerAction(
   const parsed = bannerSchema.safeParse(input);
   if (!parsed.success) return { ok: false, error: parsed.error.issues[0]?.message ?? "Invalid" };
 
+  const startsAt = nepalInstant(parsed.data.starts_at);
+  const endsAt = nepalInstant(parsed.data.ends_at);
+  if (!startsAt.ok || !endsAt.ok) {
+    return { ok: false, error: "Enter a valid Nepal date and time, or leave the time blank." };
+  }
+
   const payload = {
     ...parsed.data,
     subtitle: parsed.data.subtitle || null,
     image_url: parsed.data.image_url || null,
     link_url: parsed.data.link_url || null,
-    starts_at: parsed.data.starts_at ? new Date(parsed.data.starts_at).toISOString() : null,
-    ends_at: parsed.data.ends_at ? new Date(parsed.data.ends_at).toISOString() : null,
+    starts_at: startsAt.value,
+    ends_at: endsAt.value,
   };
 
   const db = adminDb();
@@ -312,14 +326,12 @@ export async function upsertBlogPostAction(
   const parsed = blogSchema.safeParse(input);
   if (!parsed.success) return { ok: false, error: parsed.error.issues[0]?.message ?? "Invalid" };
 
-  if (parsed.data.status === "scheduled") {
-    const when = new Date(parsed.data.published_at);
-    if (isNaN(when.getTime()) || when.getTime() <= Date.now()) {
-      return { ok: false, error: "Pick a future date/time to schedule this post." };
-    }
+  const scheduledAt = parsed.data.status === "scheduled" ? parseNepalLocalToUtc(parsed.data.published_at) : null;
+  if (parsed.data.status === "scheduled" && (!scheduledAt || scheduledAt.getTime() <= Date.now())) {
+    return { ok: false, error: "Pick a future Nepal date and time to schedule this post." };
   }
 
-  const { seo_title, seo_description, published_at, ...rest } = parsed.data;
+  const { seo_title, seo_description, published_at: _publishedAt, ...rest } = parsed.data;
   const db = adminDb();
   const payload = {
     ...rest,
@@ -328,7 +340,7 @@ export async function upsertBlogPostAction(
     author_id: auth.staff.userId,
     published_at:
       parsed.data.status === "scheduled"
-        ? new Date(published_at).toISOString()
+        ? scheduledAt!.toISOString()
         : parsed.data.status === "published"
           ? new Date().toISOString()
           : null,

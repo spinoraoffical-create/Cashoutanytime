@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 
+import { formatNepalTime } from "@/lib/admin/nepal-time";
 import {
   createAgentAction,
   resetAgentPasswordAction,
@@ -160,7 +161,7 @@ export function SubCreatorsManager({
                     <td className="px-2 py-3 text-[#e8eefc]">{row.phone || "—"}</td>
                     <td className="px-2 py-3 text-[#e8eefc]">{roleName(row.roleLabel)}</td>
                     <td className="px-2 py-3 text-[#e8eefc]">${row.wallet.toFixed(2)}</td>
-                    <td className="px-2 py-3 text-[#e8eefc]">{new Date(row.createdAt).toLocaleDateString()}</td>
+                    <td className="px-2 py-3 text-[#e8eefc]">{formatNepalTime(row.createdAt)}</td>
                     <td className="px-2 py-3 text-[#e8eefc]">{row.managerName}</td>
                     <td className="px-2 py-3 text-[#e8eefc]">{row.playerCount}</td>
                     <td className="px-2 py-3">

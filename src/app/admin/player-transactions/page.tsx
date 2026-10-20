@@ -16,6 +16,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import { formatNepalTime } from "@/lib/admin/nepal-time";
 import { coinLabel, moneyLabel, signedMoneyLabel, TRANSACTION_STATUSES, type TransactionKind } from "@/lib/admin/player-transactions";
 import { loadDailyPlayerReport, loadPlayerTransactions } from "@/lib/admin/player-transactions-data";
 import { requireAgentScope } from "@/lib/agents/scope";
@@ -267,12 +268,7 @@ function scopeDescription(level: "platform" | "store" | "sub") {
 }
 
 function formatReportTime(iso: string) {
-  return new Date(iso).toLocaleString("en-US", {
-    month: "short",
-    day: "numeric",
-    hour: "numeric",
-    minute: "2-digit",
-  });
+  return formatNepalTime(iso);
 }
 
 function reportQueryString(query: { day: string; storeId: string | null }) {

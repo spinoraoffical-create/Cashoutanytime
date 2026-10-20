@@ -1,4 +1,4 @@
-import { format } from "date-fns";
+import { formatNepalTime } from "@/lib/admin/nepal-time";
 
 import { ConfirmActionButton } from "@/components/admin/confirm-action-button";
 import {
@@ -63,7 +63,7 @@ export async function TelegramPromoMessagesSection({ db }: { db: DB }) {
                   <AdminStatusBadge status={m.is_active ? "active" : "off"} />
                 </div>
                 <p className="mt-1 text-xs text-[#8ea0c3]">
-                  {m.last_sent_at ? `Last sent ${format(new Date(m.last_sent_at), "MMM d, p")}` : "Never sent"}
+                  {m.last_sent_at ? `Last sent ${formatNepalTime(m.last_sent_at)}` : "Never sent"}
                 </p>
               </div>
               <div className="flex shrink-0 gap-1">

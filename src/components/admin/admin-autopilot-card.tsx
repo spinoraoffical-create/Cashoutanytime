@@ -5,6 +5,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { GlassCard } from "@/components/shared/glass-card";
 import { toast } from "sonner";
+import { formatNepalTime } from "@/lib/admin/nepal-time";
 import { Bot, CheckCircle2, Play, Power, Zap } from "lucide-react";
 
 type AutopilotStatus = {
@@ -140,7 +141,7 @@ export function AdminAutopilotCard() {
             </span>
             {status?.lastRunTime && (
               <span className="text-[10px] text-muted-foreground block mt-0.5">
-                Last: {new Date(status.lastRunTime).toLocaleString()}
+                Last: {formatNepalTime(status.lastRunTime)}
               </span>
             )}
           </div>
