@@ -528,6 +528,102 @@ export function escapeHtml(value: string): string {
   return value.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
 }
 
+export type ContactDisclosure = "full" | "masked";
+
+/** Full contact details only when the destination is the linked owner's private chat. */
+export function contactDisclosure(input: {
+  destinationChatId: string | null | undefined;
+  ownerPrivateChatId: string | null | undefined;
+}): ContactDisclosure {
+  const destination = input.destinationChatId?.trim() ?? "";
+  const owner = input.ownerPrivateChatId?.trim() ?? "";
+  if (!destination || !owner) return "masked";
+  if (destination.startsWith("-") || owner.startsWith("-")) return "masked";
+  if (!/^\d+$/.test(destination) || !/^\d+$/.test(owner)) return "masked";
+  return destination === owner ? "full" : "masked";
+}
+
+export function maskEmail(email: string): string {
+  const trimmed = email.trim();
+  const at = trimmed.lastIndexOf("@");
+  const name = at > 0 ? trimmed.slice(0, at) : "";
+  const domain = at > 0 ? trimmed.slice(at + 1) : "";
+  if (!name || !domain || domain.includes(" ")) return "Not provided";
+  return `${name.slice(0, 1)}***@${domain}`;
+}
+
+export function maskPhone(phone: string): string {
+  const digits = phone.replace(/\D/g, "");
+  if (digits.length < 4) return "Not provided";
+  return `***${digits.slice(-4)}`;
+}
+
+export function verificationLabel(value: boolean | null): "Verified" | "Unverified" | "Unknown" {
+  if (value === true) return "Verified";
+  if (value === false) return "Unverified";
+  return "Unknown";
+}
+
+export function formatRegisteredAt(iso: string | null | undefined): string {
+  if (!iso) return "Unknown";
+  const date = new Date(iso);
+  if (Number.isNaN(date.getTime())) return "Unknown";
+  const months = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+  const day = String(date.getUTCDate()).padStart(2, "0");
+  const hours = String(date.getUTCHours()).padStart(2, "0");
+  const minutes = String(date.getUTCMinutes()).padStart(2, "0");
+  return `${day} ${months[date.getUTCMonth()]} ${date.getUTCFullYear()}, ${hours}:${minutes} UTC`;
+}
+
+export type SignupNotice = {
+  displayName: string | null;
+  playerId: string;
+  email: string | null;
+  phone: string | null;
+  emailVerified: boolean | null;
+  phoneVerified: boolean | null;
+  registeredAt: string | null;
+  accountStatus: string | null;
+  source: string | null;
+};
+
+function contactLine(value: string | null | undefined, disclosure: ContactDisclosure, kind: "email" | "phone"): string {
+  const trimmed = value?.trim() ?? "";
+  if (!trimmed) return "Not provided";
+  const shown = disclosure === "full" ? trimmed : kind === "email" ? maskEmail(trimmed) : maskPhone(trimmed);
+  return escapeHtml(shown);
+}
+
+/** Players signup notice. Uses only the fields passed in. */
+export function signupAlertText(input: SignupNotice & { disclosure: ContactDisclosure; adminUrl?: string | null }): string {
+  const lines = [
+    "<b>New registration</b>",
+    "",
+    `Name: ${input.displayName?.trim() ? escapeHtml(input.displayName.trim()) : "Not provided"}`,
+    `Player ID: ${input.playerId.trim() ? escapeHtml(input.playerId.trim()) : "Unknown"}`,
+    `Email: ${contactLine(input.email, input.disclosure, "email")}`,
+    `Phone: ${contactLine(input.phone, input.disclosure, "phone")}`,
+    `Email verification: ${verificationLabel(input.emailVerified)}`,
+    `Phone verification: ${verificationLabel(input.phoneVerified)}`,
+    `Registered: ${formatRegisteredAt(input.registeredAt)}`,
+    `Account status: ${input.accountStatus?.trim() ? escapeHtml(input.accountStatus.trim()) : "Unknown"}`,
+    `Source: ${input.source?.trim() ? escapeHtml(input.source.trim()) : "Not provided"}`,
+  ];
+  if (input.adminUrl && input.adminUrl.startsWith("https://")) lines.push(`<a href="${escapeHtml(input.adminUrl)}">Open in admin</a>`);
+  return lines.join("\n");
+}
+
+/** after() keeps the function alive only when the callback returns its promise. */
+export function keptPromptTask(task: () => Promise<void>): () => Promise<void> {
+  return async () => {
+    try {
+      await task();
+    } catch {
+      /* The queued row stays available for the daily cron. */
+    }
+  };
+}
+
 export function secretsMatch(given: string | null | undefined, expected: string | null | undefined): boolean {
   const left = given ?? "";
   const right = expected ?? "";

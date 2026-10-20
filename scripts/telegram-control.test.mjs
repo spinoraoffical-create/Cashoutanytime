@@ -12,6 +12,7 @@ import {
   alertText,
   botForCategory,
   classifyTelegramResponse,
+  contactDisclosure,
   customerCommandAllowed,
   customerWalletText,
   deliveryLatencyMs,
@@ -20,8 +21,12 @@ import {
   duplicateJobDecision,
   enqueueDisposition,
   formatDeliveryLatency,
+  formatRegisteredAt,
   incidentFingerprint,
   keepBusinessResult,
+  keptPromptTask,
+  maskEmail,
+  maskPhone,
   promptClaimAllowed,
   promptLifecycleDecision,
   promptScheduleDecision,
@@ -35,6 +40,7 @@ import {
   paymentTitle,
   reportWindow,
   secretsMatch,
+  signupAlertText,
   summarizeDelivery,
   summarizeMoney,
 } from "../src/lib/telegram/control/rules.ts";
@@ -408,6 +414,133 @@ const signupFn = signupSource.slice(signupStart, signupEnd);
 assert.equal(signupFn.includes("void import("), false);
 assert.equal(signupFn.includes("await safePaymentAlert("), true);
 assert.equal(signupFn.indexOf("await safePaymentAlert(") < signupFn.lastIndexOf("return { ok: true }"), true);
+
+const fullSignup = signupAlertText({
+  displayName: "Alex Rivera",
+  playerId: "player-1",
+  email: "alex.rivera@example.com",
+  phone: "+1 202 555 0148",
+  emailVerified: false,
+  phoneVerified: false,
+  registeredAt: "2026-10-20T04:55:00.000Z",
+  accountStatus: "Active",
+  source: "email",
+  disclosure: "full",
+  adminUrl: "https://www.sweeptakehub.com/admin/users",
+});
+assert.equal(fullSignup.includes("Alex Rivera"), true);
+assert.equal(fullSignup.includes("alex.rivera@example.com"), true);
+assert.equal(fullSignup.includes("+1 202 555 0148"), true);
+assert.equal(fullSignup.includes("Email verification: Unverified"), true);
+assert.equal(fullSignup.includes("Phone verification: Unverified"), true);
+assert.equal(fullSignup.includes(formatRegisteredAt("2026-10-20T04:55:00.000Z")), true);
+assert.equal(fullSignup.includes("Account status: Active"), true);
+assert.equal(fullSignup.includes("Source: email"), true);
+
+const noPhone = signupAlertText({
+  displayName: "Alex Rivera",
+  playerId: "player-1",
+  email: "alex.rivera@example.com",
+  phone: null,
+  emailVerified: false,
+  phoneVerified: null,
+  registeredAt: "2026-10-20T04:55:00.000Z",
+  accountStatus: "Active",
+  source: "email",
+  disclosure: "full",
+});
+assert.equal(noPhone.includes("Phone: Not provided"), true);
+assert.equal(noPhone.includes("Phone verification: Unknown"), true);
+
+const missing = signupAlertText({
+  displayName: null,
+  playerId: "player-2",
+  email: null,
+  phone: " ",
+  emailVerified: null,
+  phoneVerified: null,
+  registeredAt: null,
+  accountStatus: null,
+  source: null,
+  disclosure: "full",
+});
+assert.equal(missing.includes("Name: Not provided"), true);
+assert.equal(missing.includes("Email: Not provided"), true);
+assert.equal(missing.includes("Registered: Unknown"), true);
+assert.equal(missing.includes("Account status: Unknown"), true);
+assert.equal(missing.includes("Source: Not provided"), true);
+
+const injected = signupAlertText({
+  displayName: "<b>@admin</b> & co",
+  playerId: "player<script>",
+  email: "a<b>@example.com",
+  phone: "+1 <script>",
+  emailVerified: true,
+  phoneVerified: null,
+  registeredAt: "not-a-date",
+  accountStatus: "Active <i>",
+  source: "email\n<b>hack</b>",
+  disclosure: "full",
+});
+assert.equal(injected.includes("<b>@admin</b>"), false);
+assert.equal(injected.includes("&lt;b&gt;@admin&lt;/b&gt;"), true);
+assert.equal(injected.includes("Registered: Unknown"), true);
+assert.equal(maskEmail("alex.rivera@example.com"), "a***@example.com");
+assert.equal(maskPhone("+1 202 555 0148").endsWith("0148"), true);
+assert.equal(maskPhone("+1 202 555 0148").includes("202"), false);
+
+const masked = signupAlertText({
+  displayName: "Alex Rivera",
+  playerId: "player-1",
+  email: "alex.rivera@example.com",
+  phone: "+12025550148",
+  emailVerified: false,
+  phoneVerified: null,
+  registeredAt: "2026-10-20T04:55:00.000Z",
+  accountStatus: "Active",
+  source: "email",
+  disclosure: "masked",
+});
+assert.equal(masked.includes("alex.rivera@example.com"), false);
+assert.equal(masked.includes("a***@example.com"), true);
+assert.equal(masked.includes("12025550148"), false);
+assert.equal(masked.includes("***0148"), true);
+assert.equal(contactDisclosure({ destinationChatId: "100", ownerPrivateChatId: "100" }), "full");
+assert.equal(contactDisclosure({ destinationChatId: "-100123", ownerPrivateChatId: "100" }), "masked");
+assert.equal(contactDisclosure({ destinationChatId: "200", ownerPrivateChatId: "100" }), "masked");
+assert.equal(contactDisclosure({ destinationChatId: "100", ownerPrivateChatId: null }), "masked");
+
+assert.equal(classifyTelegramResponse({ httpStatus: 200, ok: true }).outcome, "accepted");
+assert.equal(classifyTelegramResponse({ thrown: true }).outcome, "uncertain");
+assert.equal(nextAttemptDecision({ attempts: 1, outcome: "uncertain", retryAfterSeconds: null, nowMs: 1_000 }).nextAttemptAt, null);
+assert.equal(nextAttemptDecision({ attempts: 1, outcome: "retry", retryAfterSeconds: 30, nowMs: 1_000 }).status, "retry_pending");
+assert.equal(classifyTelegramResponse({ httpStatus: 429 }).outcome, "retry");
+assert.equal(classifyTelegramResponse({ httpStatus: 500 }).outcome, "retry");
+assert.equal(enqueueDisposition({ existingStatus: "queued", configured: true }).action, "owned");
+assert.equal(promptClaimAllowed("sending"), false);
+assert.equal(promptScheduleDecision({ inserted: true, status: "queued", jobId: "job-9" }).jobId, "job-9");
+
+let promptFinished = false;
+const promptTask = keptPromptTask(async () => {
+  await Promise.resolve();
+  promptFinished = true;
+});
+const running = promptTask();
+assert.equal(promptFinished, false);
+await running;
+assert.equal(promptFinished, true);
+const deliverySource = readFileSync(new URL("../src/lib/telegram/control/delivery.ts", import.meta.url), "utf8");
+const scheduleStart = deliverySource.indexOf("function schedulePromptDelivery");
+const scheduleFn = deliverySource.slice(scheduleStart, deliverySource.indexOf("async function signupBody"));
+assert.equal(scheduleFn.includes("void deliverQueuedJobById"), false);
+assert.equal(scheduleFn.includes("keptPromptTask"), true);
+
+const registration = keepBusinessResult({ ok: true, userId: "player-1" });
+assert.equal(registration.ok, true);
+assert.equal(paymentTitle("deposit_credited", "wallet_recorded"), "Wallet credit recorded");
+assert.equal(botForCategory("signup"), "players");
+assert.equal(botForCategory("deposit_credited"), "payments");
+assert.equal(botForCategory("load_failed"), "errors");
 
 assert.equal(ownerCommandAllowed({ linked: true, purpose: "owner", isSuperAdmin: true, userId: "owner-1" }), true);
 assert.equal(parseCommand("/help")?.name, "help");

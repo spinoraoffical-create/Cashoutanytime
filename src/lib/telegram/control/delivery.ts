@@ -19,17 +19,21 @@ import {
   alertText,
   botForCategory,
   classifyTelegramResponse,
+  contactDisclosure,
   enqueueDisposition,
   incidentFingerprint,
   incidentSeverity,
   incidentShouldSend,
   investigationEventKey,
+  keptPromptTask,
   nextAttemptDecision,
   parseRetryAfter,
   promptClaimAllowed,
   promptScheduleDecision,
   sanitizeSecurityAlert,
+  signupAlertText,
   staleSendingDecision,
+  type SignupNotice,
   workerSummary,
   type AlertCategory,
   type AlertTestBot,
@@ -105,15 +109,6 @@ export async function enqueueAlert(input: {
   try {
     const bot = botForCategory(input.category);
     const env = botEnv(bot);
-    const body = alertText({
-      category: input.category,
-      source: input.source,
-      reference: input.reference,
-      amount: input.amount,
-      detail: input.detail,
-      adminPath: input.adminPath,
-      siteUrl: SITE_URL,
-    });
     const admin = createAdminClient();
     if (!admin) return { persisted: false, legacy: true, reason: "database_unavailable" };
     const eventKey = input.eventKey.trim().slice(0, 160);
@@ -125,6 +120,17 @@ export async function enqueueAlert(input: {
       .maybeSingle();
     if (readError) return { persisted: false, legacy: true, reason: "tables_missing" };
     const configured = Boolean(env.token && env.chatId);
+    const body = input.category === "signup"
+      ? await signupBody(admin, input.reference, env.chatId, input.adminPath)
+      : alertText({
+          category: input.category,
+          source: input.source,
+          reference: input.reference,
+          amount: input.amount,
+          detail: input.detail,
+          adminPath: input.adminPath,
+          siteUrl: SITE_URL,
+        });
     const existingRow = (existing as { id?: string; status?: DeliveryJobStatus; legacy_outcome?: LegacyOutcome | null } | null) ?? null;
     if (existingRow?.id) persisted = true;
     const decision = enqueueDisposition({
@@ -225,12 +231,86 @@ export async function enqueueIncident(input: {
 
 function schedulePromptDelivery(jobId: string) {
   try {
-    after(() => {
-      void deliverQueuedJobById(jobId).catch(() => undefined);
-    });
+    after(keptPromptTask(() => deliverQueuedJobById(jobId)));
   } catch {
     /* The row stays queued. The daily cron can send it later. */
   }
+}
+
+async function signupBody(admin: Admin, userId: string, destinationChatId: string, adminPath?: string | null): Promise<string> {
+  const notice = await loadSignupNotice(admin, userId);
+  const ownerChat = await ownerPrivateChatId(admin);
+  const path = adminPath && adminPath.startsWith("/") ? `${SITE_URL.replace(/\/$/, "")}${adminPath}` : null;
+  return signupAlertText({
+    ...notice,
+    disclosure: contactDisclosure({ destinationChatId, ownerPrivateChatId: ownerChat }),
+    adminUrl: path,
+  });
+}
+
+async function ownerPrivateChatId(admin: Admin): Promise<string | null> {
+  const { data, error } = await admin
+    .from("telegram_account_links")
+    .select("chat_id")
+    .eq("purpose", "owner")
+    .is("revoked_at", null)
+    .limit(2);
+  if (error) return null;
+  const rows = (data ?? []) as Array<{ chat_id?: number | string | null }>;
+  if (rows.length !== 1 || rows[0]?.chat_id == null) return null;
+  return String(rows[0].chat_id);
+}
+
+async function loadSignupNotice(admin: Admin, userId: string): Promise<SignupNotice> {
+  const notice: SignupNotice = {
+    displayName: null,
+    playerId: userId,
+    email: null,
+    phone: null,
+    emailVerified: null,
+    phoneVerified: null,
+    registeredAt: null,
+    accountStatus: null,
+    source: null,
+  };
+  try {
+    const { data } = await admin
+      .from("profiles")
+      .select("full_name, email, phone, is_suspended, created_at")
+      .eq("id", userId)
+      .maybeSingle();
+    const profile = data as {
+      full_name?: string | null;
+      email?: string | null;
+      phone?: string | null;
+      is_suspended?: boolean | null;
+      created_at?: string | null;
+    } | null;
+    if (profile) {
+      notice.displayName = profile.full_name?.trim() || null;
+      notice.email = profile.email?.trim() || null;
+      notice.phone = profile.phone?.trim() || null;
+      notice.registeredAt = profile.created_at ?? null;
+      if (typeof profile.is_suspended === "boolean") notice.accountStatus = profile.is_suspended ? "Suspended" : "Active";
+    }
+    const authUser = await admin.auth.admin.getUserById(userId);
+    const user = authUser.data?.user;
+    if (user) {
+      const meta = (user.user_metadata ?? {}) as Record<string, unknown>;
+      if (!notice.displayName && typeof meta.full_name === "string") notice.displayName = meta.full_name.trim() || null;
+      if (!notice.email && user.email) notice.email = user.email;
+      if (!notice.phone && typeof meta.phone === "string") notice.phone = meta.phone.trim() || null;
+      if (!notice.phone && user.phone) notice.phone = user.phone;
+      notice.emailVerified = Boolean(user.email_confirmed_at);
+      const phoneConfirmed = (user as { phone_confirmed_at?: string | null }).phone_confirmed_at;
+      notice.phoneVerified = notice.phone ? Boolean(phoneConfirmed) : null;
+      if (!notice.registeredAt) notice.registeredAt = user.created_at ?? null;
+      if (!notice.source && typeof meta.auth_method === "string") notice.source = meta.auth_method.trim() || null;
+    }
+  } catch {
+    /* Missing profile fields stay Unknown or Not provided. */
+  }
+  return notice;
 }
 
 async function deliverQueuedJobById(jobId: string): Promise<void> {
