@@ -10,6 +10,11 @@ import {
   LINK_PEPPER_ENV,
   SENDING_STALE_MS,
   TELEGRAM_NETWORK_TIMEOUT_MS,
+  alertTestCompletion,
+  alertTestDuplicateDecision,
+  alertTestTarget,
+  alertTestVisibleStatus,
+  safeTelegramTestError,
   alertText,
   botForCategory,
   classifyTelegramResponse,
@@ -24,6 +29,8 @@ import {
   staleSendingDecision,
   workerSummary,
   type AlertCategory,
+  type AlertTestBot,
+  type AlertTestStatus,
   type DeliveryJobStatus,
   type LegacyOutcome,
   type Severity,
@@ -483,4 +490,92 @@ export async function sendOwnerTest(): Promise<{ ok: boolean; error?: string }> 
   });
   if (error) return { ok: false, error: "The test was not queued. Apply the Telegram SQL before sending a test." };
   return { ok: true };
+}
+
+export type AlertBotTestResult = {
+  ok: boolean;
+  status?: AlertTestStatus;
+  error?: string;
+  repeated?: boolean;
+};
+
+function storedAlertTest(row: { status: string; last_error: string | null }): AlertBotTestResult {
+  const status = alertTestVisibleStatus(row.status);
+  if (!status) return { ok: false, repeated: true, error: "A test for this bot is already being sent. It was not sent again." };
+  return {
+    ok: status === "accepted",
+    status,
+    repeated: true,
+    error: status === "accepted" ? undefined : safeTelegramTestError(row.last_error) ?? undefined,
+  };
+}
+
+/** Sends one labeled test for payments, players, or errors. Does not drain the delivery queue. */
+export async function sendAlertBotTest(bot: AlertTestBot): Promise<AlertBotTestResult> {
+  const target = alertTestTarget(bot);
+  const env = botEnv(target.bot);
+  if (!env.token || !env.chatId) return { ok: false, error: "That bot token or chat is not set." };
+  const admin = createAdminClient();
+  if (!admin) return { ok: false, error: "Database is unavailable." };
+
+  const existing = await admin
+    .from("telegram_delivery_jobs")
+    .select("status, last_error")
+    .eq("event_key", target.eventKey)
+    .maybeSingle();
+  if (existing.error) return { ok: false, error: "The test record could not be read." };
+  if (alertTestDuplicateDecision(existing.data as { status: string } | null) === "keep") {
+    return storedAlertTest(existing.data as { status: string; last_error: string | null });
+  }
+
+  const inserted = await admin
+    .from("telegram_delivery_jobs")
+    .insert({
+      event_key: target.eventKey,
+      bot_key: target.bot,
+      category: target.category,
+      chat_id: env.chatId,
+      body: target.body,
+      status: "sending",
+      attempt_count: 1,
+      next_attempt_at: null,
+    })
+    .select("id")
+    .maybeSingle();
+  if (inserted.error || !inserted.data) {
+    const raced = await admin
+      .from("telegram_delivery_jobs")
+      .select("status, last_error")
+      .eq("event_key", target.eventKey)
+      .maybeSingle();
+    if (raced.data) return storedAlertTest(raced.data as { status: string; last_error: string | null });
+    return { ok: false, error: "The test was not recorded." };
+  }
+
+  const jobId = (inserted.data as { id: string }).id;
+  const sent = await sendTelegramText(env.token, env.chatId, target.body, false);
+  const completion = alertTestCompletion({
+    httpStatus: sent.httpStatus,
+    ok: sent.ok,
+    thrown: sent.thrown,
+    description: sent.description,
+  });
+  await admin.from("telegram_delivery_attempts").insert({
+    job_id: jobId,
+    outcome: completion.status,
+    http_status: sent.httpStatus,
+    error: completion.error,
+  });
+  await admin
+    .from("telegram_delivery_jobs")
+    .update({
+      status: completion.status,
+      next_attempt_at: completion.nextAttemptAt,
+      last_error: completion.error,
+      telegram_message_id: sent.messageId,
+      updated_at: new Date().toISOString(),
+    })
+    .eq("id", jobId)
+    .eq("event_key", target.eventKey);
+  return { ok: completion.status === "accepted", status: completion.status, error: completion.error ?? undefined };
 }

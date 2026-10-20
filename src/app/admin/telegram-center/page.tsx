@@ -153,7 +153,7 @@ export default async function TelegramCenterPage({
       ) : null}
 
       {section === "overview" || section === "settings" ? (
-        <AdminSectionCard title="Owner tools" description="The test goes only to the owner chat saved in the server environment. You cannot type a chat id here.">
+        <AdminSectionCard title="Owner tools" description="Owner test goes only to the saved owner chat. Payments, Players, and Errors each send one labeled test to that bot's saved chat. A second click does not send again. You cannot type a chat id here.">
           <TelegramCenterActions />
         </AdminSectionCard>
       ) : null}

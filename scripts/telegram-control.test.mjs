@@ -1,6 +1,13 @@
 import assert from "node:assert/strict";
 
 import {
+  ALERT_TEST_BODY,
+  alertTestAccess,
+  alertTestCompletion,
+  alertTestDuplicateDecision,
+  alertTestIsQueueEligible,
+  alertTestTarget,
+  alertTestVisibleStatus,
   alertText,
   botForCategory,
   classifyTelegramResponse,
@@ -279,5 +286,40 @@ assert.equal(isolatedTelegramTarget("https://zecitlewsynyioemsqna.supabase.co"),
 assert.equal(isolatedTelegramTarget("https://www.sweeptakehub.com"), "production");
 assert.equal(isolatedTelegramTarget("http://127.0.0.1:54321"), "isolated");
 assert.equal(isolatedTelegramTarget(""), "missing");
+
+assert.equal(alertTestAccess({ isSuperAdmin: false, bot: "payments" }).ok, false);
+assert.equal(alertTestAccess({ isSuperAdmin: true, bot: "owner" }).ok, false);
+assert.equal(alertTestAccess({ isSuperAdmin: true, bot: "support" }).ok, false);
+assert.equal(alertTestAccess({ isSuperAdmin: true, bot: "payments" }).ok, true);
+
+const targets = ["payments", "players", "errors"].map((bot) => alertTestTarget(bot));
+assert.equal(new Set(targets.map((item) => item.eventKey)).size, 3);
+for (const target of targets) {
+  assert.equal(target.body, ALERT_TEST_BODY);
+  assert.equal(target.category, "control_test");
+  assert.equal(target.eventKey, `bot-test:${target.bot}`);
+  assert.equal(target.bot === "owner" || target.bot === "support", false);
+  assert.equal(alertTestIsQueueEligible("sending"), false);
+}
+assert.equal(targets[0].eventKey.includes("players"), false);
+assert.equal(targets[1].eventKey.includes("payments"), false);
+
+for (const status of ["sending", "queued", "accepted", "failed", "uncertain", "retry_pending"]) {
+  assert.equal(alertTestDuplicateDecision({ status }), "keep");
+}
+assert.equal(alertTestDuplicateDecision(null), "create");
+assert.equal(alertTestVisibleStatus("accepted"), "accepted");
+assert.equal(alertTestVisibleStatus("sending"), null);
+
+const refused = alertTestCompletion({ httpStatus: 429, ok: false, description: "Too Many Requests bot123:ABCDEFsecretvalue" });
+assert.equal(refused.status, "failed");
+assert.equal(refused.nextAttemptAt, null);
+assert.equal(alertTestIsQueueEligible(refused.status), false);
+assert.equal(refused.error.includes("bot123:"), false);
+const accepted = alertTestCompletion({ httpStatus: 200, ok: true });
+assert.equal(accepted.status, "accepted");
+assert.equal(accepted.nextAttemptAt, null);
+assert.equal(alertTestCompletion({ thrown: true }).status, "uncertain");
+assert.equal(alertTestCompletion({ httpStatus: 400, ok: false, description: "chat not found" }).status, "failed");
 
 console.log("telegram-control.test.mjs passed");

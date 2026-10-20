@@ -541,6 +541,69 @@ export function isTelegramBotKey(value: string): value is TelegramBotKey {
   return (TELEGRAM_BOTS as readonly string[]).includes(value);
 }
 
+export const ALERT_TEST_BOTS = ["payments", "players", "errors"] as const;
+export type AlertTestBot = (typeof ALERT_TEST_BOTS)[number];
+export const ALERT_TEST_BODY = "Telegram Control Center test. This is not a payment, player event, or error.";
+export type AlertTestStatus = "accepted" | "failed" | "uncertain";
+
+export function isAlertTestBot(value: string): value is AlertTestBot {
+  return (ALERT_TEST_BOTS as readonly string[]).includes(value);
+}
+
+export function alertTestAccess(input: { isSuperAdmin: boolean; bot: string }): { ok: true; bot: AlertTestBot } | { ok: false; error: string } {
+  if (!input.isSuperAdmin) return { ok: false, error: "Only an owner can send a bot test." };
+  if (!isAlertTestBot(input.bot)) return { ok: false, error: "That bot cannot be tested from here." };
+  return { ok: true, bot: input.bot };
+}
+
+export function alertTestTarget(bot: AlertTestBot): { bot: AlertTestBot; eventKey: string; body: string; category: "control_test" } {
+  return { bot, eventKey: `bot-test:${bot}`, body: ALERT_TEST_BODY, category: "control_test" };
+}
+
+/** An existing test row is kept. A repeated click must not send another message. */
+export function alertTestDuplicateDecision(existing: { status: string } | null): "create" | "keep" {
+  if (!existing) return "create";
+  return "keep";
+}
+
+export function alertTestVisibleStatus(status: string): AlertTestStatus | null {
+  if (status === "accepted" || status === "failed" || status === "uncertain") return status;
+  return null;
+}
+
+/** Due-queue selection is queued or retry_pending. A test must never match it. */
+export function alertTestIsQueueEligible(status: string): boolean {
+  return status === "queued" || status === "retry_pending";
+}
+
+export function safeTelegramTestError(description: string | null | undefined): string | null {
+  if (!description?.trim()) return null;
+  const text = description
+    .replace(/bot\d+:[A-Za-z0-9_-]+/gi, "[redacted]")
+    .replace(/\b\d{6,}:[A-Za-z0-9_-]{20,}\b/g, "[redacted]")
+    .replace(/bearer\s+\S+/gi, "bearer [redacted]")
+    .replace(/https?:\/\/\S+/gi, "[link]")
+    .replace(/\s+/g, " ")
+    .trim();
+  return text.slice(0, 180);
+}
+
+/** One attempt. Retry and refusal both finish as failed so the daily worker cannot send the test again. */
+export function alertTestCompletion(input: {
+  httpStatus?: number | null;
+  ok?: boolean | null;
+  thrown?: boolean;
+  description?: string | null;
+}): { status: AlertTestStatus; nextAttemptAt: null; error: string | null } {
+  const classified = classifyTelegramResponse(input);
+  const error = safeTelegramTestError(input.description);
+  if (classified.outcome === "accepted") return { status: "accepted", nextAttemptAt: null, error: null };
+  if (classified.outcome === "uncertain") {
+    return { status: "uncertain", nextAttemptAt: null, error: error ?? "Telegram did not answer before the timeout." };
+  }
+  return { status: "failed", nextAttemptAt: null, error: error ?? "Telegram refused the test." };
+}
+
 export function webhookPath(bot: TelegramBotKey): string {
   return `/api/telegram/${bot}`;
 }

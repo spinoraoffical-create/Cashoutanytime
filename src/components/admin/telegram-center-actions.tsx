@@ -3,12 +3,19 @@
 import { useState } from "react";
 import { toast } from "sonner";
 
-import { createTelegramLinkAction, recoverTelegramUpdateAction, sendTelegramOwnerTestAction } from "@/lib/actions/admin/telegram-center";
+import { createTelegramLinkAction, recoverTelegramUpdateAction, sendTelegramAlertTestAction, sendTelegramOwnerTestAction } from "@/lib/actions/admin/telegram-center";
 import { Button } from "@/components/ui/button";
+
+const ALERT_TESTS = [
+  ["payments", "Test Payments Bot"],
+  ["players", "Test Players Bot"],
+  ["errors", "Test Errors Bot"],
+] as const;
 
 export function TelegramCenterActions() {
   const [link, setLink] = useState("");
   const [busy, setBusy] = useState(false);
+  const [tests, setTests] = useState<Record<string, string>>({});
 
   return (
     <div className="flex flex-col gap-3">
@@ -46,8 +53,38 @@ export function TelegramCenterActions() {
         >
           Send owner test
         </Button>
+        {ALERT_TESTS.map(([bot, label]) => (
+          <Button
+            key={bot}
+            type="button"
+            variant="secondary"
+            disabled={busy}
+            onClick={() => {
+              if (!window.confirm(`Send one test through the ${bot} bot?`)) return;
+              setBusy(true);
+              void sendTelegramAlertTestAction(bot).then((result) => {
+                setBusy(false);
+                const status = result.status ?? "not sent";
+                const detail = result.error ? `${status}. ${result.error}` : status;
+                const prefix = result.repeated ? "Already recorded" : "Result";
+                setTests((current) => ({ ...current, [bot]: `${prefix}: ${detail}` }));
+                if (!result.ok) toast.error(result.error ?? "The test was not sent.");
+                else toast.success(`${label}: ${status}.`);
+              });
+            }}
+          >
+            {label}
+          </Button>
+        ))}
       </div>
       {link ? <p className="break-all text-sm text-[#d7e3ff]">{link}</p> : null}
+      {ALERT_TESTS.map(([bot, label]) =>
+        tests[bot] ? (
+          <p key={bot} className="text-sm text-[#d7e3ff]">
+            {label}: {tests[bot]}
+          </p>
+        ) : null
+      )}
     </div>
   );
 }
