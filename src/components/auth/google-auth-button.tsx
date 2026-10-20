@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
 import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
+import { bareAuthCallbackUrl, oauthNextCookie } from "@/lib/auth/oauth-return";
 import { browserOAuthUrl } from "@/lib/auth/otp-safety";
 import { getDeviceId } from "@/lib/security/device-fingerprint";
 
@@ -41,19 +42,19 @@ export function GoogleAuthButton({
 
     await getDeviceId();
 
-    const callbackUrl = new URL("/auth/callback", window.location.origin);
-    callbackUrl.searchParams.set("redirect", redirect);
-    if (referralCode?.trim()) {
-      callbackUrl.searchParams.set("ref", referralCode.trim());
-    }
-    if (agentCode?.trim()) {
-      callbackUrl.searchParams.set("agent", agentCode.trim());
-    }
+    document.cookie = oauthNextCookie({
+      redirect,
+      ref: referralCode,
+      agent: agentCode,
+      hostname: window.location.hostname,
+      secure: window.location.protocol === "https:",
+    });
+    const callbackUrl = bareAuthCallbackUrl(window.location.origin);
 
     const { data, error } = await supabase.auth.signInWithOAuth({
       provider: "google",
       options: {
-        redirectTo: callbackUrl.toString(),
+        redirectTo: callbackUrl,
         skipBrowserRedirect: true,
         queryParams: {
           access_type: "online",

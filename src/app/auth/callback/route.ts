@@ -3,6 +3,7 @@ import { cookies } from "next/headers";
 import { NextResponse, type NextRequest } from "next/server";
 import type { EmailOtpType } from "@supabase/supabase-js";
 import { pickLoginDestination, signedInUsesAdminHome } from "@/lib/auth/account-home";
+import { decodeOAuthNext, OAUTH_NEXT_COOKIE, oauthLoginError } from "@/lib/auth/oauth-return";
 import { withAuthCookieDomain } from "@/lib/supabase/cookie-domain";
 import { syncProfileFromAuthMetadata } from "@/lib/actions/auth";
 import { linkSignupSecurity } from "@/lib/actions/security";
@@ -14,11 +15,12 @@ function publicOrigin(request: NextRequest) {
   return new URL(request.url).origin;
 }
 
-function resolveRedirect(request: NextRequest, type: EmailOtpType | null) {
+function resolveRedirect(request: NextRequest, type: EmailOtpType | null, cookieRedirect = "") {
   const { searchParams } = new URL(request.url);
   const raw =
     searchParams.get("redirect") ||
     searchParams.get("next") ||
+    cookieRedirect ||
     (type === "recovery" ? "/reset-password/update" : "/dashboard");
   if (!raw.startsWith("/") || raw.startsWith("//") || raw.includes("://") || raw.includes("\\")) {
     return "/dashboard";
@@ -26,18 +28,28 @@ function resolveRedirect(request: NextRequest, type: EmailOtpType | null) {
   return raw;
 }
 
+function clearOAuthNextCookie(response: NextResponse, host: string | null) {
+  response.cookies.set(
+    OAUTH_NEXT_COOKIE,
+    "",
+    withAuthCookieDomain({ path: "/", maxAge: 0 }, host)
+  );
+  return response;
+}
+
 export async function GET(request: NextRequest) {
   const { searchParams } = new URL(request.url);
   const origin = publicOrigin(request);
+  const host = request.headers.get("host");
   const code = searchParams.get("code");
   const tokenHash = searchParams.get("token_hash");
   const rawType = searchParams.get("type");
   const type = (rawType === "email" ? "signup" : rawType) as EmailOtpType | null;
-  const redirect = resolveRedirect(request, type);
-  const referralCode = searchParams.get("ref");
-  const agentCode = searchParams.get("agent");
-
   const cookieStore = await cookies();
+  const oauthNext = decodeOAuthNext(cookieStore.get(OAUTH_NEXT_COOKIE)?.value);
+  const redirect = resolveRedirect(request, type, oauthNext.redirect);
+  const referralCode = searchParams.get("ref") || oauthNext.ref || null;
+  const agentCode = searchParams.get("agent") || oauthNext.agent || null;
   const destUrl = new URL(redirect, origin);
   if (type === "signup") {
     destUrl.searchParams.set("verified", "1");
@@ -70,24 +82,38 @@ export async function GET(request: NextRequest) {
   );
 
   const oauthError = searchParams.get("error");
-  if (!code && !tokenHash && oauthError === "access_denied") {
-    return NextResponse.redirect(`${origin}/login?error=google_cancelled`);
+  const errorCode = searchParams.get("error_code");
+  if (!code && !tokenHash && (oauthError || errorCode)) {
+    console.error("auth callback provider error:", oauthLoginError(errorCode, oauthError));
+    return clearOAuthNextCookie(
+      NextResponse.redirect(`${origin}/login?error=${oauthLoginError(errorCode, oauthError)}`),
+      host
+    );
   }
 
   if (code) {
     const { error } = await supabase.auth.exchangeCodeForSession(code);
     if (error) {
       console.error("auth callback code error:", error.message);
-      return NextResponse.redirect(`${origin}/login?error=auth_callback_failed`);
+      return clearOAuthNextCookie(
+        NextResponse.redirect(`${origin}/login?error=auth_callback_failed`),
+        host
+      );
     }
   } else if (tokenHash && type) {
     const { error } = await supabase.auth.verifyOtp({ type, token_hash: tokenHash });
     if (error) {
       console.error("auth callback otp error:", error.message);
-      return NextResponse.redirect(`${origin}/login?error=auth_callback_failed`);
+      return clearOAuthNextCookie(
+        NextResponse.redirect(`${origin}/login?error=auth_callback_failed`),
+        host
+      );
     }
   } else {
-    return NextResponse.redirect(`${origin}/login?error=auth_callback_failed`);
+    return clearOAuthNextCookie(
+      NextResponse.redirect(`${origin}/login?error=auth_callback_failed`),
+      host
+    );
   }
 
   try {
@@ -180,5 +206,5 @@ export async function GET(request: NextRequest) {
     }
   }
 
-  return response;
+  return clearOAuthNextCookie(response, host);
 }

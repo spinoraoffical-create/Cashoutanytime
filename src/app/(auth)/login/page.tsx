@@ -18,6 +18,9 @@ function LoginForm() {
     if (searchParams.get("error") === "google_cancelled") {
       toast.error("Google sign-in was cancelled. You can try again or use email.");
     }
+    if (searchParams.get("error") === "google_email_exists") {
+      toast.error("This Google email already has an email account. Sign in with email and password.");
+    }
     if (searchParams.get("error") === "auth_callback_failed") {
       toast.error(
         "That code or link expired. Request a new code, or sign in if you already verified."

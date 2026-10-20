@@ -1,5 +1,6 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { isRestrictedUsRegion, restrictedStateCodes } from "@/lib/compliance/restricted-state";
+import { oauthRecoveryTarget } from "@/lib/auth/oauth-return";
 import { updateSession } from "@/lib/supabase/middleware";
 
 export async function middleware(request: NextRequest) {
@@ -30,6 +31,10 @@ export async function middleware(request: NextRequest) {
   if (path === "/restricted") {
     return NextResponse.next();
   }
+
+  // Google can return to the site root when the callback URL was replaced.
+  const oauthReturn = oauthRecoveryTarget(request.nextUrl);
+  if (oauthReturn) return NextResponse.redirect(oauthReturn);
 
   // 2. supabase auth & session keeper
   return await updateSession(request);

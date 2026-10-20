@@ -5,6 +5,15 @@ import { isValidOtpCode } from "../src/lib/auth/phone.ts";
 import { passwordIsAcceptable, passwordProblems } from "../src/lib/auth/password-rules.ts";
 import { shouldHideAccountExistence } from "../src/lib/auth/recovery.ts";
 import { authUserUpdateForContact, browserOAuthUrl, otpFailureMessage } from "../src/lib/auth/otp-safety.ts";
+import { buildAuthCallbackUrl, getAuthCallbackUrl } from "../src/lib/auth/callback-url.ts";
+import {
+  bareAuthCallbackUrl,
+  decodeOAuthNext,
+  encodeOAuthNext,
+  oauthLoginError,
+  oauthNextCookie,
+  oauthRecoveryTarget,
+} from "../src/lib/auth/oauth-return.ts";
 import { withAuthCookieDomain } from "../src/lib/supabase/cookie-domain.ts";
 
 assert.equal(passwordIsAcceptable("secret1"), false);
@@ -73,10 +82,48 @@ assert.equal(formSource.includes('type: "signup"'), true);
 const googleSource = readFileSync(new URL("../src/components/auth/google-auth-button.tsx", import.meta.url), "utf8");
 assert.equal(googleSource.includes("browserOAuthUrl"), true);
 assert.equal(googleSource.includes("skipBrowserRedirect: true"), true);
+assert.equal(googleSource.includes("bareAuthCallbackUrl"), true);
+assert.equal(googleSource.includes("oauthNextCookie"), true);
+assert.equal(googleSource.includes('searchParams.set("redirect"'), false);
 const callbackSource = readFileSync(new URL("../src/app/auth/callback/route.ts", import.meta.url), "utf8");
 assert.equal(callbackSource.includes("exchangeCodeForSession"), true);
-assert.equal(callbackSource.includes("google_cancelled"), true);
+assert.equal(callbackSource.includes("oauthLoginError"), true);
 assert.equal(callbackSource.includes('raw.startsWith("//")'), true);
+assert.equal(callbackSource.includes("decodeOAuthNext"), true);
+const middlewareSource = readFileSync(new URL("../src/middleware.ts", import.meta.url), "utf8");
+assert.equal(middlewareSource.includes("oauthRecoveryTarget"), true);
+
+assert.equal(
+  bareAuthCallbackUrl("https://www.sweeptakehub.com"),
+  "https://www.sweeptakehub.com/auth/callback"
+);
+assert.equal(new URL(buildAuthCallbackUrl("https://www.sweeptakehub.com", "/", "REF", "AGENT")).search, "");
+assert.equal(new URL(getAuthCallbackUrl("/dashboard")).pathname, "/auth/callback");
+const packed = encodeOAuthNext({ redirect: "https://evil.example", ref: "bad ref", agent: "agent_1" });
+assert.deepEqual(decodeOAuthNext(encodeURIComponent(packed)), { redirect: "/", ref: "", agent: "agent_1" });
+assert.equal(decodeOAuthNext("%7B").redirect, "");
+assert.equal(oauthLoginError("email_exists", "server_error"), "google_email_exists");
+assert.equal(oauthLoginError(null, "access_denied"), "google_cancelled");
+assert.equal(oauthLoginError("unexpected_failure", "server_error"), "auth_callback_failed");
+const cookie = oauthNextCookie({
+  redirect: "/dashboard",
+  hostname: "www.sweeptakehub.com",
+  secure: true,
+});
+assert.equal(cookie.includes("Domain=.sweeptakehub.com"), true);
+assert.equal(cookie.includes("SameSite=Lax"), true);
+assert.equal(cookie.includes("Secure"), true);
+assert.equal(cookie.includes("auth-token"), false);
+
+const codeReturn = oauthRecoveryTarget(new URL("https://sweeptakehub.com/?code=pkce-code&error_description=hidden"));
+assert.equal(codeReturn?.toString(), "https://sweeptakehub.com/auth/callback?code=pkce-code");
+const errorReturn = oauthRecoveryTarget(
+  new URL("https://www.sweeptakehub.com/?error=server_error&error_code=email_exists&error_description=hidden%40email")
+);
+assert.equal(errorReturn?.toString(), "https://www.sweeptakehub.com/login?error=google_email_exists");
+assert.equal(oauthRecoveryTarget(new URL("https://www.sweeptakehub.com/auth/callback?code=keep")), null);
+assert.equal(oauthRecoveryTarget(new URL("https://www.sweeptakehub.com/login?error=auth_callback_failed")), null);
+assert.equal(oauthRecoveryTarget(new URL("https://www.sweeptakehub.com/login")), null);
 const template = readFileSync(new URL("../supabase/email-templates/confirm-signup.html", import.meta.url), "utf8");
 assert.equal(template.includes("{{ .Token }}"), true);
 assert.equal(template.includes("ConfirmationURL"), false);
