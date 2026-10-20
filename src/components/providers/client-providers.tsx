@@ -3,6 +3,7 @@
 import { useEffect, useState, type ReactNode } from "react";
 import { usePathname } from "next/navigation";
 import { Toaster } from "sonner";
+import { ConsentAnalytics } from "@/components/analytics/consent-analytics";
 import { MessageRealtimeProvider } from "@/components/chat/message-realtime-provider";
 import { createClient } from "@/lib/supabase/client";
 import { MessageRealtimeStubProvider } from "@/lib/chat/message-realtime-stub";
@@ -54,6 +55,7 @@ export function ClientProviders({ children }: { children: ReactNode }) {
   return (
     <>
       <Provider>{children}</Provider>
+      <ConsentAnalytics />
       <Toaster richColors closeButton position="top-center" />
     </>
   );

@@ -71,6 +71,21 @@ export function PublicHome({
         </div>
       </section>
 
+      <section className="hub-card space-y-3 rounded-[24px] p-5">
+        <h2 className="text-xl font-extrabold">What Sweepstakes Hub is</h2>
+        <p className="text-sm leading-relaxed text-muted-foreground">
+          Sweepstakes Hub is the game lobby at sweeptakehub.com. Browse Game Rooms, create an account, then open a room from Play.
+          Registration uses email or Google. Rules and answers are on Help and the FAQ. A person handles support.
+        </p>
+        <div className="flex flex-wrap gap-2 text-sm font-semibold">
+          <Link href="/play" className="rounded-full bg-white/10 px-3 py-1.5">Browse games</Link>
+          <Link href="/register" className="rounded-full bg-white/10 px-3 py-1.5">Create an account</Link>
+          <Link href="/faq" className="rounded-full bg-white/10 px-3 py-1.5">FAQ</Link>
+          <Link href="/help" className="rounded-full bg-white/10 px-3 py-1.5">Help</Link>
+          <Link href="/support" className="rounded-full bg-white/10 px-3 py-1.5">Support</Link>
+        </div>
+      </section>
+
       <section>
         <h2 className="mb-1 text-xl font-extrabold">Built to feel simple</h2>
         <p className="mb-4 text-sm text-muted-foreground">
@@ -212,8 +227,8 @@ export function PublicHome({
           <Link href="/support" className="hub-card rounded-2xl p-4 font-semibold">
             Get support
           </Link>
-          <Link href="/terms" className="hub-card rounded-2xl p-4 font-semibold">
-            Responsible play
+          <Link href="/help" className="hub-card rounded-2xl p-4 font-semibold">
+            Help and rules
           </Link>
           <Link href="/terms" className="hub-card rounded-2xl p-4 text-sm text-muted-foreground">
             Terms

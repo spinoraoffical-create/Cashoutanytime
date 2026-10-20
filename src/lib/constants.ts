@@ -27,8 +27,16 @@ export function resolveSiteUrl(raw: string | undefined): string {
   try {
     const url = new URL(configured);
     if (url.protocol !== "http:" && url.protocol !== "https:") return SITE_URL_FALLBACK;
+    if (url.hostname === "localhost" || url.hostname === "127.0.0.1") {
+      const path = url.pathname === "/" ? "" : url.pathname.replace(/\/$/, "");
+      return `${url.origin}${path}`;
+    }
+    if (url.hostname === "sweeptakehub.com" || url.hostname === "www.sweeptakehub.com") {
+      url.protocol = "https:";
+      url.hostname = "www.sweeptakehub.com";
+    }
     const path = url.pathname === "/" ? "" : url.pathname.replace(/\/$/, "");
-    return `${url.origin}${path}${url.search}`;
+    return `${url.origin}${path}`;
   } catch {
     return SITE_URL_FALLBACK;
   }
@@ -110,5 +118,26 @@ export const SOCIAL_LINKS = {
   tiktok:
     process.env.NEXT_PUBLIC_TIKTOK_URL ||
     "https://www.tiktok.com/@spinora09",
-  whatsapp: process.env.NEXT_PUBLIC_WHATSAPP_URL || "https://wa.me/1234567890",
+  whatsapp: process.env.NEXT_PUBLIC_WHATSAPP_URL || "",
 } as const;
+
+const UNVERIFIED_PROFILE = /wa\.me\/1234567890|spinora09|facebook\.com\/share\//i;
+
+/** Profiles safe to publish in structured data. Placeholder and old-brand links stay out. */
+export function verifiedProfileUrls(links: Record<string, string | undefined>): string[] {
+  const seen = new Set<string>();
+  const urls: string[] = [];
+  for (const value of Object.values(links)) {
+    const href = (value || "").trim();
+    if (!href || UNVERIFIED_PROFILE.test(href) || seen.has(href)) continue;
+    try {
+      const url = new URL(href);
+      if (url.protocol !== "https:") continue;
+      seen.add(href);
+      urls.push(url.toString());
+    } catch {
+      /* Skip a bad profile URL. */
+    }
+  }
+  return urls;
+}

@@ -12,6 +12,9 @@ const PRIVATE_PATHS = [
   "/auth/",
   "/unsubscribe",
   "/restricted",
+  "/login",
+  "/register",
+  "/reset-password",
 ];
 
 const AI_AGENTS = [

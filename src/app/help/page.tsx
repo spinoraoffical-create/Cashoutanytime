@@ -57,6 +57,18 @@ const FALLBACK = [
     answer: "From Account, open the verification row. Email, phone, and identity checks keep cash outs moving.",
   },
   {
+    id: "google",
+    category: "account",
+    question: "Google sign-in brought me back to Sign in. What now?",
+    answer: "That is not an email code. Start Continue with Google again, or create the account with email and enter the new 6-digit code from that message.",
+  },
+  {
+    id: "eligibility",
+    category: "general",
+    question: "Who can create an account?",
+    answer: "You must be 18 or older. Location limits that are already enforced on the site still apply. This page does not add a new legal rule.",
+  },
+  {
     id: "age",
     category: "general",
     question: "How old do I have to be to play?",

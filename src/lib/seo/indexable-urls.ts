@@ -1,7 +1,7 @@
 import type { MetadataRoute } from "next";
 
 import { PUBLIC_ROUTES, SITE_URL } from "@/lib/constants";
-import { getPublishedBlogPosts, allGeoCityParams, allGeoStateSlugs, getGames } from "@/lib/data/marketing";
+import { getPublishedBlogPosts, getGames } from "@/lib/data/marketing";
 import { getGameBySlug } from "@/lib/games";
 import { getGameSitemapPriority } from "@/lib/seo/game-seo";
 import { isPublicIndexablePath } from "@/lib/seo/sitemap-policy";
@@ -43,24 +43,8 @@ export async function listIndexableUrls(): Promise<IndexableUrl[]> {
       };
     });
 
-  const stateRoutes: IndexableUrl[] = (await allGeoStateSlugs())
-    .filter((slug) => isPublicIndexablePath(`/${slug}`))
-    .map((slug) => ({
-      url: `${SITE_URL}/${slug}`,
-      changeFrequency: "monthly" as const,
-      priority: 0.75,
-    }));
-
-  const cityRoutes: IndexableUrl[] = (await allGeoCityParams())
-    .filter(({ state, city }) => isPublicIndexablePath(`/${state}/${city}`))
-    .map(({ state, city }) => ({
-      url: `${SITE_URL}/${state}/${city}`,
-      changeFrequency: "monthly" as const,
-      priority: 0.7,
-    }));
-
   const seen = new Set<string>();
-  return [...staticRoutes, ...gameRoutes, ...blogRoutes, ...stateRoutes, ...cityRoutes].filter((row) => {
+  return [...staticRoutes, ...gameRoutes, ...blogRoutes].filter((row) => {
     if (!isPublicIndexablePath(new URL(row.url).pathname)) return false;
     if (seen.has(row.url)) return false;
     seen.add(row.url);

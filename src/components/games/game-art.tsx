@@ -28,5 +28,14 @@ export function GameArt({
   if (!usesNextImage(picture)) {
     return <img src={picture} alt={alt} className={`absolute inset-0 h-full w-full ${className}`} />;
   }
-  return <Image src={picture} alt={alt} fill className={className} priority={priority} sizes={sizes} />;
+  return (
+    <Image
+      src={picture}
+      alt={alt}
+      fill
+      className={className}
+      priority={priority}
+      sizes={sizes ?? "(max-width: 768px) 45vw, 200px"}
+    />
+  );
 }

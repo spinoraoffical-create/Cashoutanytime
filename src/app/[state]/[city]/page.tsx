@@ -6,7 +6,7 @@ import { allGeoCityParams, getGeoCity } from "@/lib/data/marketing";
 import { withPageSocial } from "@/lib/seo/metadata";
 
 export const revalidate = 86400;
-export const dynamicParams = true;
+export const dynamicParams = false;
 
 export async function generateStaticParams() {
   return await allGeoCityParams();
@@ -19,14 +19,17 @@ export async function generateMetadata({
 }): Promise<Metadata> {
   const { state: stateSlug, city: citySlug } = await params;
   const city = await getGeoCity(stateSlug, citySlug);
-  if (!city) return {};
+  if (!city) return { robots: { index: false, follow: false } };
 
-  const title = `Fish Table Games in ${city.name} | Sweepstakes Hub`;
-  return withPageSocial({
-    title,
-    description: city.descriptionSnippet,
-    path: `/${stateSlug}/${citySlug}`,
-  });
+  const title = `${city.name} | Sweepstakes Hub`;
+  return {
+    ...withPageSocial({
+      title,
+      description: city.descriptionSnippet,
+      path: `/${stateSlug}/${citySlug}`,
+    }),
+    robots: { index: false, follow: false },
+  };
 }
 
 export default async function CityPage({

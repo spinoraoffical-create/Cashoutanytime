@@ -137,7 +137,7 @@ export const vipMetadata = createMetadata({
 export const aboutMetadata = createMetadata({
   title: "About Sweepstakes Hub",
   description:
-    "Learn about Sweepstakes Hub — the premium gaming support platform trusted by thousands for game accounts, live support, and VIP rewards.",
+    "Sweepstakes Hub is the game lobby at sweeptakehub.com. Browse Game Rooms, create an account, and reach support.",
   keywords: ["about Sweepstakes Hub", "gaming support platform", "trusted gaming", "game account service"],
   path: "/about",
 });

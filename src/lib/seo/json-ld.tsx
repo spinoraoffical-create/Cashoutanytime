@@ -1,4 +1,4 @@
-import { SITE_NAME, SITE_URL, SITE_DESCRIPTION, SOCIAL_LINKS } from "@/lib/constants";
+import { SITE_NAME, SITE_URL, SITE_DESCRIPTION, SOCIAL_LINKS, verifiedProfileUrls } from "@/lib/constants";
 import type { Game } from "@/lib/games";
 import { getGames } from "@/lib/data/marketing";
 import { getGamePageUrl } from "@/lib/seo/game-seo";
@@ -26,7 +26,7 @@ export function OrganizationSchema() {
         url: SITE_URL,
         logo: `${SITE_URL}/logo.webp`,
         description: SITE_DESCRIPTION,
-        sameAs: Object.values(SOCIAL_LINKS).filter(Boolean),
+        sameAs: verifiedProfileUrls(SOCIAL_LINKS),
         contactPoint: {
           "@type": "ContactPoint",
           contactType: "customer support",
@@ -122,14 +122,6 @@ export function GamePageSchema({ game }: { game: Game }) {
         url: pageUrl,
         image: `${SITE_URL}${game.image}`,
         applicationCategory: "Game",
-        operatingSystem: "Android, iOS",
-        offers: {
-          "@type": "Offer",
-          url: pageUrl,
-          price: "0",
-          priceCurrency: "USD",
-          availability: "https://schema.org/InStock",
-        },
         publisher: {
           "@type": "Organization",
           name: game.provider,

@@ -24,9 +24,9 @@ export function llmsDocument(full: boolean) {
 
   return `# ${SITE_NAME}
 
-> ${SITE_NAME} is the game-room site at ${SITE_URL}. Players sign up, open Game Rooms, and use a wallet for loads and cash outs. Players must be 18 or older.
+> ${SITE_NAME} is the game-room site at ${SITE_URL}. Players browse Game Rooms, create an account, and use a wallet for loads and cash outs. The published age rule on Help is 18 or older.
 
-This file is for search engines and answer engines. Prefer the pages below over guessed summaries.
+This file only lists real pages. It does not guarantee a recommendation from any search engine or chat product. Prefer the pages below over guessed summaries.
 
 ## Site
 - Name: ${SITE_NAME}

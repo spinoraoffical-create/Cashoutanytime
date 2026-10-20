@@ -1,6 +1,8 @@
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
-import { isPublicIndexablePath } from "../src/lib/seo/sitemap-policy.ts";
+import { resolveSiteUrl, verifiedProfileUrls } from "../src/lib/constants.ts";
+import { allCityParams, allStateSlugs, getCityData, getStateData } from "../src/lib/geo-data.ts";
+import { isKnownGeoPath, isPublicIndexablePath, NON_INDEXABLE_STATE_SLUGS } from "../src/lib/seo/sitemap-policy.ts";
 
 const root = new URL("../", import.meta.url);
 
@@ -22,6 +24,33 @@ assert.equal(isPublicIndexablePath("/admin/payments"), false);
 assert.equal(isPublicIndexablePath("/api/payments/paydora/webhook"), false);
 assert.equal(isPublicIndexablePath("/restricted"), false);
 assert.equal(isPublicIndexablePath("/games/juwa/extra"), false);
+assert.equal(isPublicIndexablePath("/blog/how-to-start"), true);
+assert.equal(isPublicIndexablePath("/compare"), false);
+assert.equal(isPublicIndexablePath("/sweepstakes-rules"), false);
+assert.equal(Boolean(getStateData("texas")), true);
+assert.equal(getStateData("compare"), null);
+assert.equal(Boolean(getCityData("texas", "houston")), true);
+assert.equal(getCityData("texas", "not-a-city"), null);
+assert.equal(isKnownGeoPath("/texas"), true);
+assert.equal(isKnownGeoPath("/texas/houston"), true);
+assert.equal(isKnownGeoPath("/compare"), false);
+assert.equal(isPublicIndexablePath("/texas"), false);
+assert.equal(isPublicIndexablePath("/texas/houston"), false);
+assert.deepEqual([...NON_INDEXABLE_STATE_SLUGS].sort(), allStateSlugs().sort());
+assert.equal(allStateSlugs().length, 12);
+assert.equal(allCityParams().length, 63);
+assert.equal(resolveSiteUrl("http://sweeptakehub.com/play?q=1"), "https://www.sweeptakehub.com/play");
+assert.equal(resolveSiteUrl("http://localhost:3000"), "http://localhost:3000");
+assert.equal(resolveSiteUrl("https://www.sweeptakehub.com"), "https://www.sweeptakehub.com");
+assert.deepEqual(
+  verifiedProfileUrls({
+    whatsapp: "https://wa.me/1234567890",
+    instagram: "https://www.instagram.com/spinora09",
+    facebook: "https://www.facebook.com/share/19ea1cSC5W/",
+    telegram: "https://t.me/sweeptakehub",
+  }),
+  ["https://t.me/sweeptakehub"]
+);
 
 const config = source("next.config.ts");
 assert.match(config, /source:\s*"\/games",\s*destination:\s*"\/play",\s*permanent:\s*true/);
@@ -53,6 +82,27 @@ assert.doesNotMatch(robots, /"\/play"/);
 const sitemap = source("src/lib/seo/indexable-urls.ts");
 assert.match(sitemap, /isPublicIndexablePath/);
 assert.doesNotMatch(sitemap, /lastModified:\s*new Date\(\)/);
+assert.doesNotMatch(sitemap, /allGeoStateSlugs/);
+assert.doesNotMatch(sitemap, /allGeoCityParams/);
+
+const statePage = source("src/app/[state]/page.tsx");
+const cityPage = source("src/app/[state]/[city]/page.tsx");
+assert.match(statePage, /dynamicParams = false/);
+assert.match(cityPage, /dynamicParams = false/);
+assert.match(statePage, /index:\s*false/);
+assert.match(cityPage, /index:\s*false/);
+assert.match(source("src/app/not-found.tsx"), /index:\s*false/);
+
+const analytics = source("src/lib/analytics/public-events.ts");
+assert.match(analytics, /signup_started/);
+assert.match(analytics, /google_signin_failed/);
+assert.match(analytics, /track\(name, \{ reason: safeReason \}\)/);
+assert.doesNotMatch(analytics, /password/);
+assert.doesNotMatch(analytics, /otpValue|access_token|phoneNumber/);
+const schema = source("src/lib/seo/json-ld.tsx");
+assert.match(schema, /verifiedProfileUrls/);
+assert.doesNotMatch(schema, /priceCurrency/);
+assert.doesNotMatch(source("content/drafts/OWNER-REVIEW.md"), /export /);
 
 const auth = source("src/app/(auth)/layout.tsx");
 assert.match(auth, /index:\s*false/);

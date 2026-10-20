@@ -9,6 +9,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { toast } from "sonner";
+import { trackPublicEvent } from "@/lib/analytics/public-events";
 import { isValidOtpCode, parseTenDigitMobile } from "@/lib/auth/phone";
 import { signupReady } from "@/lib/offers/audience";
 import { buildAuthCallbackUrl, getEmailAuthOrigin } from "@/lib/auth/callback-url";
@@ -94,6 +95,7 @@ function EmailCodeForm({ email, redirect }: { email: string; redirect: string })
     }
 
     toast.success("Email verified.");
+    trackPublicEvent("signup_completed");
     router.push(redirect);
     router.refresh();
   }
@@ -287,6 +289,7 @@ export function EmailAuthForm({ mode, redirect = "/", referralCodeFromUrl, agent
       agentCode
     );
 
+    trackPublicEvent("signup_started");
     const { data, error } = await supabase.auth.signUp({
       email: normalizedEmail,
       password,
@@ -335,6 +338,7 @@ export function EmailAuthForm({ mode, redirect = "/", referralCodeFromUrl, agent
       }
       setPendingEmail(normalizedEmail);
       setAwaitingConfirmation(true);
+      trackPublicEvent("signup_code_requested");
       toast.success("Account created. Enter the 6-digit code from your email.");
       void finalizeRegistrationAfterSignUp({
         userId: data.user.id,

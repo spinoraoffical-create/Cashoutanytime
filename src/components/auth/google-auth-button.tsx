@@ -7,6 +7,7 @@ import { toast } from "sonner";
 import { bareAuthCallbackUrl, oauthNextCookie } from "@/lib/auth/oauth-return";
 import { browserOAuthUrl } from "@/lib/auth/otp-safety";
 import { getDeviceId } from "@/lib/security/device-fingerprint";
+import { trackPublicEvent } from "@/lib/analytics/public-events";
 
 interface GoogleAuthButtonProps {
   redirect?: string;
@@ -33,6 +34,7 @@ export function GoogleAuthButton({
     }
 
     setLoading(true);
+    trackPublicEvent("google_signin_started");
     const supabase = createClient();
     if (!supabase) {
       toast.error("Sign-in is temporarily unavailable. Please try again later or contact support.");

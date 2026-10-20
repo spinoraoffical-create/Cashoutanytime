@@ -6,7 +6,7 @@ import { allGeoStateSlugs, getGeoState } from "@/lib/data/marketing";
 import { withPageSocial } from "@/lib/seo/metadata";
 
 export const revalidate = 86400;
-export const dynamicParams = true;
+export const dynamicParams = false;
 
 const RESERVED = new Set([
   "admin",
@@ -51,14 +51,17 @@ export async function generateMetadata({
   const { state: stateSlug } = await params;
   if (RESERVED.has(stateSlug)) return {};
   const state = await getGeoState(stateSlug);
-  if (!state) return {};
+  if (!state) return { robots: { index: false, follow: false } };
 
-  const title = `Play Sweepstakes Games Online in ${state.name} | Sweepstakes Hub`;
-  return withPageSocial({
-    title,
-    description: state.metaDescription,
-    path: `/${stateSlug}`,
-  });
+  const title = `${state.name} | Sweepstakes Hub`;
+  return {
+    ...withPageSocial({
+      title,
+      description: state.metaDescription,
+      path: `/${stateSlug}`,
+    }),
+    robots: { index: false, follow: false },
+  };
 }
 
 export default async function StatePage({

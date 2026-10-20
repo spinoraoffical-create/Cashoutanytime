@@ -1,4 +1,4 @@
-import { SOCIAL_LINKS } from "@/lib/constants";
+import { SOCIAL_LINKS, verifiedProfileUrls } from "@/lib/constants";
 
 const socialItems = [
   {
@@ -48,14 +48,23 @@ const socialItems = [
   },
 ];
 
-const floatingSocialItems = socialItems.filter((item) =>
+const allowedProfiles = new Set(verifiedProfileUrls(SOCIAL_LINKS));
+const visibleSocialItems = socialItems.filter((item) => {
+  if (!item.href) return false;
+  try {
+    return allowedProfiles.has(new URL(item.href).toString()) || allowedProfiles.has(item.href);
+  } catch {
+    return false;
+  }
+});
+const floatingSocialItems = visibleSocialItems.filter((item) =>
   ["Telegram", "Facebook", "Instagram"].includes(item.name)
 );
 
 export function SocialLinks({ className = "" }: { className?: string }) {
   return (
     <div className={`flex items-center gap-3 ${className}`}>
-      {socialItems.map((item) => (
+      {visibleSocialItems.map((item) => (
         <a
           key={item.name}
           href={item.href}

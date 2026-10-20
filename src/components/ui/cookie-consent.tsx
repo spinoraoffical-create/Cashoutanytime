@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from "react";
 import Link from "next/link";
+import { notifyAnalyticsConsent } from "@/lib/analytics/public-events";
 
 const SHOW_DELAY_MS = 8000;
 
@@ -22,6 +23,7 @@ export function CookieConsent() {
 
   function accept() {
     localStorage.setItem("spinora-cookies", "1");
+    notifyAnalyticsConsent();
     setVisible(false);
   }
 
@@ -32,11 +34,11 @@ export function CookieConsent() {
       <div className="mx-auto max-w-4xl rounded-xl border border-purple-500/30 bg-[#1a1a1a]/95 backdrop-blur-sm p-3 sm:px-4 sm:py-3 flex flex-col sm:flex-row items-center justify-between gap-3 shadow-2xl pointer-events-auto">
         <p className="text-xs sm:text-sm text-muted-foreground text-center sm:text-left leading-snug">
           We use cookies. See{" "}
-          <Link href="/about" className="text-primary hover:underline">
+          <Link href="/terms" className="text-primary hover:underline">
             Terms
           </Link>{" "}
           &{" "}
-          <Link href="/about" className="text-primary hover:underline">
+          <Link href="/privacy" className="text-primary hover:underline">
             Privacy
           </Link>
           .

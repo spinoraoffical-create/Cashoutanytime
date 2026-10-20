@@ -10,6 +10,7 @@ import { GameWalletLoadSection } from "@/components/games/game-wallet-load-secti
 import { createClient } from "@/lib/supabase/client";
 import { getMyGameAccount } from "@/lib/actions/game-loads";
 import { GAME_BONUS_RULES, UPCOMING_GAME_MESSAGE, type Game } from "@/lib/games";
+import { gamePublicFacts, relatedPublicGames } from "@/lib/seo/game-facts";
 import { toast } from "sonner";
 
 interface GameLandingClientProps {
@@ -232,6 +233,33 @@ export function GameLandingClient({
             First load bonus {rules.firstTimeBonus}%. Later loads {rules.regularBonus}%.
           </p>
           <p>{game.bio}</p>
+          <h2 className="pt-2 text-sm font-black text-[#fcf9fb]">About this room</h2>
+          <ul className="list-disc space-y-2 pl-5">
+            {gamePublicFacts(game).map((fact) => (
+              <li key={fact}>{fact}</li>
+            ))}
+          </ul>
+          <p>
+            This page does not show live jackpots or a player count. Nothing here promises a win.
+          </p>
+          <p>
+            <Link href="/help" className="font-bold text-[#f4c64e]">Help</Link>
+            {" · "}
+            <Link href="/faq" className="font-bold text-[#f4c64e]">FAQ</Link>
+            {" · "}
+            <Link href="/play" className="font-bold text-[#f4c64e]">All rooms</Link>
+          </p>
+          {relatedPublicGames(game).length > 0 ? (
+            <p>
+              Related rooms:{" "}
+              {relatedPublicGames(game).map((row, index) => (
+                <span key={row.slug}>
+                  {index > 0 ? ", " : ""}
+                  <Link href={`/games/${row.slug}`} className="font-bold text-[#f4c64e]">{row.name}</Link>
+                </span>
+              ))}
+            </p>
+          ) : null}
         </div>
       </details>
 
