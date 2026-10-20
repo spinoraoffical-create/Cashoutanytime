@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { Mail } from "lucide-react";
@@ -14,14 +14,15 @@ import { signupReady } from "@/lib/offers/audience";
 import { buildAuthCallbackUrl, getEmailAuthOrigin } from "@/lib/auth/callback-url";
 import { normalizeEmail, formatAuthErrorMessage } from "@/lib/auth/identifier";
 import {
+  attachAuthPhoneAfterVerification,
   finalizeRegistrationAfterSignUp,
   guardAuthEmailSend,
   isPhoneAvailable,
   signInWithEmailPassword,
 } from "@/lib/actions/auth";
+import { otpFailureMessage } from "@/lib/auth/otp-safety";
 import { PasswordField } from "@/components/auth/password-field";
 import { passwordIsAcceptable } from "@/lib/auth/password-rules";
-import { OTP_REJECTED_MESSAGE } from "@/lib/auth/recovery";
 import { checkSignupAllowed, linkSignupSecurity } from "@/lib/actions/security";
 import { getDeviceId } from "@/lib/security/device-fingerprint";
 
@@ -41,6 +42,7 @@ function EmailCodeForm({ email, redirect }: { email: string; redirect: string })
   const [sending, setSending] = useState(false);
   const [cooldown, setCooldown] = useState(RESEND_COOLDOWN_SECONDS);
   const [formError, setFormError] = useState("");
+  const verifying = useRef(false);
 
   useEffect(() => {
     if (cooldown <= 0) return;
@@ -62,17 +64,33 @@ function EmailCodeForm({ email, redirect }: { email: string; redirect: string })
       return;
     }
 
+    if (verifying.current) return;
+    verifying.current = true;
     setLoading(true);
-    const { error } = await supabase.auth.verifyOtp({
-      email,
-      token: code.trim(),
-      type: "signup",
-    });
-    setLoading(false);
+    let error: { message?: string; code?: string; status?: number; name?: string } | null = null;
+    try {
+      const result = await supabase.auth.verifyOtp({
+        email,
+        token: code.trim(),
+        type: "signup",
+      });
+      error = result.error;
+    } catch {
+      error = { name: "AuthRetryableFetchError", message: "fetch failed" };
+    } finally {
+      verifying.current = false;
+      setLoading(false);
+    }
 
     if (error) {
-      setFormError(OTP_REJECTED_MESSAGE);
+      setFormError(otpFailureMessage(error));
       return;
+    }
+
+    try {
+      await attachAuthPhoneAfterVerification();
+    } catch {
+      /* The email is already confirmed. The phone remains on the profile. */
     }
 
     toast.success("Email verified.");

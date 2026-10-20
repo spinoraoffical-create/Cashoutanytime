@@ -69,6 +69,11 @@ export async function GET(request: NextRequest) {
     }
   );
 
+  const oauthError = searchParams.get("error");
+  if (!code && !tokenHash && oauthError === "access_denied") {
+    return NextResponse.redirect(`${origin}/login?error=google_cancelled`);
+  }
+
   if (code) {
     const { error } = await supabase.auth.exchangeCodeForSession(code);
     if (error) {

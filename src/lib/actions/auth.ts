@@ -8,6 +8,7 @@ import {
   phoneLookupVariants,
 } from "@/lib/auth/phone";
 import { isEmailIdentifier, normalizeEmail, formatAuthErrorMessage, maskEmail } from "@/lib/auth/identifier";
+import { authUserUpdateForContact } from "@/lib/auth/otp-safety";
 import { pickLoginDestination, signedInUsesAdminHome } from "@/lib/auth/account-home";
 import { buildAuthCallbackUrl } from "@/lib/auth/callback-url";
 import { createClient } from "@/lib/supabase/server";
@@ -259,19 +260,38 @@ async function rememberPhoneOnAuthUser(
 ) {
   const { data: authUser } = await admin.auth.admin.getUserById(userId);
   const existingMeta = authUser?.user?.user_metadata ?? {};
-  const user_metadata = {
-    ...existingMeta,
+  const attributes = authUserUpdateForContact({
+    emailConfirmed: Boolean(authUser?.user?.email_confirmed_at),
     phone: contact.phone,
-    full_name: contact.fullName,
-    auth_method: "email",
-  };
-  const saved = await admin.auth.admin.updateUserById(userId, {
-    phone: contact.phone,
-    user_metadata,
+    metadata: {
+      ...existingMeta,
+      phone: contact.phone,
+      full_name: contact.fullName,
+      auth_method: "email",
+    },
   });
-  if (saved.error) {
-    await admin.auth.admin.updateUserById(userId, { user_metadata });
+  const saved = await admin.auth.admin.updateUserById(userId, attributes);
+  if (saved.error && attributes.phone) {
+    await admin.auth.admin.updateUserById(userId, { user_metadata: attributes.user_metadata });
   }
+}
+
+/** Set the auth phone only after the email code has already been accepted. */
+export async function attachAuthPhoneAfterVerification(): Promise<void> {
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user?.email_confirmed_at || user.phone) return;
+  const phoneRaw = typeof user.user_metadata?.phone === "string" ? user.user_metadata.phone : "";
+  const phone = phoneRaw ? parseValidInternationalPhone(phoneRaw) : null;
+  if (!phone) return;
+  const admin = createAdminClient();
+  if (!admin) return;
+  await admin.auth.admin.updateUserById(user.id, {
+    phone,
+    user_metadata: { ...(user.user_metadata ?? {}), phone },
+  });
 }
 
 async function writeProfileContact(

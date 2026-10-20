@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
 import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
+import { browserOAuthUrl } from "@/lib/auth/otp-safety";
 import { getDeviceId } from "@/lib/security/device-fingerprint";
 
 interface GoogleAuthButtonProps {
@@ -88,7 +89,7 @@ export function GoogleAuthButton({
       return;
     }
 
-    window.location.href = data.url;
+    window.location.href = browserOAuthUrl(data.url);
   }
 
   useEffect(() => {
