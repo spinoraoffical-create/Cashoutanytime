@@ -1,6 +1,7 @@
 import "server-only";
 
 import { createHash } from "node:crypto";
+import { after } from "next/server";
 
 import { createAdminClient } from "@/lib/supabase/admin";
 import type { SupabaseClient } from "@supabase/supabase-js";
@@ -25,6 +26,8 @@ import {
   investigationEventKey,
   nextAttemptDecision,
   parseRetryAfter,
+  promptClaimAllowed,
+  promptScheduleDecision,
   sanitizeSecurityAlert,
   staleSendingDecision,
   workerSummary,
@@ -132,27 +135,38 @@ export async function enqueueAlert(input: {
     legacy = decision.legacy;
     if (decision.action === "insert_queued" || decision.action === "insert_unconfigured") {
       const status = decision.action === "insert_queued" ? "queued" : "unconfigured";
-      const { error } = await admin.from("telegram_delivery_jobs").insert({
-        event_key: eventKey,
-        bot_key: bot,
-        category: input.category,
-        chat_id: status === "queued" ? env.chatId : null,
-        body,
-        status,
-        legacy_outcome: status === "queued" ? "not_used" : "attempt_started",
-        next_attempt_at: status === "queued" ? new Date().toISOString() : null,
-        last_error: status === "unconfigured" ? "Bot token or chat was not set. Legacy outcome is recorded after the old sender returns." : null,
-      });
-      if (error) {
-        if (/duplicate|unique/i.test(error.message)) return { persisted: true, legacy: false, reason: "duplicate" };
+      const inserted = await admin
+        .from("telegram_delivery_jobs")
+        .insert({
+          event_key: eventKey,
+          bot_key: bot,
+          category: input.category,
+          chat_id: status === "queued" ? env.chatId : null,
+          body,
+          status,
+          legacy_outcome: status === "queued" ? "not_used" : "attempt_started",
+          next_attempt_at: status === "queued" ? new Date().toISOString() : null,
+          last_error: status === "unconfigured" ? "Bot token or chat was not set. Legacy outcome is recorded after the old sender returns." : null,
+        })
+        .select("id")
+        .maybeSingle();
+      if (inserted.error) {
+        if (/duplicate|unique/i.test(inserted.error.message)) return { persisted: true, legacy: false, reason: "duplicate" };
         return { persisted: false, legacy: true, reason: "tables_missing" };
       }
       persisted = true;
+      const createdId = (inserted.data as { id?: string } | null)?.id ?? null;
+      const plan = promptScheduleDecision({ inserted: true, status, jobId: createdId });
+      if (plan.schedule && plan.jobId) schedulePromptDelivery(plan.jobId);
       return { persisted: true, legacy, reason: status };
     }
     const row = existingRow as { id: string; status: DeliveryJobStatus };
     if (decision.action === "promote") {
       const promoted = await promoteJob(admin, row.id, env.chatId);
+      if (promoted) {
+        const plan = promptScheduleDecision({ inserted: true, status: "queued", jobId: row.id });
+        if (plan.schedule && plan.jobId) schedulePromptDelivery(plan.jobId);
+      }
       persisted = true;
       return { persisted: true, legacy: false, reason: promoted ? "promoted" : "owned" };
     }
@@ -207,6 +221,37 @@ export async function enqueueIncident(input: {
     adminPath: input.adminPath ?? "/admin/telegram-center",
   });
   return { sent: result.persisted && !result.legacy, reason: result.reason };
+}
+
+function schedulePromptDelivery(jobId: string) {
+  try {
+    after(() => {
+      void deliverQueuedJobById(jobId).catch(() => undefined);
+    });
+  } catch {
+    /* The row stays queued. The daily cron can send it later. */
+  }
+}
+
+async function deliverQueuedJobById(jobId: string): Promise<void> {
+  if (!jobId) return;
+  const admin = createAdminClient();
+  if (!admin) return;
+  const { data } = await admin
+    .from("telegram_delivery_jobs")
+    .select("id, bot_key, chat_id, body, attempt_count, status")
+    .eq("id", jobId)
+    .maybeSingle();
+  const job = data as {
+    id: string;
+    bot_key: TelegramBotKey;
+    chat_id: string | null;
+    body: string;
+    attempt_count: number;
+    status: string;
+  } | null;
+  if (!job || !promptClaimAllowed(job.status)) return;
+  await sendJob(admin, job);
 }
 
 async function promoteJob(admin: Admin, jobId: string, chatId: string): Promise<boolean> {

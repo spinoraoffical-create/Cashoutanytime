@@ -13,8 +13,17 @@ import {
   classifyTelegramResponse,
   customerCommandAllowed,
   customerWalletText,
+  deliveryLatencyMs,
+  deliveryPanelState,
+  deliveryStatusAccess,
   duplicateJobDecision,
+  enqueueDisposition,
+  formatDeliveryLatency,
   incidentFingerprint,
+  keepBusinessResult,
+  promptClaimAllowed,
+  promptScheduleDecision,
+  visibleDeliverySummary,
   incidentShouldSend,
   linkConsumeDecision,
   nextAttemptDecision,
@@ -24,6 +33,7 @@ import {
   paymentTitle,
   reportWindow,
   secretsMatch,
+  summarizeDelivery,
   summarizeMoney,
 } from "../src/lib/telegram/control/rules.ts";
 
@@ -122,7 +132,6 @@ const {
   countReport,
   TELEGRAM_DELIVERY_CRON,
   cashoutAlertPlan,
-  enqueueDisposition,
   fallbackAfterEnqueue,
   investigationEventKey,
   isDailyCron,
@@ -321,5 +330,72 @@ assert.equal(accepted.status, "accepted");
 assert.equal(accepted.nextAttemptAt, null);
 assert.equal(alertTestCompletion({ thrown: true }).status, "uncertain");
 assert.equal(alertTestCompletion({ httpStatus: 400, ok: false, description: "chat not found" }).status, "failed");
+
+const firstDeposit = enqueueDisposition({ existingStatus: null, configured: true });
+assert.equal(firstDeposit.action, "insert_queued");
+const sameDeposit = enqueueDisposition({ existingStatus: "queued", configured: true });
+assert.equal(sameDeposit.action, "owned");
+const scheduled = promptScheduleDecision({ inserted: true, status: "queued", jobId: "job-1" });
+assert.equal(scheduled.schedule, true);
+assert.equal(scheduled.jobId, "job-1");
+assert.equal(promptScheduleDecision({ inserted: false, status: "queued", jobId: "job-1" }).schedule, false);
+assert.equal(promptScheduleDecision({ inserted: true, status: "unconfigured", jobId: "job-1" }).schedule, false);
+assert.equal(promptScheduleDecision({ inserted: true, status: "queued", jobId: null }).schedule, false);
+assert.equal(alertTestIsQueueEligible("queued"), true);
+
+assert.equal(promptClaimAllowed("queued"), true);
+assert.equal(promptClaimAllowed("retry_pending"), true);
+assert.equal(promptClaimAllowed("sending"), false);
+assert.equal(promptClaimAllowed("accepted"), false);
+assert.equal(promptClaimAllowed("uncertain"), false);
+const raced = ["queued", "sending"].filter(promptClaimAllowed);
+assert.equal(raced.length, 1);
+
+assert.equal(classifyTelegramResponse({ httpStatus: 429 }).outcome, "retry");
+assert.equal(classifyTelegramResponse({ httpStatus: 500 }).outcome, "retry");
+assert.equal(classifyTelegramResponse({ thrown: true }).outcome, "uncertain");
+assert.equal(nextAttemptDecision({ attempts: 1, outcome: "retry", retryAfterSeconds: 30, nowMs: 1_000 }).status, "retry_pending");
+assert.equal(nextAttemptDecision({ attempts: 1, outcome: "uncertain", retryAfterSeconds: null, nowMs: 1_000 }).nextAttemptAt, null);
+assert.equal(nextAttemptDecision({ attempts: 1, outcome: "failed", retryAfterSeconds: null, nowMs: 1_000 }).status, "failed");
+
+const credited = { ok: true, depositId: "dep_1" };
+assert.equal(keepBusinessResult(credited).ok, true);
+assert.equal(keepBusinessResult(credited).depositId, "dep_1");
+
+assert.equal(deliveryStatusAccess(false), false);
+assert.equal(visibleDeliverySummary(false, []), null);
+assert.equal(deliveryPanelState({ queryFailed: false, isSuperAdmin: false, rows: [] }).kind, "hidden");
+assert.equal(deliveryPanelState({ queryFailed: true, isSuperAdmin: true, rows: [] }).kind, "unavailable");
+const emptyPanel = deliveryPanelState({ queryFailed: false, isSuperAdmin: true, rows: [] });
+assert.equal(emptyPanel.kind, "ready");
+if (emptyPanel.kind === "ready") {
+  assert.equal(emptyPanel.summary.counts.queued, 0);
+  assert.equal(emptyPanel.summary.counts.sending, 0);
+  assert.equal(emptyPanel.summary.counts.accepted, 0);
+  assert.equal(emptyPanel.summary.counts.failed, 0);
+  assert.equal(emptyPanel.summary.counts.uncertain, 0);
+  assert.equal(emptyPanel.summary.lastSuccess, null);
+  assert.equal(emptyPanel.summary.problems.length, 0);
+}
+const panel = visibleDeliverySummary(true, [
+  { status: "accepted", bot: "payments", category: "deposit_credited", createdAt: "2026-10-20T03:00:00.000Z", updatedAt: "2026-10-20T03:00:02.000Z", lastError: null },
+  { status: "failed", bot: "errors", category: "load_failed", createdAt: "2026-10-20T03:00:00.000Z", updatedAt: "2026-10-20T03:00:04.000Z", lastError: "bot999:SECRETVALUE chat not found" },
+  { status: "queued", bot: "players", category: "signup", createdAt: "2026-10-20T03:01:00.000Z", updatedAt: "2026-10-20T03:01:00.000Z", lastError: null },
+]);
+assert.equal(panel?.counts.accepted, 1);
+assert.equal(panel?.counts.failed, 1);
+assert.equal(panel?.counts.queued, 1);
+assert.equal(summarizeDelivery([{ status: "retry_pending", bot: "payments", category: "deposit_credited", createdAt: "2026-10-20T03:00:00.000Z", updatedAt: "2026-10-20T03:00:00.000Z", lastError: null }]).counts.queued, 1);
+assert.equal(panel?.counts.sending, 0);
+assert.equal(panel?.counts.uncertain, 0);
+assert.equal(panel?.lastSuccess?.bot, "payments");
+assert.equal(panel?.lastSuccess?.latencyMs, 2000);
+assert.equal(formatDeliveryLatency(2000), "2 s");
+assert.equal(deliveryLatencyMs("bad", "bad"), null);
+assert.equal(panel?.problems[0]?.error?.includes("SECRETVALUE"), false);
+assert.equal(panel?.problems[0]?.error?.includes("chat not found"), true);
+assert.equal(ownerCommandAllowed({ linked: true, purpose: "owner", isSuperAdmin: true, userId: "owner-1" }), true);
+assert.equal(parseCommand("/help")?.name, "help");
+assert.equal(customerCommandAllowed({ linked: true, purpose: "customer", isSuperAdmin: false, userId: "p1" }, "p1"), true);
 
 console.log("telegram-control.test.mjs passed");

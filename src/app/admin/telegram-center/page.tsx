@@ -8,7 +8,7 @@ import { AdminStatusBadge } from "@/components/admin/ui/admin-status-badge";
 import { requireSuperAdmin } from "@/lib/data/admin";
 import { adminDb } from "@/lib/actions/admin/core";
 import { botStatus } from "@/lib/telegram/control/delivery";
-import { TELEGRAM_BOTS, TELEGRAM_DELIVERY_CRON, webhookPath } from "@/lib/telegram/control/rules";
+import { TELEGRAM_BOTS, TELEGRAM_DELIVERY_CRON, deliveryPanelState, formatDeliveryLatency, safeTelegramTestError, webhookPath } from "@/lib/telegram/control/rules";
 import { SITE_URL } from "@/lib/constants";
 
 export const metadata: Metadata = { title: "Telegram Control Center" };
@@ -38,6 +38,38 @@ export default async function TelegramCenterPage({
     created_at: string;
   }>;
   const failed = jobs.filter((job) => job.status === "failed" || job.status === "uncertain" || job.status === "retry_pending" || job.status === "needs_investigation");
+  let summaryFailed = false;
+  let summaryRows: Array<{
+    status: string;
+    bot_key: string;
+    category: string;
+    created_at: string;
+    updated_at: string;
+    last_error: string | null;
+  }> = [];
+  try {
+    const summaryQuery = await db
+      .from("telegram_delivery_jobs")
+      .select("status, bot_key, category, created_at, updated_at, last_error")
+      .order("updated_at", { ascending: false })
+      .limit(200);
+    summaryFailed = Boolean(summaryQuery.error);
+    summaryRows = (summaryQuery.data ?? []) as typeof summaryRows;
+  } catch {
+    summaryFailed = true;
+  }
+  const panel = deliveryPanelState({
+    queryFailed: summaryFailed,
+    isSuperAdmin: true,
+    rows: summaryRows.map((row) => ({
+      status: row.status,
+      bot: row.bot_key,
+      category: row.category,
+      createdAt: row.created_at,
+      updatedAt: row.updated_at,
+      lastError: row.last_error,
+    })),
+  });
   const updatesQuery = await db
     .from("telegram_webhook_updates")
     .select("bot_key, update_id, status, attempts, command_name, last_error")
@@ -57,7 +89,7 @@ export default async function TelegramCenterPage({
     <div className="mx-auto max-w-6xl space-y-4 px-1">
       <AdminPageHeader
         title="Telegram Control Center"
-        description={`Checkout only queues an alert. The Hobby cron at ${TELEGRAM_DELIVERY_CRON} UTC is a daily recovery sweep, not an urgent sender. An external worker must call the protected delivery route for payment and security alerts. Telegram acceptance is not a read receipt.`}
+        description={`A new alert is sent after the website finishes the operation. The daily cron at ${TELEGRAM_DELIVERY_CRON} UTC sends anything still waiting. Queued includes jobs waiting for a retry. Telegram acceptance is not a read receipt.`}
       />
       <nav className="flex gap-2 overflow-x-auto pb-1 text-sm">
         {[
@@ -93,6 +125,42 @@ export default async function TelegramCenterPage({
       ) : null}
 
       {section === "overview" || section === "delivery" ? (
+        <AdminSectionCard title="Delivery status" description="Counts come from the latest 200 jobs. Errors are shortened and do not include message text.">
+          {panel.kind === "hidden" ? (
+            <AdminEmptyState title="Delivery status hidden" body="Only a Super Admin can see delivery status." />
+          ) : panel.kind === "unavailable" ? (
+            <AdminEmptyState title="Delivery status unavailable" body="The delivery counts could not be read. No alert was sent or changed." />
+          ) : (
+            <div className="space-y-3 text-sm text-[#d7e3ff]">
+              <div className="flex flex-wrap gap-2">
+                <AdminStatusBadge status={`Queued ${panel.summary.counts.queued}`} />
+                <AdminStatusBadge status={`Sending ${panel.summary.counts.sending}`} />
+                <AdminStatusBadge status={`Accepted ${panel.summary.counts.accepted}`} />
+                <AdminStatusBadge status={`Failed ${panel.summary.counts.failed}`} />
+                <AdminStatusBadge status={`Uncertain ${panel.summary.counts.uncertain}`} />
+              </div>
+              <p>
+                {panel.summary.lastSuccess
+                  ? `Last success: ${panel.summary.lastSuccess.category} on ${panel.summary.lastSuccess.bot}${formatDeliveryLatency(panel.summary.lastSuccess.latencyMs) ? ` in ${formatDeliveryLatency(panel.summary.lastSuccess.latencyMs)}` : ""}.`
+                  : "No accepted delivery in the latest 200 jobs."}
+              </p>
+              {panel.summary.problems.length > 0 ? (
+                <ul className="space-y-1">
+                  {panel.summary.problems.map((problem, index) => (
+                    <li key={`${problem.bot}-${problem.category}-${index}`}>
+                      {problem.status}: {problem.category} on {problem.bot}
+                      {problem.error ? ` — ${problem.error}` : ""}
+                      {formatDeliveryLatency(problem.latencyMs) ? ` (${formatDeliveryLatency(problem.latencyMs)})` : ""}
+                    </li>
+                  ))}
+                </ul>
+              ) : null}
+            </div>
+          )}
+        </AdminSectionCard>
+      ) : null}
+
+      {section === "overview" || section === "delivery" ? (
         <AdminSectionCard title="Delivery history" description="Statuses are queued, accepted, failed, retry pending, or uncertain. Accepted means Telegram took the message.">
           {jobsUnavailable ? (
             <AdminEmptyState title="Delivery history unavailable" body="Apply supabase/migrations/20261019000300_telegram_control_center.sql. Until then, the old Telegram sender still runs." />
@@ -105,7 +173,7 @@ export default async function TelegramCenterPage({
                   <div>
                     <p className="font-semibold text-white">{job.category}</p>
                     <p className="text-[#9fb0d0]">{job.bot_key} · attempts {job.attempt_count}</p>
-                    {job.last_error ? <p className="text-[#f0b4b4]">{job.last_error}</p> : null}
+                    {job.last_error ? <p className="text-[#f0b4b4]">{safeTelegramTestError(job.last_error)}</p> : null}
                   </div>
                   <AdminStatusBadge status={job.status} />
                 </li>
@@ -122,7 +190,7 @@ export default async function TelegramCenterPage({
           ) : (
             <ul className="space-y-2 text-sm text-[#d7e3ff]">
               {failed.map((job) => (
-                <li key={job.id}>{job.status}: {job.category} {job.last_error ? `— ${job.last_error}` : ""}</li>
+                <li key={job.id}>{job.status}: {job.category} {job.last_error ? `— ${safeTelegramTestError(job.last_error)}` : ""}</li>
               ))}
             </ul>
           )}

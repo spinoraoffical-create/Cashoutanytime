@@ -604,6 +604,102 @@ export function alertTestCompletion(input: {
   return { status: "failed", nextAttemptAt: null, error: error ?? "Telegram refused the test." };
 }
 
+/** Schedule a send only for a job that was just queued. Anything else stays for the daily cron. */
+export function promptScheduleDecision(input: {
+  inserted: boolean;
+  status: string | null;
+  jobId: string | null;
+}): { schedule: boolean; jobId: string | null } {
+  if (!input.inserted || input.status !== "queued" || !input.jobId) return { schedule: false, jobId: null };
+  return { schedule: true, jobId: input.jobId };
+}
+
+/** The sender may claim only a waiting row. sending, accepted, failed, and uncertain are not claimed again. */
+export function promptClaimAllowed(status: string): boolean {
+  return status === "queued" || status === "retry_pending";
+}
+
+export function deliveryStatusAccess(isSuperAdmin: boolean): boolean {
+  return isSuperAdmin;
+}
+
+export function deliveryLatencyMs(createdAt: string, updatedAt: string): number | null {
+  const start = Date.parse(createdAt);
+  const end = Date.parse(updatedAt);
+  if (!Number.isFinite(start) || !Number.isFinite(end) || end < start) return null;
+  return end - start;
+}
+
+export function formatDeliveryLatency(ms: number | null): string | null {
+  if (ms == null) return null;
+  if (ms < 1000) return `${ms} ms`;
+  const seconds = Math.round(ms / 1000);
+  if (seconds < 60) return `${seconds} s`;
+  return `${Math.floor(seconds / 60)} min`;
+}
+
+export type DeliverySnapshot = {
+  status: string;
+  bot: string;
+  category: string;
+  createdAt: string;
+  updatedAt: string;
+  lastError?: string | null;
+};
+
+export function summarizeDelivery(rows: DeliverySnapshot[]): {
+  counts: Record<"queued" | "sending" | "accepted" | "failed" | "uncertain", number>;
+  lastSuccess: { at: string; bot: string; category: string; latencyMs: number | null } | null;
+  problems: Array<{ status: "failed" | "uncertain"; bot: string; category: string; error: string | null; latencyMs: number | null }>;
+} {
+  const counts = { queued: 0, sending: 0, accepted: 0, failed: 0, uncertain: 0 };
+  let lastSuccess: { at: string; bot: string; category: string; latencyMs: number | null } | null = null;
+  const problems: Array<{ status: "failed" | "uncertain"; bot: string; category: string; error: string | null; latencyMs: number | null }> = [];
+  for (const row of rows) {
+    if (row.status === "queued" || row.status === "retry_pending") counts.queued += 1;
+    else if (row.status === "sending" || row.status === "accepted" || row.status === "failed" || row.status === "uncertain") {
+      counts[row.status] += 1;
+    }
+    const latencyMs = deliveryLatencyMs(row.createdAt, row.updatedAt);
+    if (row.status === "accepted" && (!lastSuccess || Date.parse(row.updatedAt) > Date.parse(lastSuccess.at))) {
+      lastSuccess = { at: row.updatedAt, bot: row.bot, category: row.category, latencyMs };
+    }
+    if ((row.status === "failed" || row.status === "uncertain") && problems.length < 5) {
+      problems.push({
+        status: row.status,
+        bot: row.bot,
+        category: row.category,
+        error: safeTelegramTestError(row.lastError),
+        latencyMs,
+      });
+    }
+  }
+  return { counts, lastSuccess, problems };
+}
+
+export function visibleDeliverySummary(isSuperAdmin: boolean, rows: DeliverySnapshot[]) {
+  if (!deliveryStatusAccess(isSuperAdmin)) return null;
+  return summarizeDelivery(rows);
+}
+
+export function deliveryPanelState(input: {
+  queryFailed: boolean;
+  isSuperAdmin: boolean;
+  rows: DeliverySnapshot[];
+}):
+  | { kind: "hidden" }
+  | { kind: "unavailable" }
+  | { kind: "ready"; summary: ReturnType<typeof summarizeDelivery> } {
+  if (!deliveryStatusAccess(input.isSuperAdmin)) return { kind: "hidden" };
+  if (input.queryFailed) return { kind: "unavailable" };
+  return { kind: "ready", summary: summarizeDelivery(input.rows) };
+}
+
+/** Alert work cannot replace the business result that was already saved. */
+export function keepBusinessResult<T>(result: T): T {
+  return result;
+}
+
 export function webhookPath(bot: TelegramBotKey): string {
   return `/api/telegram/${bot}`;
 }
