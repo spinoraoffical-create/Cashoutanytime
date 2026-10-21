@@ -22,7 +22,8 @@ import {
   type NewsletterSegmentId,
 } from "@/lib/email/newsletter-segments";
 import { promoEmailHeaders, promoUnsubscribeUrl, PROMO_REPLY_TO } from "@/lib/email/deliverability";
-import { FROM, getResend } from "@/lib/email/resend";
+import { resolveMarketingFrom } from "@/lib/email/marketing-from";
+import { getResend } from "@/lib/email/resend";
 
 const campaignSchema = z.object({
   name: z.string().trim().min(1).max(200),
@@ -244,6 +245,8 @@ export async function sendNewsletterTestAction(id: string): Promise<AdminActionR
   if ("error" in auth) return { ok: false, error: auth.error };
   if (!auth.staff.email) return { ok: false, error: "Your account has no email on file." };
 
+  const marketingFrom = resolveMarketingFrom();
+  if (!marketingFrom.ok) return { ok: false, error: marketingFrom.error };
   const resend = getResend();
   if (!resend) return { ok: false, error: "RESEND_API_KEY is not configured." };
 
@@ -260,7 +263,7 @@ export async function sendNewsletterTestAction(id: string): Promise<AdminActionR
 
   const message = buildCampaignEmail(campaign);
   const { error } = await resend.emails.send({
-    from: FROM,
+    from: marketingFrom.from,
     to: auth.staff.email,
     replyTo: PROMO_REPLY_TO,
     subject: message.subject,

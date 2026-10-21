@@ -1,3 +1,5 @@
+import { resolveMarketingFrom } from "@/lib/email/marketing-from";
+
 export interface EmailOptions {
   to: string;
   subject: string;
@@ -10,6 +12,9 @@ export interface EmailOptions {
  */
 export async function sendFreePlayerEmail({ to, subject, html }: EmailOptions): Promise<{ ok: boolean; error?: string }> {
   try {
+    const marketingFrom = resolveMarketingFrom();
+    if (!marketingFrom.ok) return { ok: false, error: marketingFrom.error };
+
     const resendApiKey = process.env.RESEND_API_KEY;
 
     if (!resendApiKey) {
@@ -24,7 +29,7 @@ export async function sendFreePlayerEmail({ to, subject, html }: EmailOptions): 
         Authorization: `Bearer ${resendApiKey}`,
       },
       body: JSON.stringify({
-        from: process.env.RESEND_FROM_EMAIL ?? "Sweepstakes Hub <noreply@sweeptakehub.com>",
+        from: marketingFrom.from,
         to: [to],
         subject,
         html,

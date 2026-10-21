@@ -4,7 +4,8 @@ import { adminDb, writeAudit } from "@/lib/actions/admin/core";
 import { getAgentScope } from "@/lib/agents/scope";
 import { SITE_URL } from "@/lib/constants";
 import { getStaffContext } from "@/lib/data/admin";
-import { FROM, getResend } from "@/lib/email/resend";
+import { resolveMarketingFrom } from "@/lib/email/marketing-from";
+import { getResend } from "@/lib/email/resend";
 import { promoEmailHeaders, promoUnsubscribeUrl, PROMO_REPLY_TO } from "@/lib/email/deliverability";
 import {
   emailRecipients,
@@ -153,6 +154,8 @@ export async function sendScopedOffer(input: { subject: string; emailBody: strin
     return { ok: false as const, error: "Enter a subject, an email, and a short SMS." };
   }
 
+  const marketingFrom = resolveMarketingFrom();
+  if (!marketingFrom.ok) return { ok: false as const, error: marketingFrom.error };
   const resend = getResend();
   if (!resend) return { ok: false as const, error: "RESEND_API_KEY is not configured." };
 
@@ -195,7 +198,7 @@ export async function sendScopedOffer(input: { subject: string; emailBody: strin
     const unsubscribeUrl = `${SITE_URL}/unsubscribe/${player.id}/${unsubscribeToken(player.id, secret)}`;
     const text = formatOfferEmail({ name: player.name, body: emailBody, unsubscribeUrl });
     const { error } = await resend.emails.send({
-      from: FROM,
+      from: marketingFrom.from,
       to: player.email || "",
       replyTo: PROMO_REPLY_TO,
       subject,

@@ -11,8 +11,9 @@ import {
   PROMO_REPLY_TO,
 } from "@/lib/email/deliverability";
 import { accountStateFromProfileRead, promoEmailBlockReason } from "@/lib/email/newsletter-consent";
+import { resolveMarketingFrom } from "@/lib/email/marketing-from";
 import { customCampaignEmail } from "@/lib/email/newsletter-templates";
-import { FROM, getResend } from "@/lib/email/resend";
+import { getResend } from "@/lib/email/resend";
 
 const BATCH_SIZE = 100;
 const SEND_DELAY_MS = 130;
@@ -100,6 +101,16 @@ async function blockReasonNow(db: SupabaseClient, userId: string): Promise<strin
  */
 export async function processCampaignBatch(campaignId: string, limit = BATCH_SIZE) {
   const admin = adminDb();
+  const marketingFrom = resolveMarketingFrom();
+  if (!marketingFrom.ok) {
+    await admin.from("newsletter_campaigns").update({ status: "failed" }).eq("id", campaignId);
+    await admin
+      .from("newsletter_campaign_recipients")
+      .update({ status: "failed", error: marketingFrom.error })
+      .eq("campaign_id", campaignId)
+      .eq("status", "pending");
+    return { sent: 0, failed: 0, skipped: 0, remaining: -1 };
+  }
   const resend = getResend();
   if (!resend) {
     await admin.from("newsletter_campaigns").update({ status: "failed" }).eq("id", campaignId);
@@ -164,7 +175,7 @@ export async function processCampaignBatch(campaignId: string, limit = BATCH_SIZ
     }
 
     const { error } = await resend.emails.send({
-      from: FROM,
+      from: marketingFrom.from,
       to: recipient.email,
       replyTo: PROMO_REPLY_TO,
       subject,
