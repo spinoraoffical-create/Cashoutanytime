@@ -159,14 +159,117 @@ BEGIN
            banned_until = 'infinity'
      WHERE id = target;
   END IF;
-  IF to_regclass('auth.sessions') IS NOT NULL THEN
-    DELETE FROM auth.sessions WHERE user_id = target;
-  END IF;
   IF to_regclass('auth.refresh_tokens') IS NOT NULL THEN
     DELETE FROM auth.refresh_tokens WHERE user_id = target;
   END IF;
+  IF to_regclass('auth.sessions') IS NOT NULL THEN
+    DELETE FROM auth.sessions WHERE user_id = target;
+  END IF;
+  IF to_regclass('auth.identities') IS NOT NULL THEN
+    DELETE FROM auth.identities WHERE user_id = target;
+  END IF;
 END;
 $$;
+
+CREATE OR REPLACE FUNCTION public.assert_player_can_move_money(p_kind TEXT)
+RETURNS void
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public
+AS $$
+DECLARE
+  v_user UUID := auth.uid();
+  v_suspended BOOLEAN;
+  v_test BOOLEAN;
+  v_dob DATE;
+  v_meta JSONB;
+  v_until TEXT;
+BEGIN
+  IF v_user IS NULL THEN
+    RAISE EXCEPTION 'Not authenticated';
+  END IF;
+
+  SELECT COALESCE(is_suspended, FALSE), COALESCE(is_test, FALSE), date_of_birth
+  INTO v_suspended, v_test, v_dob
+  FROM public.profiles
+  WHERE id = v_user;
+
+  IF v_suspended THEN
+    RAISE EXCEPTION 'This account is paused. Contact support.';
+  END IF;
+  IF v_test THEN
+    RAISE EXCEPTION 'Test accounts cannot move money.';
+  END IF;
+
+  IF v_dob IS NULL OR v_dob > (CURRENT_DATE - INTERVAL '18 years') THEN
+    RAISE EXCEPTION 'You must be 18 or older.';
+  END IF;
+
+  IF p_kind IS DISTINCT FROM 'load' THEN
+    RETURN;
+  END IF;
+
+  IF to_regclass('auth.users') IS NULL THEN
+    RETURN;
+  END IF;
+  SELECT raw_user_meta_data INTO v_meta FROM auth.users WHERE id = v_user;
+  v_until := v_meta #>> '{prefs,selfExcludeUntil}';
+  BEGIN
+    IF v_until IS NOT NULL AND btrim(v_until) <> '' AND v_until::timestamptz > now() THEN
+      RAISE EXCEPTION 'Self-exclusion is on.';
+    END IF;
+  EXCEPTION
+    WHEN invalid_datetime_format OR datetime_field_overflow THEN
+      NULL;
+  END;
+
+  v_until := v_meta #>> '{prefs,timeoutUntil}';
+  BEGIN
+    IF v_until IS NOT NULL AND btrim(v_until) <> '' AND v_until::timestamptz > now() THEN
+      RAISE EXCEPTION 'A short-term break is on.';
+    END IF;
+  EXCEPTION
+    WHEN invalid_datetime_format OR datetime_field_overflow THEN
+      NULL;
+  END;
+END;
+$$;
+
+REVOKE ALL ON FUNCTION public.assert_player_can_move_money(TEXT) FROM PUBLIC, anon;
+GRANT EXECUTE ON FUNCTION public.assert_player_can_move_money(TEXT) TO authenticated;
+
+CREATE OR REPLACE FUNCTION public.block_closed_player_money()
+RETURNS trigger
+LANGUAGE plpgsql
+SET search_path = public
+AS $$
+BEGIN
+  IF NEW.user_id IS NOT NULL AND EXISTS (
+    SELECT 1 FROM public.profiles
+    WHERE id = NEW.user_id
+      AND (coalesce(is_suspended, false) OR coalesce(is_test, false))
+  ) THEN
+    RAISE EXCEPTION 'This account cannot move money.';
+  END IF;
+  RETURN NEW;
+END;
+$$;
+
+DO $$
+DECLARE
+  money_table text;
+BEGIN
+  FOREACH money_table IN ARRAY ARRAY['payment_intents', 'paydora_payout_requests', 'deposit_requests', 'game_load_requests']
+  LOOP
+    IF to_regclass('public.' || money_table) IS NOT NULL THEN
+      EXECUTE format('DROP TRIGGER IF EXISTS block_closed_player_money ON public.%I', money_table);
+      EXECUTE format(
+        'CREATE TRIGGER block_closed_player_money BEFORE INSERT ON public.%I FOR EACH ROW EXECUTE FUNCTION public.block_closed_player_money()',
+        money_table
+      );
+    END IF;
+  END LOOP;
+END $$;
 
 DROP FUNCTION IF EXISTS public.admin_delete_user_account(uuid);
 
@@ -205,16 +308,28 @@ BEGIN
     IF to_regclass('public.loyalty_phone_challenges') IS NOT NULL THEN
       DELETE FROM public.loyalty_phone_challenges WHERE user_id = target_user_id;
     END IF;
-    IF to_regclass('public.conversations') IS NOT NULL THEN
+    IF EXISTS (
+      SELECT 1 FROM information_schema.columns
+      WHERE table_schema = 'public' AND table_name = 'conversations' AND column_name = 'admin_id'
+    ) THEN
       UPDATE public.conversations SET admin_id = NULL WHERE admin_id = target_user_id;
     END IF;
-    IF to_regclass('public.deposit_requests') IS NOT NULL THEN
+    IF EXISTS (
+      SELECT 1 FROM information_schema.columns
+      WHERE table_schema = 'public' AND table_name = 'deposit_requests' AND column_name = 'reviewed_by'
+    ) THEN
       UPDATE public.deposit_requests SET reviewed_by = NULL WHERE reviewed_by = target_user_id;
     END IF;
-    IF to_regclass('public.newsletter_campaigns') IS NOT NULL THEN
+    IF EXISTS (
+      SELECT 1 FROM information_schema.columns
+      WHERE table_schema = 'public' AND table_name = 'newsletter_campaigns' AND column_name = 'created_by'
+    ) THEN
       UPDATE public.newsletter_campaigns SET created_by = NULL WHERE created_by = target_user_id;
     END IF;
-    IF to_regclass('public.wallet_transactions') IS NOT NULL THEN
+    IF EXISTS (
+      SELECT 1 FROM information_schema.columns
+      WHERE table_schema = 'public' AND table_name = 'wallet_transactions' AND column_name = 'created_by'
+    ) THEN
       UPDATE public.wallet_transactions SET created_by = NULL WHERE created_by = target_user_id;
     END IF;
     IF EXISTS (
@@ -242,6 +357,9 @@ REVOKE ALL ON FUNCTION public.lock_welcome_reward_identity(uuid) FROM PUBLIC, an
 REVOKE ALL ON FUNCTION public.anonymize_closed_account(uuid) FROM PUBLIC, anon, authenticated;
 REVOKE ALL ON FUNCTION public.admin_delete_user_account(uuid) FROM PUBLIC, anon, authenticated;
 GRANT EXECUTE ON FUNCTION public.admin_delete_user_account(uuid) TO service_role;
+REVOKE ALL ON FUNCTION public.grant_loyalty_coins(uuid, text, text) FROM PUBLIC, anon, authenticated;
+GRANT EXECUTE ON FUNCTION public.grant_loyalty_coins(uuid, text, text) TO service_role;
+REVOKE ALL ON TABLE public.loyalty_identity_locks FROM PUBLIC, anon, authenticated;
 
 CREATE OR REPLACE FUNCTION public.grant_loyalty_coins(p_user uuid, p_task text, p_event text)
 RETURNS bigint
@@ -285,6 +403,9 @@ BEGIN
     RETURN 0;
   END IF;
   SELECT public.loyalty_email_hash(email) INTO email_hash FROM public.profiles WHERE id = p_user;
+  IF email_hash IS NULL AND to_regclass('auth.users') IS NOT NULL THEN
+    SELECT public.loyalty_email_hash(email) INTO email_hash FROM auth.users WHERE id = p_user;
+  END IF;
   IF email_hash IS NOT NULL AND EXISTS (
     SELECT 1 FROM public.loyalty_identity_locks
     WHERE identity_hash = email_hash AND task_key = p_task
@@ -292,6 +413,17 @@ BEGIN
     INSERT INTO public.loyalty_reward_attempts (user_id, kind, detail)
     VALUES (p_user, 'eligibility', 'Welcome reward already used for this identity');
     RETURN 0;
+  END IF;
+  IF to_regclass('auth.users') IS NOT NULL THEN
+    SELECT public.loyalty_email_hash(email) INTO email_hash FROM auth.users WHERE id = p_user;
+    IF email_hash IS NOT NULL AND EXISTS (
+      SELECT 1 FROM public.loyalty_identity_locks
+      WHERE identity_hash = email_hash AND task_key = p_task
+    ) THEN
+      INSERT INTO public.loyalty_reward_attempts (user_id, kind, detail)
+      VALUES (p_user, 'eligibility', 'Welcome reward already used for this identity');
+      RETURN 0;
+    END IF;
   END IF;
 
   SELECT coins INTO task_coins FROM public.loyalty_tasks WHERE key = p_task AND enabled;

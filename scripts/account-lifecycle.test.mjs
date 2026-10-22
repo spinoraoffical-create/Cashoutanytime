@@ -61,8 +61,16 @@ try {
       id uuid PRIMARY KEY,
       email text,
       phone text,
-      banned_until timestamptz
+      banned_until timestamptz,
+      raw_user_meta_data jsonb
     );
+    CREATE TABLE auth.sessions (id uuid PRIMARY KEY, user_id uuid);
+    CREATE TABLE auth.refresh_tokens (id uuid PRIMARY KEY, user_id uuid, session_id uuid);
+    CREATE TABLE auth.identities (id uuid PRIMARY KEY, user_id uuid, email text);
+    CREATE TABLE public.payment_intents (id uuid PRIMARY KEY DEFAULT gen_random_uuid(), user_id uuid);
+    CREATE TABLE public.paydora_payout_requests (id uuid PRIMARY KEY DEFAULT gen_random_uuid(), user_id uuid);
+    CREATE TABLE public.deposit_requests (id uuid PRIMARY KEY DEFAULT gen_random_uuid(), user_id uuid);
+    CREATE TABLE public.game_load_requests (id uuid PRIMARY KEY DEFAULT gen_random_uuid(), user_id uuid);
     CREATE OR REPLACE FUNCTION auth.uid() RETURNS uuid LANGUAGE sql STABLE AS $$
       SELECT NULLIF(current_setting('request.jwt.claim.sub', true), '')::uuid $$;
     DO $$ BEGIN CREATE ROLE anon NOLOGIN; EXCEPTION WHEN duplicate_object THEN NULL; END $$;
@@ -77,6 +85,7 @@ try {
       phone text,
       referred_by uuid,
       is_suspended boolean NOT NULL DEFAULT false,
+      date_of_birth date,
       coins_balance bigint NOT NULL DEFAULT 0,
       vip_points integer NOT NULL DEFAULT 0,
       wallet_balance numeric NOT NULL DEFAULT 0,
@@ -143,7 +152,7 @@ try {
   await sql`insert into public.loyalty_grants (user_id, task_key, event_key, coins) values (${historyUser}, 'signup', 'signup:history', 200)`;
   await sql`insert into public.fraud_scores (user_id, risk_score, flags, rewards_blocked, manual_review) values (${fraudUser}, 75, '["admin_manual_block"]'::jsonb, true, true)`;
   await sql`insert into public.site_settings (key, value) values ('coins_earning_enabled', 'true'::jsonb) on conflict (key) do update set value = excluded.value`;
-  await sql`update public.loyalty_tasks set enabled = true where key in ('signup', 'daily_checkin')`;
+  await sql`update public.loyalty_tasks set enabled = true where key in ('signup', 'daily_checkin', 'welcome_survey', 'email_verified')`;
   await sql`update public.site_settings set value = 'false'::jsonb where key = 'legacy_freeplay_claims_enabled'`;
   await sql`update public.site_settings set value = 'true'::jsonb where key = 'coins_checkin_enabled'`;
 
@@ -154,13 +163,17 @@ try {
   const locks = await sql`select count(*)::int as n from public.loyalty_identity_locks`;
   assert.equal(locks[0].n, 6);
 
-  await sql`insert into auth.users (id, email) values (${rejoinUser}, 'empty@example.com')`;
-  await sql`insert into public.profiles (id, email, full_name) values (${rejoinUser}, 'empty@example.com', 'Again')`;
+  await sql`insert into auth.users (id, email) values (${rejoinUser}, ' Empty@Example.com ')` ;
+  await sql`insert into public.profiles (id, email, full_name, date_of_birth) values (${rejoinUser}, ' Empty@Example.com ', 'Again', '1990-01-01')`;
   const repeat = await asService((tx) => tx.unsafe(`select public.grant_loyalty_coins($1::uuid, 'signup', 'signup:again') as coins`, [rejoinUser]));
   assert.equal(Number(repeat[0].coins), 0);
   const repeatBalance = await sql`select coins_balance from public.profiles where id = ${rejoinUser}`;
   assert.equal(Number(repeatBalance[0].coins_balance), 0);
 
+  const sessionId = "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb";
+  await sql`insert into auth.sessions (id, user_id) values (${sessionId}, ${historyUser})`;
+  await sql`insert into auth.refresh_tokens (id, user_id, session_id) values ('cccccccc-cccc-4ccc-8ccc-cccccccccccc', ${historyUser}, ${sessionId})`;
+  await sql`insert into auth.identities (id, user_id, email) values ('dddddddd-dddd-4ddd-8ddd-dddddddddddd', ${historyUser}, 'history@example.com')`;
   const closed = await asService((tx) => tx.unsafe(`select public.admin_delete_user_account($1::uuid) as outcome`, [historyUser]));
   assert.equal(closed[0].outcome, "anonymized");
   const kept = await sql`select email, is_suspended, wallet_balance, coins_balance from public.profiles where id = ${historyUser}`;
@@ -171,11 +184,94 @@ try {
   const grantKept = await sql`select count(*)::int as n, coalesce(sum(coins), 0)::int as coins from public.loyalty_grants where user_id = ${historyUser}`;
   assert.equal(grantKept[0].n, 1);
   assert.equal(grantKept[0].coins, 200);
+  const sessions = await sql`select count(*)::int as n from auth.sessions where user_id = ${historyUser}`;
+  const refreshes = await sql`select count(*)::int as n from auth.refresh_tokens where user_id = ${historyUser}`;
+  const identities = await sql`select count(*)::int as n from auth.identities where user_id = ${historyUser}`;
+  const banned = await sql`select banned_until from auth.users where id = ${historyUser}`;
+  assert.equal(sessions[0].n, 0);
+  assert.equal(refreshes[0].n, 0);
+  assert.equal(identities[0].n, 0);
+  assert.equal(banned[0].banned_until !== null, true);
+  await assert.rejects(
+    () => sql.begin(async (tx) => {
+      await tx.unsafe(`select set_config('request.jwt.claim.sub', $1, true)`, [historyUser]);
+      await tx.unsafe(`select set_config('request.jwt.claim.role', 'authenticated', true)`);
+      await tx.unsafe(`set local role authenticated`);
+      await tx.unsafe(`select public.claim_loyalty_checkin('daily')`);
+    }),
+    /account suspended/
+  );
+  await assert.rejects(
+    () => sql`insert into public.payment_intents (user_id) values (${historyUser})`,
+    /cannot move money/
+  );
 
+  const lockRows = await sql`select identity_hash from public.loyalty_identity_locks`;
+  for (const row of lockRows) {
+    assert.equal(String(row.identity_hash).includes("@"), false);
+    assert.equal(String(row.identity_hash).length, 64);
+  }
+  await assert.rejects(
+    () => sql.begin(async (tx) => {
+      await tx.unsafe(`set local role authenticated`);
+      await tx.unsafe(`select * from public.loyalty_identity_locks`);
+    }),
+    /permission denied/i
+  );
+  const freshUser = "12121212-1212-4212-8212-121212121212";
+  await sql`insert into auth.users (id, email) values (${freshUser}, 'fresh@example.com')`;
+  await sql`insert into public.profiles (id, email, full_name, date_of_birth) values (${freshUser}, 'fresh@example.com', 'Fresh', '1990-01-01')`;
+  const freshCoins = await asService((tx) => tx.unsafe(`select public.grant_loyalty_coins($1::uuid, 'signup', 'signup:fresh') as coins`, [freshUser]));
+  assert.equal(Number(freshCoins[0].coins), 200);
+  await sql`update public.loyalty_tasks set enabled = true where key = 'email_verified'`;
+  await sql`update public.profiles set email = 'changed@example.com' where id = ${rejoinUser}`;
+  const changedStillLocked = await asService((tx) => tx.unsafe(`select public.grant_loyalty_coins($1::uuid, 'email_verified', 'email:rejoin') as coins`, [rejoinUser]));
+  assert.equal(Number(changedStillLocked[0].coins), 0);
+
+  await sql`update public.profiles set date_of_birth = '1990-01-01' where id = ${testUser}`;
+  await assert.rejects(
+    () => sql.begin(async (tx) => {
+      await tx.unsafe(`select set_config('request.jwt.claim.sub', $1, true)`, [testUser]);
+      await tx.unsafe(`select public.assert_player_can_move_money('load')`);
+    }),
+    /Test accounts cannot move money/
+  );
+  await assert.rejects(
+    () => sql`insert into public.game_load_requests (user_id) values (${testUser})`,
+    /cannot move money/
+  );
+  await assert.rejects(
+    () => sql`insert into public.paydora_payout_requests (user_id) values (${testUser})`,
+    /cannot move money/
+  );
+  await assert.rejects(
+    () => sql`insert into public.deposit_requests (user_id) values (${testUser})`,
+    /cannot move money/
+  );
   const testCoins = await asService((tx) => tx.unsafe(`select public.grant_loyalty_coins($1::uuid, 'signup', 'signup:test') as coins`, [testUser]));
   assert.equal(Number(testCoins[0].coins), 0);
   const fraudCoins = await asService((tx) => tx.unsafe(`select public.grant_loyalty_coins($1::uuid, 'signup', 'signup:fraud') as coins`, [fraudUser]));
   assert.equal(Number(fraudCoins[0].coins), 0);
+  await assert.rejects(
+    () => sql.begin(async (tx) => {
+      await tx.unsafe(`select set_config('request.jwt.claim.sub', $1, true)`, [fraudUser]);
+      await tx.unsafe(`select set_config('request.jwt.claim.role', 'authenticated', true)`);
+      await tx.unsafe(`set local role authenticated`);
+      await tx.unsafe(`select public.save_loyalty_survey('both', 'friend', 'support')`);
+    }),
+    /welcome reward budget is used up|Coins are not available/i
+  );
+  const fraudSurvey = await sql`select count(*)::int as n from public.loyalty_survey_responses where user_id = ${fraudUser}`;
+  const fraudBalance = await sql`select coins_balance from public.profiles where id = ${fraudUser}`;
+  assert.equal(fraudSurvey[0].n, 0);
+  assert.equal(Number(fraudBalance[0].coins_balance), 0);
+  await assert.rejects(
+    () => sql.begin(async (tx) => {
+      await tx.unsafe(`set local role authenticated`);
+      await tx.unsafe(`select public.grant_loyalty_coins($1::uuid, 'signup', 'signup:intruder')`, [fraudUser]);
+    }),
+    /permission denied/i
+  );
 
   await assert.rejects(
     () => sql.begin(async (tx) => {
