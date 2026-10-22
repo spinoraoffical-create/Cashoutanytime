@@ -1007,7 +1007,7 @@ export type Database = {
         Args: {
           target_user_id: string;
         };
-        Returns: undefined;
+        Returns: string;
       };
       request_game_load: {
         Args: {

@@ -12,7 +12,7 @@ export default async function AdminFraudPage() {
     <div className="mx-auto max-w-7xl">
       <AdminPageHeader
         title="Fraud flags"
-        description="Players already flagged by the existing rules. Restore access and Block freeplay still ask you to confirm, and each one writes an audit entry."
+        description="Players already flagged by the existing rules. A blocked player is offered Unblock freeplay instead of another block. Each change asks you to confirm and writes an audit entry."
       />
 
       {error ? <AdminErrorState title="The fraud list could not be loaded" body={error} /> : null}

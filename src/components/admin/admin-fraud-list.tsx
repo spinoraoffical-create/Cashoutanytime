@@ -10,6 +10,7 @@ import { formatDate } from "@/lib/utils";
 import {
   blockUserFreeplay,
   clearUserFraudFlags,
+  unblockUserFreeplay,
   type AdminFraudRow,
 } from "@/lib/actions/admin-fraud";
 import { MessageCircle, Search, ShieldAlert, ShieldCheck } from "lucide-react";
@@ -38,7 +39,7 @@ export function AdminFraudList({ users }: AdminFraudListProps) {
   }, [users, query]);
 
   async function handleClear(userId: string) {
-    if (!window.confirm("Clear fraud flags and restore this player? This is written to the audit log.")) return;
+    if (!window.confirm("Clear fraud flags for this player? This does not lift a separate ban and does not delete reward history. This is written to the audit log.")) return;
     setLoadingId(userId);
     const result = await clearUserFraudFlags(userId);
     setLoadingId(null);
@@ -46,7 +47,20 @@ export function AdminFraudList({ users }: AdminFraudListProps) {
       toast.error(result.error);
       return;
     }
-    toast.success("User restored — spin rewards enabled");
+    toast.success("Fraud flags cleared. A separate ban was left as it is, and reward history was kept.");
+    router.refresh();
+  }
+
+  async function handleUnblockFreeplay(userId: string) {
+    if (!window.confirm("Unblock freeplay for this player? Calculated fraud flags stay in place. This is written to the audit log.")) return;
+    setLoadingId(userId);
+    const result = await unblockUserFreeplay(userId);
+    setLoadingId(null);
+    if (result.error) {
+      toast.error(result.error);
+      return;
+    }
+    toast.success("Freeplay block removed");
     router.refresh();
   }
 
@@ -118,6 +132,13 @@ export function AdminFraudList({ users }: AdminFraudListProps) {
                         {user.flags.length ? ` · ${user.flags.join(", ")}` : ""}
                       </p>
                       <p className="mt-2 text-xs text-[#8ea0c3]">
+                        Restriction: {user.flags.length ? user.flags.join(", ").replaceAll("_", " ") : "none recorded"}
+                        {" · "}
+                        {formatDate(user.restriction_at || user.updated_at || user.last_calculated_at)}
+                        {" · "}
+                        {user.restriction_actor ? `By ${user.restriction_actor}` : "Admin name was not recorded"}
+                      </p>
+                      <p className="mt-2 text-xs text-[#8ea0c3]">
                         Joined {formatDate(user.created_at)} · {user.device_count} linked device
                         {user.device_count === 1 ? "" : "s"} · Updated {formatDate(user.last_calculated_at)}
                       </p>
@@ -139,6 +160,9 @@ export function AdminFraudList({ users }: AdminFraudListProps) {
                           Message
                         </Link>
                       </Button>
+                      <Button variant="outline" size="sm" asChild className="border-white/15 text-[#e8eefc]">
+                        <Link href={`/admin/users/${user.user_id}`}>Review restriction</Link>
+                      </Button>
                       <Button
                         size="sm"
                         className="gap-1.5 bg-gradient-to-r from-[#6d28d9] to-[#2563eb] text-white"
@@ -148,15 +172,27 @@ export function AdminFraudList({ users }: AdminFraudListProps) {
                         <ShieldCheck className="h-4 w-4" />
                         Restore access
                       </Button>
-                      <Button
-                        size="sm"
-                        variant="destructive"
-                        disabled={busy}
-                        onClick={() => handleBlockFreeplay(user.user_id)}
-                      >
-                        <ShieldAlert className="h-4 w-4" />
-                        Block freeplay
-                      </Button>
+                      {user.rewards_blocked ? (
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          className="border-white/15 text-[#e8eefc]"
+                          disabled={busy}
+                          onClick={() => handleUnblockFreeplay(user.user_id)}
+                        >
+                          Unblock freeplay
+                        </Button>
+                      ) : (
+                        <Button
+                          size="sm"
+                          variant="destructive"
+                          disabled={busy}
+                          onClick={() => handleBlockFreeplay(user.user_id)}
+                        >
+                          <ShieldAlert className="h-4 w-4" />
+                          Block freeplay
+                        </Button>
+                      )}
                     </div>
                   </div>
                 </div>

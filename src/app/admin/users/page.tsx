@@ -21,7 +21,8 @@ import {
   profileNum,
   type ProfileRow,
 } from "@/lib/admin/spinora-profile";
-import { requirePermission } from "@/lib/data/admin";
+import { TestAccountForm } from "@/components/admin/test-account-form";
+import { getStaffContext, requirePermission } from "@/lib/data/admin";
 import { cn } from "@/lib/utils";
 
 export const metadata: Metadata = { title: "All players" };
@@ -34,6 +35,7 @@ export default async function AdminUsersPage({
   searchParams: Promise<{ q?: string; page?: string }>;
 }) {
   await requirePermission("users.manage");
+  const staff = await getStaffContext();
   const params = await searchParams;
   const q = (params.q ?? "").trim();
   const page = Math.max(1, Number(params.page) || 1);
@@ -117,6 +119,8 @@ export default async function AdminUsersPage({
         title="All players"
         description="Search by name or email, then open a player. Balances on this list are read-only."
       />
+
+      {staff?.isSuperAdmin ? <TestAccountForm /> : null}
 
       <form className="mb-4 flex flex-col gap-2 sm:flex-row" action="/admin/users">
         <div className="relative flex-1">

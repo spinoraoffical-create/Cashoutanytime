@@ -62,19 +62,37 @@ export async function deleteUserAccountAction(userId: string): Promise<AdminActi
   const db = adminDb();
   const { data: before } = await db.from("profiles").select("*").eq("id", userId).single();
 
-  const { error } = await db.rpc("admin_delete_user_account", { target_user_id: userId });
-  if (error) return { ok: false, error: "Could not delete the account." };
+  const { data, error } = await db.rpc("admin_delete_user_account", { target_user_id: userId });
+  if (error) {
+    if (/owner account/i.test(error.message)) {
+      return { ok: false, error: "The owner account cannot be deleted." };
+    }
+    return { ok: false, error: "Could not delete the account." };
+  }
+  const outcome = String(data ?? "");
+  if (outcome !== "deleted" && outcome !== "anonymized") {
+    return { ok: false, error: "Could not delete the account." };
+  }
 
   const audited = await writeAudit({
     actorId: auth.staff.userId,
-    action: "user.delete",
+    action: outcome === "anonymized" ? "user.anonymize" : "user.delete",
     entityType: "profile",
     entityId: userId,
     before,
+    after: { outcome },
   });
 
   revalidatePath("/admin/users");
-  return { ok: true, message: "Account permanently deleted.", ...partialAuditResult(audited) };
+  revalidatePath(`/admin/users/${userId}`);
+  return {
+    ok: true,
+    message:
+      outcome === "anonymized"
+        ? "Account closed. Balances, KYC, and reward history were kept, and the login was disabled."
+        : "Account deleted. It had no balance, KYC, or reward history.",
+    ...partialAuditResult(audited),
+  };
 }
 
 const adjustSchema = z.object({

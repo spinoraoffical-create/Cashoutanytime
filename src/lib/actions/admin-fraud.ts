@@ -22,6 +22,9 @@ export interface AdminFraudRow {
   device_count: number;
   signupIp: string;
   lastSeenIp: string;
+  updated_at: string | null;
+  restriction_actor: string | null;
+  restriction_at: string | null;
 }
 
 async function requireAdmin() {
@@ -52,7 +55,7 @@ export async function getFlaggedFraudUsers(): Promise<{
   const { data: scores, error } = await admin
     .from("fraud_scores")
     .select(
-      "user_id, risk_score, flags, blocked, rewards_blocked, manual_review, last_calculated_at"
+      "user_id, risk_score, flags, blocked, rewards_blocked, manual_review, last_calculated_at, updated_at"
     )
     .or("rewards_blocked.eq.true,blocked.eq.true,manual_review.eq.true,risk_score.gte.50")
     .order("risk_score", { ascending: false })
@@ -84,10 +87,26 @@ export async function getFlaggedFraudUsers(): Promise<{
       ).data
     : profileSelect.data;
 
-  const [{ data: devices }, ips] = await Promise.all([
+  const [{ data: devices }, ips, { data: audits }] = await Promise.all([
     admin.from("device_map").select("user_id, device_id").in("user_id", userIds),
     latestIpsFor(admin, userIds),
+    admin
+      .from("audit_logs")
+      .select("entity_id, actor_id, created_at, action")
+      .in("entity_id", userIds)
+      .eq("action", "fraud.block_freeplay")
+      .order("created_at", { ascending: false }),
   ]);
+  const latestBlock = new Map<string, { actor_id: string | null; created_at: string }>();
+  for (const audit of audits ?? []) {
+    if (!audit.entity_id || latestBlock.has(audit.entity_id)) continue;
+    latestBlock.set(audit.entity_id, { actor_id: audit.actor_id, created_at: audit.created_at });
+  }
+  const actorIds = [...new Set([...latestBlock.values()].map((row) => row.actor_id).filter((id): id is string => Boolean(id)))];
+  const { data: actors } = actorIds.length
+    ? await admin.from("profiles").select("id, full_name, email").in("id", actorIds)
+    : { data: [] };
+  const actorName = new Map((actors ?? []).map((actor) => [actor.id, actor.full_name || actor.email || "Admin"]));
 
   const profileById = new Map((profileRows ?? []).map((p) => [p.id, p]));
   const deviceCountByUser = new Map<string, Set<string>>();
@@ -103,6 +122,7 @@ export async function getFlaggedFraudUsers(): Promise<{
     .map((score) => {
       const profile = profileById.get(score.user_id);
       if (!profile) return null;
+      const block = latestBlock.get(score.user_id);
       return {
         user_id: score.user_id,
         risk_score: score.risk_score ?? 0,
@@ -119,6 +139,9 @@ export async function getFlaggedFraudUsers(): Promise<{
         device_count: deviceCountByUser.get(score.user_id)?.size ?? 0,
         signupIp: ips.signup.get(score.user_id)?.trim() || "—",
         lastSeenIp: ips.seen.get(score.user_id)?.trim() || "—",
+        updated_at: "updated_at" in score ? String(score.updated_at ?? "") || null : null,
+        restriction_actor: block?.actor_id ? actorName.get(block.actor_id) ?? "Admin" : null,
+        restriction_at: block?.created_at ?? null,
       };
     })
     .filter((row): row is AdminFraudRow => row !== null);
@@ -126,7 +149,7 @@ export async function getFlaggedFraudUsers(): Promise<{
   return { users };
 }
 
-/** Restore signup rewards + clear fraud flags (and unsuspend if fraud-related). */
+/** Clear fraud flags only. A separate ban and reward history stay in place. */
 export async function clearUserFraudFlags(userId: string): Promise<{ success?: boolean; error?: string }> {
   const auth = await requireAdmin();
   if (auth.error) return { error: auth.error };
@@ -154,13 +177,6 @@ export async function clearUserFraudFlags(userId: string): Promise<{ success?: b
     }
     return { error: fraudError.message };
   }
-
-  const { error: profileError } = await admin
-    .from("profiles")
-    .update({ is_suspended: false })
-    .eq("id", userId);
-
-  if (profileError) return { error: profileError.message };
 
   await admin
     .from("fraud_events")
@@ -192,16 +208,23 @@ export async function blockUserFreeplay(userId: string): Promise<{ success?: boo
   const admin = createAdminClient();
   if (!admin) return { error: "Admin client not configured" };
 
+  const { data: existing } = await admin
+    .from("fraud_scores")
+    .select("flags, risk_score, blocked")
+    .eq("user_id", userId)
+    .maybeSingle();
+  const flags = parseFlags(existing?.flags);
+  const nextFlags = flags.includes("admin_manual_block") ? flags : [...flags, "admin_manual_block"];
   const { error } = await admin
     .from("fraud_scores")
     .upsert(
       {
         user_id: userId,
-        risk_score: 75,
+        risk_score: Math.max(Number(existing?.risk_score ?? 0), 75),
         rewards_blocked: true,
         manual_review: true,
-        blocked: false,
-        flags: ["admin_manual_block"],
+        blocked: Boolean(existing?.blocked),
+        flags: nextFlags,
         updated_at: new Date().toISOString(),
       },
       { onConflict: "user_id" }
@@ -215,6 +238,45 @@ export async function blockUserFreeplay(userId: string): Promise<{ success?: boo
     entityType: "profile",
     entityId: userId,
     after: { rewards_blocked: true },
+  });
+
+  revalidatePath("/admin/fraud");
+  return { success: true };
+}
+
+export async function unblockUserFreeplay(userId: string): Promise<{ success?: boolean; error?: string }> {
+  const auth = await requireAdmin();
+  if (auth.error) return { error: auth.error };
+
+  const admin = createAdminClient();
+  if (!admin) return { error: "Admin client not configured" };
+
+  const { data: existing, error: readError } = await admin
+    .from("fraud_scores")
+    .select("flags, risk_score, blocked")
+    .eq("user_id", userId)
+    .maybeSingle();
+  if (readError) return { error: readError.message };
+  const flags = parseFlags(existing?.flags).filter((flag) => flag !== "admin_manual_block");
+  const stillRestricted = flags.length > 0 || Boolean(existing?.blocked);
+  const { error } = await admin
+    .from("fraud_scores")
+    .update({
+      flags,
+      rewards_blocked: stillRestricted,
+      manual_review: stillRestricted,
+      risk_score: stillRestricted ? Number(existing?.risk_score ?? 0) : 0,
+      updated_at: new Date().toISOString(),
+    })
+    .eq("user_id", userId);
+  if (error) return { error: error.message };
+
+  await writeAudit({
+    actorId: auth.userId,
+    action: "fraud.unblock_freeplay",
+    entityType: "profile",
+    entityId: userId,
+    after: { rewards_blocked: stillRestricted, flags },
   });
 
   revalidatePath("/admin/fraud");

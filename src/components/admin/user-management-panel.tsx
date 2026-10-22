@@ -309,15 +309,15 @@ export function UserManagementPanel({
         <AdminSectionCard
           className="border-rose-400/30"
           title="Delete account"
-          description="Permanently deletes the login, profile, wallet, and ledger history. This cannot be undone."
+          description="An empty account is deleted. An account with a balance, KYC, or reward history is closed instead: the login is disabled and those records stay."
           action={<Trash2 className="size-4 text-rose-200" aria-hidden />}
         >
           <div className="mt-4">
             <ConfirmActionButton
               action={deleteUserAccountAction.bind(null, userId)}
-              title="Permanently delete this account?"
-              description="This permanently deletes the login, profile, wallet, ledger, and all associated data. This cannot be undone."
-              confirmLabel="Delete account"
+              title="Close this account?"
+              description="An empty account is deleted. An account with a balance, KYC, or reward history keeps those records, disables the login, and does not reopen welcome Coins."
+              confirmLabel="Close account"
               triggerLabel="Delete account"
               redirectTo="/admin/users"
             />

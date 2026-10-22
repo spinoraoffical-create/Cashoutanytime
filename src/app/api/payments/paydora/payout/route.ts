@@ -56,11 +56,13 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: "Payout amount must be at least $1.00" }, { status: 400 });
     }
 
-    const { data: profile } = await supabase
-      .from("profiles")
-      .select("cashout_wallet, kyc_status, date_of_birth, is_suspended")
-      .eq("id", user.id)
-      .single();
+    const [{ data: profile }, test] = await Promise.all([
+      supabase.from("profiles").select("cashout_wallet, kyc_status, date_of_birth, is_suspended").eq("id", user.id).single(),
+      supabase.from("profiles").select("is_test").eq("id", user.id).maybeSingle(),
+    ]);
+    if (!test.error && (test.data as { is_test?: boolean | null } | null)?.is_test) {
+      return NextResponse.json({ error: "Test accounts cannot cash out." }, { status: 403 });
+    }
     if ((profile as { is_suspended?: boolean | null } | null)?.is_suspended) {
       return NextResponse.json({ error: "This account is paused. Contact support." }, { status: 403 });
     }

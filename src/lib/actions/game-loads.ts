@@ -214,12 +214,14 @@ async function blockPlayerMoney(
   supabase: Awaited<ReturnType<typeof createClient>>,
   userId: string
 ) {
-  const { data } = await supabase
-    .from("profiles")
-    .select("date_of_birth, is_suspended")
-    .eq("id", userId)
-    .maybeSingle();
+  const [{ data }, test] = await Promise.all([
+    supabase.from("profiles").select("date_of_birth, is_suspended").eq("id", userId).maybeSingle(),
+    supabase.from("profiles").select("is_test").eq("id", userId).maybeSingle(),
+  ]);
   const profile = data as { date_of_birth?: string | null; is_suspended?: boolean | null } | null;
+  if (!test.error && (test.data as { is_test?: boolean | null } | null)?.is_test) {
+    return "Test accounts cannot move money.";
+  }
   if (profile?.is_suspended) return "This account is paused. Contact support.";
   return playerMoneyDenial({
     operation,
