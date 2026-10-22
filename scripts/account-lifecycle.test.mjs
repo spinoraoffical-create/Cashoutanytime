@@ -12,6 +12,7 @@ const fraudActions = readFileSync(path.join(root, "src/lib/actions/admin-fraud.t
 const testAction = readFileSync(path.join(root, "src/lib/actions/admin/test-accounts.ts"), "utf8");
 const deleteAction = readFileSync(path.join(root, "src/lib/actions/admin/users.ts"), "utf8");
 const migration = readFileSync(path.join(root, "supabase/migrations/20261022000300_account_lifecycle.sql"), "utf8");
+const closeFix = readFileSync(path.join(root, "supabase/migrations/20261022000400_account_close_fix.sql"), "utf8");
 
 assert.match(fraudList, /Unblock freeplay/);
 assert.match(fraudList, /user\.rewards_blocked \?/);
@@ -24,6 +25,10 @@ assert.match(testAction, /is_test: true/);
 assert.equal(testAction.includes("tryGrantLoyaltyCoins"), false);
 assert.match(deleteAction, /The owner account cannot be deleted/);
 assert.match(deleteAction, /outcome === "anonymized"/);
+assert.match(deleteAction, /console\.error\("admin_delete_user_account failed"/);
+assert.match(deleteAction, /Could not close the account\. The login and history were left unchanged\./);
+assert.match(closeFix, /auth\.role\(\) IS DISTINCT FROM 'service_role'/);
+assert.match(closeFix, /search_path = public, extensions/);
 assert.match(migration, /RETURN 'anonymized'/);
 assert.match(migration, /loyalty_grants/);
 assert.match(migration, /The owner account cannot be deleted/);
@@ -100,6 +105,13 @@ try {
       reload_bonus_percent numeric NOT NULL DEFAULT 10
     );
     INSERT INTO public.games (slug) VALUES ('juwa');
+    CREATE SCHEMA IF NOT EXISTS extensions;
+    CREATE EXTENSION IF NOT EXISTS pgcrypto SCHEMA extensions;
+    CREATE OR REPLACE FUNCTION auth.role() RETURNS text LANGUAGE sql STABLE AS $$
+      SELECT coalesce(
+        nullif(current_setting('request.jwt.claim.role', true), ''),
+        nullif(current_setting('request.jwt.claims', true), '')::jsonb ->> 'role'
+      ) $$;
     CREATE OR REPLACE FUNCTION public.is_service_role() RETURNS boolean LANGUAGE sql STABLE AS $$
       SELECT current_setting('request.jwt.claim.role', true) = 'service_role' $$;
     CREATE OR REPLACE FUNCTION public.protect_profile_columns() RETURNS trigger LANGUAGE plpgsql AS $$
@@ -116,10 +128,12 @@ try {
     CREATE TABLE public.roles (id uuid PRIMARY KEY, key text UNIQUE);
     CREATE TABLE public.user_roles (user_id uuid, role_id uuid);
   `);
+  await sql.unsafe(`select set_config('search_path', 'public, extensions', false)`);
   for (const file of [
     "supabase/migrations/20261022000100_loyalty_coins.sql",
     "supabase/migrations/20261022000200_loyalty_completion.sql",
     "supabase/migrations/20261022000300_account_lifecycle.sql",
+    "supabase/migrations/20261022000400_account_close_fix.sql",
   ]) {
     await sql.unsafe(readFileSync(path.join(root, file), "utf8"));
   }
@@ -291,6 +305,30 @@ try {
   );
   const ownerLeft = await sql`select count(*)::int as n from public.profiles where id = ${ownerUser}`;
   assert.equal(ownerLeft[0].n, 1);
+
+  const closedAgain = await asService((tx) => tx.unsafe(`select public.admin_delete_user_account($1::uuid) as outcome`, [historyUser]));
+  assert.equal(closedAgain[0].outcome, "anonymized");
+  const historyStill = await sql`select wallet_balance, coins_balance from public.profiles where id = ${historyUser}`;
+  assert.equal(Number(historyStill[0].wallet_balance), 12.5);
+  assert.equal(Number(historyStill[0].coins_balance), 0);
+
+  const postgrestUser = "13131313-1313-4313-8313-131313131313";
+  await sql`insert into auth.users (id, email) values (${postgrestUser}, 'postgrest@example.com')`;
+  await sql`insert into public.profiles (id, email, full_name, wallet_balance) values (${postgrestUser}, 'postgrest@example.com', 'PostgREST', 4)`;
+  await sql`insert into public.loyalty_grants (user_id, task_key, event_key, coins) values (${postgrestUser}, 'signup', 'signup:postgrest', 200)`;
+  const closedLikeProduction = await sql.begin(async (tx) => {
+    await tx.unsafe(`select set_config('request.jwt.claims', '{"role":"service_role"}', true)`);
+    await tx.unsafe(`select set_config('request.jwt.claim.role', '', true)`);
+    await tx.unsafe(`set local role service_role`);
+    return tx.unsafe(`select public.admin_delete_user_account($1::uuid) as outcome`, [postgrestUser]);
+  });
+  assert.equal(closedLikeProduction[0].outcome, "anonymized");
+  const postgrestKept = await sql`select email, is_suspended, wallet_balance from public.profiles where id = ${postgrestUser}`;
+  assert.equal(postgrestKept[0].is_suspended, true);
+  assert.equal(Number(postgrestKept[0].wallet_balance), 4);
+  assert.match(postgrestKept[0].email, /@users\.invalid$/);
+  const postgrestGrant = await sql`select count(*)::int as n from public.loyalty_grants where user_id = ${postgrestUser}`;
+  assert.equal(postgrestGrant[0].n, 1);
 
   await assert.rejects(
     () => sql.begin(async (tx) => {

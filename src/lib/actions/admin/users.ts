@@ -64,14 +64,28 @@ export async function deleteUserAccountAction(userId: string): Promise<AdminActi
 
   const { data, error } = await db.rpc("admin_delete_user_account", { target_user_id: userId });
   if (error) {
+    console.error("admin_delete_user_account failed", {
+      code: error.code,
+      message: error.message,
+    });
     if (/owner account/i.test(error.message)) {
       return { ok: false, error: "The owner account cannot be deleted." };
     }
-    return { ok: false, error: "Could not delete the account." };
+    if (/account not found/i.test(error.message)) {
+      return { ok: false, error: "Account not found." };
+    }
+    return {
+      ok: false,
+      error: "Could not close the account. The login and history were left unchanged.",
+    };
   }
   const outcome = String(data ?? "");
   if (outcome !== "deleted" && outcome !== "anonymized") {
-    return { ok: false, error: "Could not delete the account." };
+    console.error("admin_delete_user_account failed", { outcome });
+    return {
+      ok: false,
+      error: "Could not close the account. The login and history were left unchanged.",
+    };
   }
 
   const audited = await writeAudit({
