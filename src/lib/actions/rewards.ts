@@ -18,6 +18,19 @@ export async function claimRewardAction(ruleKey: string) {
   const admin = createAdminClient();
   if (!admin) return { ok: false as const, error: "Rewards are unavailable right now." };
 
+  const guarded = await admin.rpc("claim_legacy_freeplay", {
+    p_rule: ruleKey,
+    p_user: user.id,
+  });
+  if (!guarded.error) {
+    revalidatePath("/dashboard/rewards");
+    revalidatePath("/dashboard");
+    return { ok: true as const, coins: 0, xp: 0, multiplier: 1 };
+  }
+  if (!/schema cache|does not exist|claim_legacy_freeplay/i.test(guarded.error.message)) {
+    return { ok: false as const, error: guarded.error.message };
+  }
+
   const { data, error } = await admin.rpc("claim_reward", {
     rule_key: ruleKey,
     p_user_id: user.id,

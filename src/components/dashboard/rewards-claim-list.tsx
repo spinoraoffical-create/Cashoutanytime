@@ -12,10 +12,8 @@ import type { StreamState } from "@/lib/data/dashboard";
 
 export function RewardsClaimList({
   streams,
-  multiplier,
 }: {
   streams: StreamState[];
-  multiplier: number;
 }) {
   const [pending, startTransition] = useTransition();
 
@@ -60,13 +58,8 @@ export function RewardsClaimList({
               <p className="text-sm text-muted-foreground">{rule.description}</p>
             </CardHeader>
             <CardContent className="space-y-3">
-              <p className="text-sm">
-                <span className="text-orange-400 font-semibold">
-                  +{Math.round(rule.coins * multiplier).toLocaleString()} coins
-                </span>
-                {rule.xp > 0 && (
-                  <span className="text-muted-foreground"> · +{rule.xp} XP</span>
-                )}
+              <p className="text-sm text-[#d5def2]">
+                $1 freeplay and 50 VIP points. This does not pay Coins.
               </p>
               {progress && progress.required > 0 && (
                 <div className="space-y-1">

@@ -8,6 +8,7 @@ import { authorize, writeAudit } from "@/lib/actions/admin/core";
 import { identityDecisionLogCode, identityDecisionMessage } from "@/lib/kyc/decision";
 import { checkKycDataUrl } from "@/lib/kyc/upload-rules";
 import { logIncident } from "@/lib/observability/incident";
+import { tryGrantLoyaltyCoins } from "@/lib/rewards/try-grant-loyalty";
 
 export interface KYCSubmissionRecord {
   id: string;
@@ -238,6 +239,11 @@ export async function updateKYCStatus(
   if (error) {
     console.error("[KYC decision]", identityDecisionLogCode(error));
     return { ok: false, error: identityDecisionMessage(error) };
+  }
+
+  if (newStatus === "approved") {
+    const playerId = (submission as { user_id?: string }).user_id;
+    if (playerId) await tryGrantLoyaltyCoins(playerId, "kyc_approved", `kyc:${playerId}`);
   }
 
   revalidatePath("/dashboard/kyc");

@@ -10,6 +10,7 @@ import { GameWalletLoadSection } from "@/components/games/game-wallet-load-secti
 import { createClient } from "@/lib/supabase/client";
 import { getMyGameAccount } from "@/lib/actions/game-loads";
 import { GAME_BONUS_RULES, UPCOMING_GAME_MESSAGE, type Game } from "@/lib/games";
+import { bonusDetailLines } from "@/lib/payments/game-bonus-offer";
 import { gamePublicFacts, relatedPublicGames } from "@/lib/seo/game-facts";
 import { toast } from "sonner";
 
@@ -143,6 +144,16 @@ export function GameLandingClient({
   }, [autoCreate, walletLoadEnabled, providerReady, accountStatus]);
 
   const rules = GAME_BONUS_RULES;
+  const bonusLines = bonusDetailLines({
+    firstDepositBonusPercent: game.firstDepositBonusPercent ?? null,
+    reloadBonusPercent: game.reloadBonusPercent ?? null,
+    bonusEnabled: game.bonusEnabled,
+    minDeposit: game.bonusMinDeposit,
+    maxBonusAmount: game.bonusMaxAmount,
+    startsAt: game.bonusStartsAt,
+    endsAt: game.bonusEndsAt,
+  });
+  const bonusCopy = bonusLines.join(" ") || "This room's deposit bonus is shown here when the game list has loaded it.";
   const hasAccount = accountStatus === "has" || Boolean(resolvedAccount?.game_username);
 
   const createModal = (
@@ -215,7 +226,7 @@ export function GameLandingClient({
               <ChevronDown className="h-4 w-4" />
             </summary>
             <p className="px-4 pb-4 text-sm leading-relaxed text-[#b9b3c6]">
-              Loads start at ${rules.minDeposit}. Move winnings after they reach {rules.redeemMin}× your latest load, up to {rules.redeemMax}×. First load bonus {rules.firstTimeBonus}%. Later loads {rules.regularBonus}%.
+              Loads start at ${rules.minDeposit}. Move winnings after they reach {rules.redeemMin}× your latest load, up to {rules.redeemMax}×. {bonusCopy}
             </p>
           </details>
         </section>
@@ -229,8 +240,8 @@ export function GameLandingClient({
         <div className="space-y-3 px-4 pb-4 text-sm leading-relaxed text-[#b9b3c6]">
           <p>
             Loads start at <strong className="text-[#fcf9fb]">${rules.minDeposit}</strong>. Move winnings after they reach{" "}
-            <strong className="text-[#fcf9fb]">{rules.redeemMin}×</strong> your latest load, up to {rules.redeemMax}×.
-            First load bonus {rules.firstTimeBonus}%. Later loads {rules.regularBonus}%.
+            <strong className="text-[#fcf9fb]">{rules.redeemMin}×</strong> your latest load, up to {rules.redeemMax}×.{" "}
+            {bonusCopy}
           </p>
           <p>{game.bio}</p>
           <h2 className="pt-2 text-sm font-black text-[#fcf9fb]">About this room</h2>

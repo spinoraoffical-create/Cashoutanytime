@@ -6,7 +6,9 @@ import { missedAuditMessage } from "@/lib/admin/audit-result";
 import { logIncident } from "@/lib/observability/incident";
 import { fulfillTrackedRequest } from "@/lib/game-automation/fulfill-tracked-request";
 import { assignPlayerToAgentByCode } from "@/lib/agents/assign";
-import { bonusForPercent, depositKind } from "@/lib/payments/bonus-math";
+import { depositKind } from "@/lib/payments/bonus-math";
+import { offerIsLive, quoteBonus } from "@/lib/payments/game-bonus-offer";
+import { tryGrantDepositCoins } from "@/lib/rewards/deposit-loyalty";
 import { realValueDenial } from "@/lib/compliance/real-value";
 import { wholeCoinAmount } from "@/lib/payments/whole-coin";
 import { ensureGameAccountUsername, generateGamePassword } from "@/lib/game-automation/account-username";
@@ -162,6 +164,30 @@ type QuoteRow = {
   base_amount: number | null;
 };
 
+type GameBonusRow = {
+  name?: string;
+  first_deposit_bonus_percent?: number | null;
+  reload_bonus_percent?: number | null;
+  bonus_enabled?: boolean | null;
+  bonus_min_deposit?: number | null;
+  bonus_max_amount?: number | null;
+  bonus_starts_at?: string | null;
+  bonus_ends_at?: string | null;
+};
+
+async function readGameBonus(admin: Admin, slug: string): Promise<GameBonusRow | null> {
+  const base = "name, first_deposit_bonus_percent, reload_bonus_percent";
+  const extra = ", bonus_enabled, bonus_min_deposit, bonus_max_amount, bonus_starts_at, bonus_ends_at";
+  const extended = await admin.from("games").select(base + extra).eq("slug", slug).maybeSingle();
+  const chosen =
+    extended.error &&
+    /bonus_enabled|bonus_min_deposit|bonus_max_amount|bonus_starts_at|bonus_ends_at|schema cache|column/i.test(extended.error.message)
+      ? await admin.from("games").select(base).eq("slug", slug).maybeSingle()
+      : extended;
+  if (chosen.error) throw migrationError(chosen.error);
+  return (chosen.data ?? null) as GameBonusRow | null;
+}
+
 export async function quotePaidDeposit(
   admin: Admin,
   input: {
@@ -223,21 +249,22 @@ export async function quotePaidDeposit(
     .not("final_credit", "is", null);
   if (lockedError) throw migrationError(lockedError);
   const kind = depositKind((count ?? 0) + (lockedFirst ?? 0));
-  const { data: game, error: gameError } = await admin
-    .from("games")
-    .select("name, first_deposit_bonus_percent, reload_bonus_percent")
-    .eq("slug", gameSlug)
-    .maybeSingle();
-  if (gameError) throw migrationError(gameError);
-  if (!game) throw new PaymentIdentityError("Payment intent or game is missing");
-  const stored = game as { name?: string; first_deposit_bonus_percent?: number; reload_bonus_percent?: number };
-  const percent = Number(kind === "first" ? stored.first_deposit_bonus_percent : stored.reload_bonus_percent);
-  if (!Number.isFinite(percent)) {
-    throw new PaymentIdentityError("Apply supabase/migrations/20261008000130_auto_ops.sql before crediting deposits.");
-  }
+  const stored = await readGameBonus(admin, gameSlug);
+  if (!stored) throw new PaymentIdentityError("Payment intent or game is missing");
   const offered = Number(input.baseAmount);
   const paidBase = Math.min(savedBase, Number.isFinite(offered) && offered > 0 ? offered : savedBase);
-  const priced = bonusForPercent(paidBase, percent);
+  const priced = quoteBonus({
+    paid: paidBase,
+    kind,
+    firstDepositBonusPercent: Number(stored.first_deposit_bonus_percent),
+    reloadBonusPercent: Number(stored.reload_bonus_percent),
+    bonusEnabled: stored.bonus_enabled !== false && offerIsLive({ startsAt: stored.bonus_starts_at, endsAt: stored.bonus_ends_at }),
+    minDeposit: stored.bonus_min_deposit,
+    maxBonusAmount: stored.bonus_max_amount,
+  });
+  if (!priced) {
+    throw new PaymentIdentityError("Apply supabase/migrations/20261008000130_auto_ops.sql before crediting deposits.");
+  }
   let quote: DepositQuote = {
     gameSlug,
     gameName: stored.name || row.game_name,
@@ -253,9 +280,16 @@ export async function quotePaidDeposit(
     locked = await lockQuote(admin, provider, input.depositId, quote);
   } catch (err) {
     if (!(err instanceof FirstDepositTaken) || kind !== "first") throw err;
-    const reloadPercent = Number(stored.reload_bonus_percent);
-    if (!Number.isFinite(reloadPercent)) throw err;
-    const reload = bonusForPercent(paidBase, reloadPercent);
+    const reload = quoteBonus({
+      paid: paidBase,
+      kind: "reload",
+      firstDepositBonusPercent: Number(stored.first_deposit_bonus_percent),
+      reloadBonusPercent: Number(stored.reload_bonus_percent),
+      bonusEnabled: stored.bonus_enabled !== false && offerIsLive({ startsAt: stored.bonus_starts_at, endsAt: stored.bonus_ends_at }),
+      minDeposit: stored.bonus_min_deposit,
+      maxBonusAmount: stored.bonus_max_amount,
+    });
+    if (!reload) throw err;
     quote = {
       ...quote,
       kind: "reload",
@@ -415,6 +449,9 @@ export async function settleDepositSideEffects(
   });
   if (!audited) logIncident("audit", missedAuditMessage("deposit.auto_settle"));
   await markWebhook(admin, key, "processed");
+  if (input.walletCredited) {
+    await tryGrantDepositCoins(admin, input.userId, key, input.quote.baseAmount);
+  }
 }
 
 async function loadGameOnce(

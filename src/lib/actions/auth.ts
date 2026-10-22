@@ -15,6 +15,7 @@ import { createClient } from "@/lib/supabase/server";
 import { missingProfileColumn } from "@/lib/admin/spinora-profile";
 import { registrationWriteDenial } from "@/lib/auth/registration-guard";
 import { createAdminClient } from "@/lib/supabase/admin";
+import { tryGrantLoyaltyCoins } from "@/lib/rewards/try-grant-loyalty";
 import { rateLimit } from "@/lib/rate-limit";
 import { headers } from "next/headers";
 
@@ -544,6 +545,8 @@ export async function registerWithEmail(input: {
   if (!saved.ok) {
     return { ok: false, error: saved.error ?? "Account created but phone was not saved" };
   }
+
+  await tryGrantLoyaltyCoins(data.user.id, "signup", `signup:${data.user.id}`);
 
   // Do not signOut here — it clears PKCE state and breaks the confirmation email link
   return { ok: true, email: normalizedEmail };

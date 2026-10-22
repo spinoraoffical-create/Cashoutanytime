@@ -192,6 +192,11 @@ export function OtpAuthForm({ mode, redirect = "/", referralCodeFromUrl }: OtpAu
       return;
     }
 
+    if (mode === "register") {
+      const { recordEmailVerifiedCoins } = await import("@/lib/actions/loyalty");
+      await recordEmailVerifiedCoins();
+    }
+
     if (mode === "register" && pendingPhone) {
       const saved = await saveUserContactInfo(
         pendingPhone,

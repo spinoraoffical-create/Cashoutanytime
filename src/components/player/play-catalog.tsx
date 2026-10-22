@@ -8,6 +8,7 @@ import { ChevronRight, Gamepad2, LayoutGrid, Search, SlidersHorizontal, Star } f
 import { motion } from "framer-motion";
 import { cn } from "@/lib/utils";
 import type { Game } from "@/lib/games";
+import { firstDepositBadge } from "@/lib/payments/game-bonus-offer";
 import { filterPlayCatalog } from "@/lib/games-marketing";
 import { usePlayerMotion } from "@/lib/player-motion";
 import { MotionPage } from "@/components/player/motion-page";
@@ -198,6 +199,11 @@ export function PlayCatalog({ games }: { games: Game[] }) {
                   <div className="min-w-0">
                     <p className="truncate text-sm font-bold">{g.name}</p>
                     <p className="text-[11px] text-zinc-400">{g.category}</p>
+                    {firstDepositBadge(g.firstDepositBonusPercent, g.bonusEnabled) ? (
+                      <p className="mt-1 text-[10px] font-bold leading-tight text-[#f4c64e]">
+                        {firstDepositBadge(g.firstDepositBonusPercent, g.bonusEnabled)}
+                      </p>
+                    ) : null}
                   </div>
                   <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-[#f3264f] text-white shadow-[0_8px_18px_-10px_rgba(243,38,79,0.9)]">
                     <ChevronRight className="h-4 w-4" />

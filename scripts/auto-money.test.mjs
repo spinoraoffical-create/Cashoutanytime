@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { collectedDepositAmount } from "../src/lib/payments/paydora.ts";
 import { bonusForPercent } from "../src/lib/payments/bonus-math.ts";
+import { closeRefundedRejection } from "../src/lib/game-automation/load-outcome.ts";
 
 assert.equal(collectedDepositAmount({ status: "partial", amount: 20, paidAmount: 10 }), 10);
 assert.equal(collectedDepositAmount({ status: "paid", amount: 20, paidAmount: 20 }), 20);
@@ -58,7 +59,13 @@ assert.match(stop, /x-twilio-signature/);
 
 const loads = readFileSync(new URL("../src/lib/actions/game-loads.ts", import.meta.url), "utf8");
 assert.match(loads, /finishGameLoad/);
-assert.equal(loads.includes('status: "failed"'), false);
+assert.match(loads, /refund_game_load_wallet/);
+assert.match(loads, /closeRefundedRejection/);
+assert.match(loads, /\.\.\.\(close \? \{ status: "failed" \} : \{\}\)/);
+assert.equal(closeRefundedRejection({ outcome: "confirmed_failure", loadType: "load", walletRefunded: false, status: "pending" }), false);
+assert.equal(closeRefundedRejection({ outcome: "unknown", loadType: "load", walletRefunded: true, status: "pending" }), false);
+assert.equal(closeRefundedRejection({ outcome: "confirmed_failure", loadType: "redeem", walletRefunded: true, status: "pending" }), false);
+assert.equal(closeRefundedRejection({ outcome: "confirmed_failure", loadType: "load", walletRefunded: true, status: "pending" }), true);
 
 const wallet = readFileSync(new URL("../src/app/dashboard/wallet/page.tsx", import.meta.url), "utf8");
 assert.match(wallet, /id="add-money"/);
@@ -80,9 +87,9 @@ assert.equal(withdraw.includes("/dashboard/games"), false);
 assert.match(withdraw, /CashoutRequestForm/);
 
 const nav = readFileSync(new URL("../src/lib/admin/nav.ts", import.meta.url), "utf8");
-assert.match(nav, /href: "\/admin\/requests"[\s\S]{0,180}permission: "requests\.manage"/);
-assert.match(nav, /href: "\/admin\/failed-loads"[\s\S]{0,180}permission: "requests\.manage"/);
-assert.match(nav, /href: "\/admin\/kyc"[\s\S]{0,120}permission: "kyc\.manage"/);
+assert.match(nav, /href: "\/admin\/deposits"[\s\S]{0,240}permission: "requests\.manage"/);
+assert.match(nav, /href: "\/admin\/failed-loads"[\s\S]{0,240}permission: "requests\.manage"/);
+assert.match(nav, /href: "\/admin\/kyc", label: "Identity check", permission: "kyc\.manage"/);
 
 const debitStart = sql.indexOf("CREATE OR REPLACE FUNCTION public.debit_paydora_payout");
 const debitEnd = sql.indexOf("CREATE OR REPLACE FUNCTION public.credit_cashout_payout_void");

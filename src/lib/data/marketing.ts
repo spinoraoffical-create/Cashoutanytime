@@ -411,20 +411,36 @@ export async function getActivePromotions(): Promise<MarketingPromotion[]> {
 export type MarketingGame = Pick<
   Game,
   "id" | "slug" | "name" | "description" | "image_url" | "badge_text" | "is_featured" | "popularity" | "play_url" | "download_url"
->;
+> & {
+  first_deposit_bonus_percent?: number | null;
+  reload_bonus_percent?: number | null;
+  bonus_text?: string | null;
+  bonus_enabled?: boolean | null;
+  bonus_min_deposit?: number | null;
+  bonus_max_amount?: number | null;
+  bonus_starts_at?: string | null;
+  bonus_ends_at?: string | null;
+};
 
 async function queryActiveGames(): Promise<MarketingGame[] | null> {
   try {
     const supabase = createAdminClient() ?? createStaticClient();
-    const { data, error } = await supabase
+    const columns = "id, slug, name, description, image_url, badge_text, is_featured, popularity, play_url, download_url";
+    const bonusColumns = ", first_deposit_bonus_percent, reload_bonus_percent, bonus_text";
+    const limitColumns = ", bonus_enabled, bonus_min_deposit, bonus_max_amount, bonus_starts_at, bonus_ends_at";
+    const withLimits = await supabase
       .from("games")
-      .select(
-        "id, slug, name, description, image_url, badge_text, is_featured, popularity, play_url, download_url"
-      )
+      .select(columns + bonusColumns + limitColumns)
       .eq("is_active", true)
       .order("popularity", { ascending: false });
-    if (error || !data) return null;
-    const rows = data as MarketingGame[];
+    const withBonus = withLimits.error && /bonus_enabled|bonus_min_deposit|bonus_max_amount|bonus_starts_at|bonus_ends_at|schema cache|column/i.test(withLimits.error.message)
+      ? await supabase.from("games").select(columns + bonusColumns).eq("is_active", true).order("popularity", { ascending: false })
+      : withLimits;
+    const result = withBonus.error && /first_deposit_bonus_percent|reload_bonus_percent|bonus_text|schema cache|column/i.test(withBonus.error.message)
+      ? await supabase.from("games").select(columns).eq("is_active", true).order("popularity", { ascending: false })
+      : withBonus;
+    if (result.error || !result.data) return null;
+    const rows = result.data as unknown as MarketingGame[];
     const seen = new Set<string>();
     return rows.filter((g) => {
       const key = g.slug.trim().toLowerCase();

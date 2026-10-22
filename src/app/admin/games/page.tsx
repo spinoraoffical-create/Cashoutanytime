@@ -100,8 +100,13 @@ export default async function AdminGamesPage() {
     "id, slug, name, description, image_url, badge_text, is_featured, is_active, play_url, download_url";
   const bonusColumns =
     ", is_live, first_deposit_bonus_percent, reload_bonus_percent, bonus_text";
+  const limitColumns = ", bonus_enabled, bonus_min_deposit, bonus_max_amount, bonus_starts_at, bonus_ends_at";
+  const withLimits = await db.from("games").select(baseColumns + bonusColumns + limitColumns).order("name");
+  const gamesQuery = withLimits.error
+    ? await db.from("games").select(baseColumns + bonusColumns).order("name")
+    : withLimits;
   const [gamesResult, configsResult] = await Promise.all([
-    db.from("games").select(baseColumns + bonusColumns).order("name"),
+    Promise.resolve(gamesQuery),
     db
       .from("game_server_configs")
       .select("game_id, webhook_secret, is_enabled, api_base_url, api_username, api_password, notes"),
@@ -125,6 +130,11 @@ export default async function AdminGamesPage() {
     first_deposit_bonus_percent?: number;
     reload_bonus_percent?: number;
     bonus_text?: string | null;
+    bonus_enabled?: boolean | null;
+    bonus_min_deposit?: number | null;
+    bonus_max_amount?: number | null;
+    bonus_starts_at?: string | null;
+    bonus_ends_at?: string | null;
   }>;
   const configsData = configsResult.data;
   const configsByGameId = new Map(
@@ -207,6 +217,10 @@ export default async function AdminGamesPage() {
                   <UrlStatus label="Image URL" value={game.image_url} />
                   <p className="text-[#d5def2]">
                     First deposit {Number(game.first_deposit_bonus_percent ?? 50)}% · Reload {Number(game.reload_bonus_percent ?? 10)}%
+                  </p>
+                  <p className="text-[#9fb0d0]">
+                    Players see {Number(game.first_deposit_bonus_percent ?? 50)}% First Deposit Bonus when it is on. Deposits calculate from the same saved numbers.
+                    {game.bonus_max_amount != null ? ` Maximum bonus $${Number(game.bonus_max_amount).toFixed(2)}.` : ""}
                   </p>
                   <p className="text-[#9fb0d0]">
                     Provider connection {cfg?.is_enabled && (cfg.api_username || cfg.api_password) ? "saved" : "not saved"}
@@ -369,6 +383,26 @@ export default async function AdminGamesPage() {
                         type: "text",
                         defaultValue: game.bonus_text ?? "",
                       },
+                      {
+                        name: "bonus_enabled",
+                        label: "Bonus on",
+                        type: "switch",
+                        defaultValue: game.bonus_enabled !== false,
+                      },
+                      {
+                        name: "bonus_min_deposit",
+                        label: "Minimum deposit for this bonus (blank uses the normal deposit rules)",
+                        type: "number",
+                        defaultValue: game.bonus_min_deposit ?? "",
+                        min: 0,
+                      },
+                      {
+                        name: "bonus_max_amount",
+                        label: "Maximum bonus dollars (blank means no extra cap)",
+                        type: "number",
+                        defaultValue: game.bonus_max_amount ?? "",
+                        min: 0,
+                      },
                     ]}
                     action={async (v: Record<string, FieldValue>) => {
                       "use server";
@@ -387,6 +421,9 @@ export default async function AdminGamesPage() {
                         first_deposit_bonus_percent: Number(v.first_deposit_bonus_percent ?? 50),
                         reload_bonus_percent: Number(v.reload_bonus_percent ?? 10),
                         bonus_text: String(v.bonus_text ?? ""),
+                        bonus_enabled: v.bonus_enabled !== false,
+                        bonus_min_deposit: v.bonus_min_deposit === "" || v.bonus_min_deposit == null ? null : Number(v.bonus_min_deposit),
+                        bonus_max_amount: v.bonus_max_amount === "" || v.bonus_max_amount == null ? null : Number(v.bonus_max_amount),
                       });
                     }}
                   />

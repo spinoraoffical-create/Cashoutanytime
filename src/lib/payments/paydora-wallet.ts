@@ -322,7 +322,7 @@ export async function reversePaydoraDeposit(input: {
   if (!admin) throw new Error("Admin client unavailable");
   const { data: ledger, error: ledgerError } = await admin
     .from("deposit_bonus_ledger")
-    .select("user_id, final_credit")
+    .select("user_id, final_credit, base_amount")
     .eq("deposit_key", input.depositId)
     .maybeSingle();
   if (ledgerError) {
@@ -332,7 +332,7 @@ export async function reversePaydoraDeposit(input: {
         : ledgerError.message
     );
   }
-  const saved = ledger as { user_id?: string; final_credit?: number } | null;
+  const saved = ledger as { user_id?: string; final_credit?: number; base_amount?: number } | null;
   const finalCredit = Number(saved?.final_credit);
   if (!saved?.user_id || !Number.isFinite(finalCredit) || finalCredit <= 0) {
     throw new PaymentIdentityError("Bonus ledger final credit is missing");
@@ -358,6 +358,8 @@ export async function reversePaydoraDeposit(input: {
         after: { finalCredit: amount },
       });
       if (!audited) logIncident("audit", missedAuditMessage("deposit.refund"));
+      const { tryReverseDepositCoins } = await import("@/lib/rewards/deposit-loyalty");
+      await tryReverseDepositCoins(admin, input.depositId, `refund:${input.depositId}`, Number(saved.base_amount));
     }
     return {
       reversed: Boolean(row.reversed),

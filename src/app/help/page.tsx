@@ -84,7 +84,7 @@ const FALLBACK = [
     id: "bonus",
     category: "rewards",
     question: "Do new players get a welcome bonus?",
-    answer: `The first load bonus is ${GAME_BONUS_RULES.firstTimeBonus}%. Later loads are ${GAME_BONUS_RULES.regularBonus}%.`,
+    answer: "Each game has its own first-deposit and later-deposit bonus. The game card, the game page, and the deposit credit all use the percentage saved for that game.",
   },
 ];
 

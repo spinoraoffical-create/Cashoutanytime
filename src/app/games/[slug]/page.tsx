@@ -20,10 +20,23 @@ interface GamePageProps {
 
 async function visibleGame(slug: string): Promise<Game | null> {
   if (!(await gameIsActive(slug))) return null;
-  const local = getGameBySlug(slug);
-  if (local) return local;
   const key = canonicalGameSlug(slug);
-  return marketingGamesToCards(await getGames()).find((game) => canonicalGameSlug(game.slug) === key) ?? null;
+  const stored = marketingGamesToCards(await getGames()).find((game) => canonicalGameSlug(game.slug) === key) ?? null;
+  const local = getGameBySlug(slug);
+  if (local) {
+    return {
+      ...local,
+      firstDepositBonusPercent: stored?.firstDepositBonusPercent ?? null,
+      reloadBonusPercent: stored?.reloadBonusPercent ?? null,
+      bonusText: stored?.bonusText ?? null,
+      bonusEnabled: stored?.bonusEnabled ?? null,
+      bonusMinDeposit: stored?.bonusMinDeposit ?? null,
+      bonusMaxAmount: stored?.bonusMaxAmount ?? null,
+      bonusStartsAt: stored?.bonusStartsAt ?? null,
+      bonusEndsAt: stored?.bonusEndsAt ?? null,
+    };
+  }
+  return stored;
 }
 
 export async function generateMetadata({ params }: GamePageProps) {

@@ -253,6 +253,11 @@ const gameSchema = z.object({
   first_deposit_bonus_percent: z.coerce.number().min(0).max(200).optional().default(50),
   reload_bonus_percent: z.coerce.number().min(0).max(200).optional().default(10),
   bonus_text: z.string().trim().max(240).optional().default(""),
+  bonus_enabled: z.boolean().optional().default(true),
+  bonus_min_deposit: z.number().min(0).max(100000).nullable().optional(),
+  bonus_max_amount: z.number().min(0).max(100000).nullable().optional(),
+  bonus_starts_at: z.string().trim().max(40).nullable().optional(),
+  bonus_ends_at: z.string().trim().max(40).nullable().optional(),
 });
 
 export async function upsertGameAction(
@@ -299,7 +304,19 @@ export async function upsertGameAction(
     after: patch,
   });
 
+  const limits = {
+    bonus_enabled: parsed.data.bonus_enabled,
+    bonus_min_deposit: parsed.data.bonus_min_deposit ?? null,
+    bonus_max_amount: parsed.data.bonus_max_amount ?? null,
+    bonus_starts_at: parsed.data.bonus_starts_at || null,
+    bonus_ends_at: parsed.data.bonus_ends_at || null,
+  };
+  const limitWrite = await db.from("games").update(limits).eq("id", input.id);
   revalidateGameCatalog();
+  if (limitWrite.error && /bonus_enabled|bonus_min_deposit|bonus_max_amount|bonus_starts_at|bonus_ends_at|schema cache|column/i.test(limitWrite.error.message)) {
+    return { ok: true, message: "Game saved. Bonus caps and dates need the Coins database update before they can be stored." };
+  }
+  if (limitWrite.error) return { ok: false, error: "Could not save the bonus limits." };
   return { ok: true, message: "Game saved." };
 }
 

@@ -15,6 +15,15 @@ export interface Game {
   upcoming?: boolean;
   promotional?: boolean;
   topRated?: boolean;
+  /** Saved in games.first_deposit_bonus_percent. Absent when the catalog did not load it. */
+  firstDepositBonusPercent?: number | null;
+  reloadBonusPercent?: number | null;
+  bonusText?: string | null;
+  bonusEnabled?: boolean | null;
+  bonusMinDeposit?: number | null;
+  bonusMaxAmount?: number | null;
+  bonusStartsAt?: string | null;
+  bonusEndsAt?: string | null;
 }
 
 /** Shared bonus & load rules shown on every game landing page */

@@ -16,6 +16,7 @@ import {
 } from "@/components/ui/table";
 import { adminDb } from "@/lib/actions/admin/core";
 import { updateRewardRuleAction } from "@/lib/actions/admin/economy";
+import { LoyaltyCoinsAdmin } from "@/components/admin/loyalty-coins-admin";
 import { requirePermission } from "@/lib/data/admin";
 
 export const metadata: Metadata = { title: "Rewards" };
@@ -44,7 +45,7 @@ export default async function AdminRewardsPage() {
     <div className="mx-auto max-w-5xl">
       <AdminPageHeader
         title="Rewards"
-        description="Tune the coins, XP and availability of every reward stream. Changes apply to future claims immediately."
+        description="The table below is the older reward catalog. Its coin numbers do not pay the $1 freeplay claim and are not player Coins. Use the Coins section for the new rewards."
       />
 
       <div className="overflow-hidden rounded-2xl border border-[#7c3aed]/25 bg-[#0d1428]">
@@ -116,6 +117,7 @@ export default async function AdminRewardsPage() {
           </Table>
         </div>
       </div>
+      <LoyaltyCoinsAdmin />
     </div>
   );
 }
