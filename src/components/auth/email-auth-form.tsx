@@ -94,6 +94,13 @@ function EmailCodeForm({ email, redirect }: { email: string; redirect: string })
       /* The email is already confirmed. The phone remains on the profile. */
     }
 
+    try {
+      const { recordEmailVerifiedCoins } = await import("@/lib/actions/loyalty");
+      await recordEmailVerifiedCoins();
+    } catch {
+      /* The email is confirmed. Coins stay off when that reward is disabled. */
+    }
+
     toast.success("Email verified.");
     trackPublicEvent("signup_completed");
     router.push(redirect);

@@ -690,6 +690,13 @@ export async function finalizeRegistrationAfterSignUp(input: {
     /* The account is already saved. A queued alert stays for the daily cron. */
   }
 
+  try {
+    const { tryGrantLoyaltyCoins } = await import("@/lib/rewards/try-grant-loyalty");
+    await tryGrantLoyaltyCoins(input.userId, "signup", `signup:${input.userId}`);
+  } catch {
+    /* Registration stays saved when Coins are off or the ledger is unavailable. */
+  }
+
   return { ok: true };
 }
 

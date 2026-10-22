@@ -6,6 +6,7 @@ import { pickLoginDestination, signedInUsesAdminHome } from "@/lib/auth/account-
 import { decodeOAuthNext, OAUTH_NEXT_COOKIE, oauthLoginError } from "@/lib/auth/oauth-return";
 import { withAuthCookieDomain } from "@/lib/supabase/cookie-domain";
 import { syncProfileFromAuthMetadata } from "@/lib/actions/auth";
+import { recordEmailVerifiedCoins } from "@/lib/actions/loyalty";
 import { linkSignupSecurity } from "@/lib/actions/security";
 
 function publicOrigin(request: NextRequest) {
@@ -120,6 +121,14 @@ export async function GET(request: NextRequest) {
     await syncProfileFromAuthMetadata();
   } catch (err) {
     console.error("auth callback profile sync:", err);
+  }
+
+  if (type === "signup") {
+    try {
+      await recordEmailVerifiedCoins();
+    } catch (err) {
+      console.error("auth callback email coins:", err);
+    }
   }
 
   const {
