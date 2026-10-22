@@ -70,7 +70,7 @@ try {
       raw_user_meta_data jsonb
     );
     CREATE TABLE auth.sessions (id uuid PRIMARY KEY, user_id uuid);
-    CREATE TABLE auth.refresh_tokens (id uuid PRIMARY KEY, user_id uuid, session_id uuid);
+    CREATE TABLE auth.refresh_tokens (id uuid PRIMARY KEY, user_id character varying, session_id uuid);
     CREATE TABLE auth.identities (id uuid PRIMARY KEY, user_id uuid, email text);
     CREATE TABLE public.payment_intents (id uuid PRIMARY KEY DEFAULT gen_random_uuid(), user_id uuid);
     CREATE TABLE public.paydora_payout_requests (id uuid PRIMARY KEY DEFAULT gen_random_uuid(), user_id uuid);
@@ -134,6 +134,7 @@ try {
     "supabase/migrations/20261022000200_loyalty_completion.sql",
     "supabase/migrations/20261022000300_account_lifecycle.sql",
     "supabase/migrations/20261022000400_account_close_fix.sql",
+    "supabase/migrations/20261022000500_account_close_session_cast.sql",
   ]) {
     await sql.unsafe(readFileSync(path.join(root, file), "utf8"));
   }
